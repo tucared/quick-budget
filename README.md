@@ -55,22 +55,6 @@ npm run build               # Build for production
 npm run lint                # Run ESLint
 ```
 
-## Troubleshooting
-
-**"Cannot connect to Docker daemon"**
-- Ensure Docker Desktop is running
-
-**"Port already in use"**
-- Check ports 54321-54324 are available
-- Stop other Supabase instances: `supabase stop`
-
-**Auth or data issues**
-- Reset database: `supabase db reset`
-
-**Environment variables not loading**
-- Ensure `.env.local` exists with correct values
-- Restart dev server: `npm run dev`
-
 ## Project Structure
 
 ```
@@ -117,10 +101,6 @@ supabase db reset
 # Push to production (see DEPLOYMENT.md)
 supabase db push
 ```
-
-## Production Deployment
-
-See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for production deployment instructions.
 
 ## Other Documentation
 
