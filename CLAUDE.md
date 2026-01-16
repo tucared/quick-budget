@@ -1,5 +1,10 @@
 # Project guidelines
 
-- Always look at @PROGRESS.md to see the current JTBD being implemented
-- When finishing a JTBD, mark its status as Complete the @PROGRESS.md
-- Read the @DATA_MODEL.md when planning for data changes
+- Read @PROGRESS.md when JTBD are mentionned
+- Read @DATA_MODEL.md when planning for data changes
+- Read @README.md to know about the stack and how to launch server
+- Keep all *.md files mentionned up to date when you perform changes or see drift
+
+# Development guidelines
+
+- Use Playwright MCP to verify your changes before commiting
