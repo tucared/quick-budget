@@ -12,7 +12,19 @@
       "Bash(supabase status:*)",
       "Bash(psql:*)",
       "Bash(supabase db reset:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(lsof:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_install",
+      "Bash(xargs kill -9)",
+      "Bash(supabase logs:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__generate_typescript_types",
+      "mcp__supabase__get_advisors",
+      "mcp__supabase__list_migrations"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
