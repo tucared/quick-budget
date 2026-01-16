@@ -1,115 +1,54 @@
-# quick-budget
+# Quick Budget
 
-Fast expense tracking and flexible budgeting for partners who share finances.
+Fast expense tracking and flexible budgeting for partners.
 
-## Description
-
-A personal finance app designed for busy couples to track spending in seconds, manage fair allowances, rebalance budgets mid-month, and anticipate irregular bills without friction.
-
-## Quick Start (Local Development)
-
-Get up and running in under 5 minutes:
+## Quick Start
 
 ```bash
-# 1. Install dependencies
+# Install dependencies
 npm install
 
-# 2. Start local Supabase (requires Docker Desktop)
+# Start Supabase (requires Docker Desktop running)
 supabase start
 
-# 3. Start Next.js dev server
+# Start app
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and log in with a test account!
+Visit http://localhost:3000
 
-### Test Accounts (Pre-seeded)
+### Test Accounts
 
-- **User 1**: user1@test.com / password123
-- **User 2**: user2@test.com / password123
+- user1@test.com / password123
+- user2@test.com / password123
 
-### What You Get Out of the Box
+## Key Commands
 
-- ✅ Full local development environment (no cloud account needed)
-- ✅ PostgreSQL database with migrations auto-applied
-- ✅ 2 pre-seeded test user accounts with sample data
-- ✅ 10+ pre-seeded expense categories
-- ✅ Authentication (email/password)
-- ✅ Real-time expense updates
-- ✅ Database UI at [http://localhost:54323](http://localhost:54323) (Supabase Studio)
+```bash
+# Database
+supabase start          # Start Supabase
+supabase stop           # Stop Supabase
+supabase db reset       # Reset database (reapply migrations + seed)
+supabase status         # View connection info
 
-### Prerequisites
+# Development
+npm run dev             # Start dev server
+npm run build           # Build for production
+npm run lint            # Run linter
 
-- Node.js 18+
-- Docker Desktop ([Download here](https://docs.docker.com/desktop/))
-- Supabase CLI (install via `brew install supabase/tap/supabase`)
+# Database UI
+open http://localhost:54323   # Supabase Studio
+```
 
-See **[SETUP.md](./SETUP.md)** for detailed setup instructions, deployment guides, and troubleshooting.
+## Stack
 
-## Technologies
-
-- **Frontend**: Next.js 14+ (App Router) + TypeScript + Tailwind CSS
-- **Backend**: Supabase (PostgreSQL + Auth + Real-time)
-- **UI Library**: shadcn/ui
-- **Forms**: React Hook Form + Zod
-- **Deployment**: Vercel
-
-## Features (JTBD #17 Complete)
-
-- ⚡ **Frictionless Logging**: Add expenses in under 10 seconds
-- 🧠 **Smart Defaults**: Remembers your last category, account, and currency
-- 📝 **Batch Entry**: Form stays open for quick consecutive entries
-- 🔄 **Real-time Updates**: See your expenses appear instantly
-- 📱 **Mobile-First**: Optimized for on-the-go expense tracking
-- 🎯 **Auto-onboarding**: Default account created automatically for new users
-
-## Project Status
-
-See **[PROGRESS.md](./PROGRESS.md)** for the full roadmap and implementation status.
-
-**Current Status**: JTBD #17 (Frictionless Expense Logging) ✅ Complete
-
-**Next Up**:
-- JTBD #1-5: Monthly planning & budget setting
-- JTBD #6-9: Monthly review & progress tracking
-- JTBD #19: Foreign currency conversion
+- Next.js 14 + TypeScript + Tailwind CSS
+- Supabase (PostgreSQL + Auth + Real-time)
+- shadcn/ui components
+- React Hook Form + Zod
 
 ## Documentation
 
-- **[SETUP.md](./SETUP.md)** - Complete setup guide (local & production)
-- **[DATA_MODEL.md](./DATA_MODEL.md)** - Database schema and design decisions
-- **[PROGRESS.md](./PROGRESS.md)** - Development roadmap and JTBD tracking
-- **[JTBD.md](./JTBD.md)** - Jobs To Be Done (user requirements)
-
-## Development Commands
-
-```bash
-# Start local Supabase
-supabase start
-
-# Start Next.js dev server
-npm run dev
-
-# Build for production
-npm run build
-
-# Run linter
-npm run lint
-
-# Stop local Supabase
-supabase stop
-
-# Reset database (reapply migrations)
-supabase db reset
-
-# View Supabase status
-supabase status
-```
-
-## Contributing
-
-This is a personal project, but feedback and suggestions are welcome! Open an issue to discuss any changes.
-
-## License
-
-Private project - All rights reserved.
+- [SETUP.md](./SETUP.md) - Detailed setup and deployment
+- [DATA_MODEL.md](./DATA_MODEL.md) - Database schema
+- [PROGRESS.md](./PROGRESS.md) - Development roadmap
