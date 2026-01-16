@@ -21,12 +21,18 @@ supabase start
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign up to start tracking expenses!
+Open [http://localhost:3000](http://localhost:3000) and log in with a test account!
+
+### Test Accounts (Pre-seeded)
+
+- **User 1**: user1@test.com / password123
+- **User 2**: user2@test.com / password123
 
 ### What You Get Out of the Box
 
 - ✅ Full local development environment (no cloud account needed)
 - ✅ PostgreSQL database with migrations auto-applied
+- ✅ 2 pre-seeded test user accounts with sample data
 - ✅ 10+ pre-seeded expense categories
 - ✅ Authentication (email/password)
 - ✅ Real-time expense updates

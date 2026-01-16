@@ -88,8 +88,13 @@ Visit [http://localhost:54323](http://localhost:54323) to access Supabase Studio
 
 ## Testing the App
 
-1. **Sign Up**: Create a new account at `/signup`
-2. **Automatic Onboarding**: A default "Primary Account" is automatically created for you
+The local database is pre-seeded with 2 test accounts:
+
+- **User 1**: user1@test.com / password123
+- **User 2**: user2@test.com / password123
+
+1. **Log In**: Visit http://localhost:3000 and log in with either test account
+2. **Sample Data**: Each user has pre-configured accounts and sample expenses
 3. **Add Expenses**: Navigate to `/expenses` and start logging expenses
 4. **Batch Entry Test**: Add 5 expenses in a row to test the stay-open-after-save feature
 5. **Smart Defaults**: Notice how the category and account persist between entries
@@ -315,13 +320,22 @@ This creates a new file in `supabase/migrations/`. Edit it to add your SQL chang
 
 **Local:**
 ```bash
-supabase db reset  # Resets and reapplies all migrations
+supabase db reset  # Resets and reapplies all migrations + seed data
 ```
 
 **Production:**
 ```bash
 supabase db push  # Pushes new migrations to linked project
 ```
+
+### Seed Data
+
+The `supabase/seed.sql` file contains test data for local development:
+- 2 pre-configured user accounts
+- Sample expenses and accounts for each user
+- Runs automatically after migrations during `supabase db reset`
+
+**Note:** Seed data is for local development only and should NOT be pushed to production.
 
 ## Next Steps
 

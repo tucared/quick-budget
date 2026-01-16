@@ -63,8 +63,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url))
   }
 
-  // Redirect to expenses if already logged in and trying to access login/signup
-  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup")) {
+  // Redirect to expenses if already logged in and trying to access login
+  if (user && request.nextUrl.pathname === "/login") {
     return NextResponse.redirect(new URL("/expenses", request.url))
   }
 
