@@ -6,7 +6,13 @@
       "Bash(npm install:*)",
       "Bash(jj st:*)",
       "Bash(jj commit:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(supabase init:*)",
+      "Bash(supabase start:*)",
+      "Bash(supabase status:*)",
+      "Bash(psql:*)",
+      "Bash(supabase db reset:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }
