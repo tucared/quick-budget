@@ -88,16 +88,3 @@ When logging an expense in BRL, I want to enter the amount I actually paid, so I
 
 ### [ ] JTBD #20: Import historical data from current app
 When setting up the new system, I want to import my expense and budget data from CSV exports of my current app, so I have continuity of my financial history and can see trends without starting from zero
-
----
-
-## Technical Foundation Checklist
-
-Track infrastructure work that enables multiple JTBDs:
-
-- [x] Next.js app structure with frontend & backend (single repo, not monorepo)
-- [x] Supabase project setup (database + auth)
-- [x] Database schema v1 (accounts, expenses, categories, users)
-- [ ] Multi-user auth (partner access to shared budget) - Deferred to JTBD #7
-- [x] Deployment pipeline (Vercel-ready)
-- [x] UI component library (shadcn/ui)
