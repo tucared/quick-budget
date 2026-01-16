@@ -1,0 +1,84 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase"
+import { ExpenseForm } from "@/components/expense-form"
+import { ExpenseList } from "@/components/expense-list"
+import { Button } from "@/components/ui/button"
+
+export default function ExpensesPage() {
+  const router = useRouter()
+  const [userName, setUserName] = useState<string>("")
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        // Try to get full name from users table
+        const { data: userData } = await supabase
+          .from("users")
+          .select("full_name")
+          .eq("id", user.id)
+          .single()
+
+        if (userData?.full_name) {
+          setUserName(userData.full_name)
+        } else {
+          setUserName(user.email?.split("@")[0] || "")
+        }
+      }
+    }
+
+    loadUser()
+  }, [])
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/")
+    router.refresh()
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-background border-b">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Quick Budget</h1>
+            {userName && (
+              <p className="text-sm text-muted-foreground">
+                Welcome, {userName}
+              </p>
+            )}
+          </div>
+          <Button variant="outline" onClick={handleLogout}>
+            Log Out
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 max-w-2xl">
+        {/* Expense Form - Sticky at top */}
+        <div className="mb-8 bg-background">
+          <div className="bg-card border rounded-lg p-6 shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Add Expense</h2>
+            <ExpenseForm onSuccess={() => setRefreshKey((prev) => prev + 1)} />
+          </div>
+        </div>
+
+        {/* Recent Expenses List */}
+        <div key={refreshKey}>
+          <ExpenseList />
+        </div>
+      </main>
+    </div>
+  )
+}

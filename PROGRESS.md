@@ -73,7 +73,7 @@ When I see a category running out faster than expected, I want to review the ind
 
 ## Expense Logging & Tracking
 
-### [ ] JTBD #17: Log expenses without friction, even when catching up
+### [x] JTBD #17: Log expenses without friction, even when catching up
 When I've spent money (whether just now or earlier today), I want to log it in seconds without interrupting what I'm doing, so it doesn't feel like a chore even if I have a few to enter
 
 ### [ ] JTBD #18: Stay accountable to each other
@@ -95,9 +95,9 @@ When setting up the new system, I want to import my expense and budget data from
 
 Track infrastructure work that enables multiple JTBDs:
 
-- [ ] Monorepo structure with frontend & backend
-- [ ] Supabase project setup (database + auth)
-- [ ] Database schema v1 (accounts, budgets, expenses, categories)
-- [ ] Multi-user auth (partner access to shared budget)
-- [ ] Deployment pipeline (Vercel or similar)
-- [ ] UI component library (shadcn/ui, MUI, or similar)
+- [x] Next.js app structure with frontend & backend (single repo, not monorepo)
+- [x] Supabase project setup (database + auth)
+- [x] Database schema v1 (accounts, expenses, categories, users)
+- [ ] Multi-user auth (partner access to shared budget) - Deferred to JTBD #7
+- [x] Deployment pipeline (Vercel-ready)
+- [x] UI component library (shadcn/ui)
