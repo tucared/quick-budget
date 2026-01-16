@@ -1,6 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr"
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
-import { cookies } from "next/headers"
 
 // Browser client for use in client components
 export function createClient() {
@@ -12,6 +11,7 @@ export function createClient() {
 
 // Server client for use in server components and API routes
 export async function createServerSupabaseClient() {
+  const { cookies } = await import("next/headers")
   const cookieStore = await cookies()
 
   return createServerClient(
