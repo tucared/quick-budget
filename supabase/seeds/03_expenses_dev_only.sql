@@ -1,10 +1,12 @@
--- Seed file for local development
--- Creates 2 test user accounts with sample data
+-- ============================================================================
+-- DEVELOPMENT ONLY: Sample Expenses for Testing
+-- ============================================================================
+-- This file contains sample expense data for local development and testing.
+-- DO NOT run this in production - expenses will be logged via the app.
+--
+-- This runs automatically in local dev via `supabase db reset`.
+-- ============================================================================
 
--- Note: This seed file is for LOCAL DEVELOPMENT ONLY
--- Password for all users: password123
-
--- User IDs (fixed UUIDs for consistency)
 DO $$
 DECLARE
   user1_id UUID := '00000000-0000-0000-0000-000000000001';
@@ -15,69 +17,7 @@ DECLARE
   dining_cat_id UUID;
   transport_cat_id UUID;
 BEGIN
-  -- Insert test users into auth.users
-  -- Password hash for 'password123' using Supabase's auth
-  INSERT INTO auth.users (
-    id,
-    instance_id,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    created_at,
-    updated_at,
-    raw_app_meta_data,
-    raw_user_meta_data,
-    aud,
-    role
-  ) VALUES (
-    user1_id,
-    '00000000-0000-0000-0000-000000000000',
-    'user1@test.com',
-    '$2a$10$VN9pMl7hYqB9z8mVYqK3k.GHVT0LqNOhvz3lkJSR9L7.0iYg5Kvgm', -- bcrypt hash of 'password123'
-    NOW(),
-    NOW(),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Test User 1"}',
-    'authenticated',
-    'authenticated'
-  ), (
-    user2_id,
-    '00000000-0000-0000-0000-000000000000',
-    'user2@test.com',
-    '$2a$10$VN9pMl7hYqB9z8mVYqK3k.GHVT0LqNOhvz3lkJSR9L7.0iYg5Kvgm', -- bcrypt hash of 'password123'
-    NOW(),
-    NOW(),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Test User 2"}',
-    'authenticated',
-    'authenticated'
-  )
-  ON CONFLICT (id) DO NOTHING;
-
-  -- Insert into public.users (this would normally be done by trigger, but we're being explicit)
-  INSERT INTO public.users (id, email, full_name, created_at, updated_at)
-  VALUES
-    (user1_id, 'user1@test.com', 'Test User 1', NOW(), NOW()),
-    (user2_id, 'user2@test.com', 'Test User 2', NOW(), NOW())
-  ON CONFLICT (id) DO NOTHING;
-
-  -- Insert accounts for User 1
-  INSERT INTO public.accounts (id, user_id, name, account_type, currency, is_default, is_active)
-  VALUES
-    (gen_random_uuid(), user1_id, 'Credit Card', 'credit_card', 'USD', true, true),
-    (gen_random_uuid(), user1_id, 'Cash', 'cash', 'USD', false, true)
-  ON CONFLICT DO NOTHING;
-
-  -- Insert accounts for User 2
-  INSERT INTO public.accounts (id, user_id, name, account_type, currency, is_default, is_active)
-  VALUES
-    (gen_random_uuid(), user2_id, 'Debit Card', 'debit_card', 'USD', true, true),
-    (gen_random_uuid(), user2_id, 'Savings', 'bank_account', 'USD', false, true)
-  ON CONFLICT DO NOTHING;
-
-  -- Get category IDs for sample expenses
+  -- Get category IDs
   SELECT id INTO groceries_cat_id FROM public.categories WHERE name = 'Groceries' LIMIT 1;
   SELECT id INTO dining_cat_id FROM public.categories WHERE name = 'Dining Out' LIMIT 1;
   SELECT id INTO transport_cat_id FROM public.categories WHERE name = 'Transportation' LIMIT 1;
@@ -117,11 +57,11 @@ BEGIN
 
 END $$;
 
--- Display seed summary
+-- Display seed summary for local development
 DO $$
 BEGIN
   RAISE NOTICE '========================================';
-  RAISE NOTICE 'Seed data loaded successfully!';
+  RAISE NOTICE 'Development seed data loaded!';
   RAISE NOTICE '========================================';
   RAISE NOTICE 'Test Accounts:';
   RAISE NOTICE '  User 1: user1@test.com / password123';
