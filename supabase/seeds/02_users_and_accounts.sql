@@ -25,34 +25,55 @@ BEGIN
     email,
     encrypted_password,
     email_confirmed_at,
+    confirmation_token,
+    recovery_token,
+    email_change_token_current,
+    email_change_token_new,
+    email_change,
     created_at,
     updated_at,
     raw_app_meta_data,
     raw_user_meta_data,
+    is_sso_user,
+    is_anonymous,
     aud,
     role
   ) VALUES (
     user1_id,
     '00000000-0000-0000-0000-000000000000',
     'user1@test.com',  -- CHANGE THIS IN PRODUCTION
-    '$2a$10$VN9pMl7hYqB9z8mVYqK3k.GHVT0LqNOhvz3lkJSR9L7.0iYg5Kvgm', -- bcrypt hash of 'password123'
+    crypt('password123', gen_salt('bf')),  -- Use crypt() for proper bcrypt hashing
     NOW(),
+    '',  -- confirmation_token
+    '',  -- recovery_token
+    '',  -- email_change_token_current
+    '',  -- email_change_token_new
+    '',  -- email_change
     NOW(),
     NOW(),
     '{"provider":"email","providers":["email"]}',
     '{"full_name":"Test User 1"}',  -- CHANGE THIS IN PRODUCTION
+    false,  -- is_sso_user
+    false,  -- is_anonymous
     'authenticated',
     'authenticated'
   ), (
     user2_id,
     '00000000-0000-0000-0000-000000000000',
     'user2@test.com',  -- CHANGE THIS IN PRODUCTION
-    '$2a$10$VN9pMl7hYqB9z8mVYqK3k.GHVT0LqNOhvz3lkJSR9L7.0iYg5Kvgm', -- bcrypt hash of 'password123'
+    crypt('password123', gen_salt('bf')),  -- Use crypt() for proper bcrypt hashing
     NOW(),
+    '',  -- confirmation_token
+    '',  -- recovery_token
+    '',  -- email_change_token_current
+    '',  -- email_change_token_new
+    '',  -- email_change
     NOW(),
     NOW(),
     '{"provider":"email","providers":["email"]}',
     '{"full_name":"Test User 2"}',  -- CHANGE THIS IN PRODUCTION
+    false,  -- is_sso_user
+    false,  -- is_anonymous
     'authenticated',
     'authenticated'
   )
