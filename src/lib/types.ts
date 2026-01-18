@@ -4,6 +4,14 @@ export interface User {
   id: string
   email: string
   full_name: string | null
+  household_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Household {
+  id: string
+  name: string
   created_at: string
   updated_at: string
 }
@@ -12,6 +20,7 @@ export type CategoryType = "monthly" | "long_term"
 
 export interface Category {
   id: string
+  household_id: string
   name: string
   category_type: CategoryType
   icon: string | null
@@ -25,7 +34,8 @@ export type AccountType = "credit_card" | "debit_card" | "bank_account" | "cash"
 
 export interface Account {
   id: string
-  user_id: string
+  household_id: string
+  owner_user_id: string
   name: string
   account_type: AccountType
   currency: string
@@ -37,9 +47,10 @@ export interface Account {
 
 export interface Expense {
   id: string
-  user_id: string
+  logged_by_user_id: string
   category_id: string | null
   account_id: string | null
+  recurring_expense_id: string | null
   amount: number
   currency: string
   converted_amount: number
@@ -47,6 +58,35 @@ export interface Expense {
   exchange_rate: number
   expense_date: string // Date in YYYY-MM-DD format
   description: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BudgetAllocation {
+  id: string
+  household_id: string
+  category_id: string
+  budget_month: string // Date in YYYY-MM-DD format (first day of month)
+  allocated_amount: number
+  currency: string
+  created_at: string
+  updated_at: string
+}
+
+export type RecurringExpenseFrequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly"
+
+export interface RecurringExpense {
+  id: string
+  household_id: string
+  category_id: string
+  account_id: string | null
+  name: string
+  amount: number
+  currency: string
+  frequency: RecurringExpenseFrequency
+  next_due_date: string // Date in YYYY-MM-DD format
+  is_active: boolean
   notes: string | null
   created_at: string
   updated_at: string

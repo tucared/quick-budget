@@ -1,28 +1,11 @@
 -- ============================================================================
--- PRODUCTION SEED: Default Categories
+-- CATEGORIES SEED (DEPRECATED)
 -- ============================================================================
--- This file contains default categories needed in production.
--- Run this manually in Supabase Studio SQL Editor for production deployment.
+-- Categories are now household-scoped and automatically seeded when a new
+-- household is created via the handle_new_user() trigger.
 --
--- For local development, this runs automatically via `supabase db reset`.
+-- For existing households created by 02_users_and_accounts.sql, categories
+-- are seeded there directly.
+--
+-- This file is kept for reference but does nothing.
 -- ============================================================================
-
--- Insert default spending categories
-INSERT INTO categories (name, category_type, icon, color) VALUES
-  ('Groceries', 'monthly', '🛒', '#22c55e'),
-  ('Dining Out', 'monthly', '🍽️', '#f59e0b'),
-  ('Transportation', 'monthly', '🚗', '#3b82f6'),
-  ('Entertainment', 'monthly', '🎬', '#a855f7'),
-  ('Shopping', 'monthly', '🛍️', '#ec4899'),
-  ('Bills & Utilities', 'monthly', '💡', '#ef4444'),
-  ('Healthcare', 'monthly', '⚕️', '#14b8a6'),
-  ('Personal Care', 'monthly', '💇', '#8b5cf6'),
-  ('Education', 'monthly', '📚', '#06b6d4'),
-  ('Other', 'monthly', '📌', '#6b7280')
-ON CONFLICT DO NOTHING;
-
--- Insert default long-term goal categories
-INSERT INTO categories (name, category_type, icon, color) VALUES
-  ('Holiday Fund', 'long_term', '✈️', '#f97316'),
-  ('Emergency Fund', 'long_term', '🏦', '#10b981')
-ON CONFLICT DO NOTHING;

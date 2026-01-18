@@ -23,7 +23,11 @@
       "mcp__supabase__get_advisors",
       "mcp__supabase__list_migrations",
       "mcp__supabase__get_logs",
-      "Bash(jj diff:*)"
+      "Bash(jj diff:*)",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_close",
+      "Bash(jj describe:*)"
     ]
   },
   "enabledMcpjsonServers": [

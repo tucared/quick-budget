@@ -115,7 +115,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       // Insert expense
       const { error: insertError } = await supabase.from("expenses").insert({
-        user_id: user.id,
+        logged_by_user_id: user.id,
         category_id: data.category_id,
         account_id: data.account_id,
         amount: data.amount,
