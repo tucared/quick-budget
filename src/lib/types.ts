@@ -74,6 +74,22 @@ export interface BudgetAllocation {
   updated_at: string
 }
 
+export interface BudgetSummary {
+  id: string
+  household_id: string
+  budget_month: string
+  category_id: string
+  category_name: string
+  category_icon: string | null
+  category_color: string | null
+  category_type: CategoryType
+  allocated_amount: number
+  currency: string
+  spent_amount: number
+  remaining_amount: number
+  percent_spent: number
+}
+
 export type RecurringExpenseFrequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly"
 
 export interface RecurringExpense {

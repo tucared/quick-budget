@@ -44,7 +44,7 @@ When I get paid for a freelance project, I want to see the impact on our net wor
 
 ## Daily Spending Decisions
 
-### [ ] JTBD #10: Check shared discretionary budget
+### [x] JTBD #10: Check shared discretionary budget
 When we're deciding whether to go out, we want to see if we have budget left in shared discretionary spending, so we can enjoy it without worry
 
 ### [ ] JTBD #11: Spend personal allowance guilt-free

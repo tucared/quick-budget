@@ -30,7 +30,13 @@
       "Bash(jj describe:*)",
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_take_screenshot",
-      "mcp__supabase__execute_sql"
+      "mcp__supabase__execute_sql",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_run_code",
+      "mcp__playwright__browser_network_requests"
     ]
   },
   "enabledMcpjsonServers": [
