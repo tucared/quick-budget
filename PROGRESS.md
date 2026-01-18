@@ -76,15 +76,18 @@ When I see a category running out faster than expected, I want to review the ind
 ### [x] JTBD #17: Log expenses without friction, even when catching up
 When I've spent money (whether just now or earlier today), I want to log it in seconds without interrupting what I'm doing, so it doesn't feel like a chore even if I have a few to enter
 
-### [ ] JTBD #18: Stay accountable to each other
+### [ ] JTBD #18: Split expenses between shared and personal
+When I have a purchase that's partly personal and partly shared (like a lunch alone where we agreed on €10 shared), I want to allocate portions to different categories, so each budget reflects only its relevant spending
+
+### [ ] JTBD #19: Stay accountable to each other
 When either of us hasn't logged any expenses in several days, we want to be notified, so we know our shared financial picture might be incomplete and trigger a catch up
 
-### [ ] JTBD #19: Enter foreign currency naturally
+### [ ] JTBD #20: Enter foreign currency naturally
 When logging an expense in BRL, I want to enter the amount I actually paid, so I don't have to calculate conversions or delay entering it
 
 ---
 
 ## Data Migration & Import
 
-### [ ] JTBD #20: Import historical data from current app
+### [ ] JTBD #21: Import historical data from current app
 When setting up the new system, I want to import my expense and budget data from CSV exports of my current app, so I have continuity of my financial history and can see trends without starting from zero
