@@ -35,3 +35,6 @@ next-env.d.ts
 
 # Playwright
 chrome/
+
+# Supabase production seeds (contain real user data)
+/supabase/seeds/prod/

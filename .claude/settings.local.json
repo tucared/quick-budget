@@ -27,7 +27,10 @@
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_close",
-      "Bash(jj describe:*)"
+      "Bash(jj describe:*)",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__supabase__execute_sql"
     ]
   },
   "enabledMcpjsonServers": [
