@@ -23,15 +23,15 @@ BEGIN
   SELECT id INTO transport_cat_id FROM public.categories WHERE name = 'Transportation' LIMIT 1;
 
   -- Get User 1's default account
-  SELECT id INTO user1_account_id FROM public.accounts WHERE user_id = user1_id AND is_default = true LIMIT 1;
+  SELECT id INTO user1_account_id FROM public.accounts WHERE owner_user_id = user1_id AND is_default = true LIMIT 1;
 
   -- Get User 2's default account
-  SELECT id INTO user2_account_id FROM public.accounts WHERE user_id = user2_id AND is_default = true LIMIT 1;
+  SELECT id INTO user2_account_id FROM public.accounts WHERE owner_user_id = user2_id AND is_default = true LIMIT 1;
 
   -- Insert sample expenses for User 1
   IF user1_account_id IS NOT NULL AND groceries_cat_id IS NOT NULL THEN
     INSERT INTO public.expenses (
-      user_id, category_id, account_id,
+      logged_by_user_id, category_id, account_id,
       amount, currency,
       converted_amount, converted_currency, exchange_rate,
       expense_date, description
@@ -45,7 +45,7 @@ BEGIN
   -- Insert sample expenses for User 2
   IF user2_account_id IS NOT NULL AND groceries_cat_id IS NOT NULL THEN
     INSERT INTO public.expenses (
-      user_id, category_id, account_id,
+      logged_by_user_id, category_id, account_id,
       amount, currency,
       converted_amount, converted_currency, exchange_rate,
       expense_date, description
