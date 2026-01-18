@@ -8,3 +8,4 @@
 # Development guidelines
 
 - Use Playwright MCP to verify your changes before commiting
+- Use Supbase MCP instead of docker for querying the db etc.

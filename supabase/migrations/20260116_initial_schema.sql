@@ -22,14 +22,18 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- Users can only read and update their own profile
 CREATE POLICY "Users can view own profile" ON users
-  FOR SELECT USING (auth.uid() = id);
+  FOR SELECT USING ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Users can update own profile" ON users
-  FOR UPDATE USING (auth.uid() = id);
+  FOR UPDATE USING ((SELECT auth.uid()) = id);
 
 -- Automatically create user profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   INSERT INTO public.users (id, email, full_name)
   VALUES (
@@ -39,7 +43,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -64,7 +68,7 @@ CREATE TABLE categories (
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Categories are viewable by all authenticated users" ON categories
-  FOR SELECT USING (auth.role() = 'authenticated');
+  FOR SELECT USING ((SELECT auth.role()) = 'authenticated');
 
 -- Create index for active categories query
 CREATE INDEX idx_categories_active ON categories(is_active) WHERE is_active = TRUE;
@@ -90,16 +94,16 @@ ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own accounts
 CREATE POLICY "Users can view own accounts" ON accounts
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can insert own accounts" ON accounts
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can update own accounts" ON accounts
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can delete own accounts" ON accounts
-  FOR DELETE USING (auth.uid() = user_id);
+  FOR DELETE USING ((SELECT auth.uid()) = user_id);
 
 -- Create indexes
 CREATE INDEX idx_accounts_user ON accounts(user_id);
@@ -107,13 +111,17 @@ CREATE INDEX idx_accounts_user_active ON accounts(user_id, is_active) WHERE is_a
 
 -- Automatically create default account for new users
 CREATE OR REPLACE FUNCTION public.create_default_account()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   INSERT INTO public.accounts (user_id, name, account_type, is_default, currency)
   VALUES (NEW.id, 'Primary Account', 'other', TRUE, 'USD');
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE TRIGGER on_user_created_default_account
   AFTER INSERT ON public.users
@@ -153,16 +161,16 @@ ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own expenses
 CREATE POLICY "Users can view own expenses" ON expenses
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can insert own expenses" ON expenses
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can update own expenses" ON expenses
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can delete own expenses" ON expenses
-  FOR DELETE USING (auth.uid() = user_id);
+  FOR DELETE USING ((SELECT auth.uid()) = user_id);
 
 -- Create indexes for common queries
 CREATE INDEX idx_expenses_user ON expenses(user_id);
@@ -175,12 +183,15 @@ CREATE INDEX idx_expenses_account ON expenses(account_id);
 -- ============================================================================
 -- Function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Apply to all tables with updated_at
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
