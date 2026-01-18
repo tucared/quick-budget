@@ -10,8 +10,22 @@ DECLARE
   user1_id UUID := '00000000-0000-0000-0000-000000000001';
   user2_id UUID := '00000000-0000-0000-0000-000000000002';
   shared_household_id UUID := '00000000-0000-0000-0000-000000000100';
+  auto_household_ids UUID[];
 BEGIN
+  -- Clean up any existing test data (cascades to all related tables)
+  DELETE FROM auth.users WHERE id IN (user1_id, user2_id);
+  DELETE FROM public.households WHERE id = shared_household_id;
+
+  -- Create our shared household FIRST
+  INSERT INTO public.households (id, name, created_at, updated_at)
+  VALUES (shared_household_id, 'Test Household', NOW(), NOW());
+
   -- Insert test users into auth.users
+  -- NOTE: This triggers handle_new_user() which will:
+  --   1. Create a household for each user
+  --   2. Insert into public.users with that household_id
+  --   3. Create a default account
+  --   4. Seed default categories
   INSERT INTO auth.users (
     id,
     instance_id,
@@ -69,50 +83,44 @@ BEGIN
     false,
     'authenticated',
     'authenticated'
-  )
-  ON CONFLICT (id) DO NOTHING;
+  );
 
-  -- Create shared household
-  INSERT INTO public.households (id, name, created_at, updated_at)
-  VALUES (shared_household_id, 'Test Household', NOW(), NOW())
-  ON CONFLICT (id) DO NOTHING;
+  -- Capture the auto-created household IDs before we change them
+  SELECT ARRAY_AGG(household_id) INTO auto_household_ids
+  FROM public.users
+  WHERE id IN (user1_id, user2_id);
 
-  -- Insert into public.users with household_id
-  INSERT INTO public.users (id, email, full_name, household_id, created_at, updated_at)
+  -- Move both users to our shared household
+  UPDATE public.users
+  SET household_id = shared_household_id
+  WHERE id IN (user1_id, user2_id);
+
+  -- Move all auto-created accounts to the shared household
+  UPDATE public.accounts
+  SET household_id = shared_household_id
+  WHERE household_id = ANY(auto_household_ids);
+
+  -- Move all auto-created categories to the shared household (deduping by name)
+  -- First, update one set of categories to point to shared household
+  UPDATE public.categories
+  SET household_id = shared_household_id
+  WHERE household_id = auto_household_ids[1];
+
+  -- Delete duplicate categories from the second auto-created household
+  DELETE FROM public.categories
+  WHERE household_id = ANY(auto_household_ids[2:]);
+
+  -- Delete the auto-created households (now that everything is moved)
+  DELETE FROM public.households
+  WHERE id = ANY(auto_household_ids);
+
+  -- Add our custom accounts (in addition to the auto-created "Primary Account")
+  INSERT INTO public.accounts (household_id, owner_user_id, name, account_type, currency, is_default, is_active)
   VALUES
-    (user1_id, 'user1@test.com', 'Test User 1', shared_household_id, NOW(), NOW()),
-    (user2_id, 'user2@test.com', 'Test User 2', shared_household_id, NOW(), NOW())
-  ON CONFLICT (id) DO NOTHING;
-
-  -- Insert accounts for User 1
-  INSERT INTO public.accounts (id, household_id, owner_user_id, name, account_type, currency, is_default, is_active)
-  VALUES
-    (gen_random_uuid(), shared_household_id, user1_id, 'Credit Card', 'credit_card', 'USD', true, true),
-    (gen_random_uuid(), shared_household_id, user1_id, 'Cash', 'cash', 'USD', false, true)
-  ON CONFLICT DO NOTHING;
-
-  -- Insert accounts for User 2
-  INSERT INTO public.accounts (id, household_id, owner_user_id, name, account_type, currency, is_default, is_active)
-  VALUES
-    (gen_random_uuid(), shared_household_id, user2_id, 'Debit Card', 'debit_card', 'USD', true, true),
-    (gen_random_uuid(), shared_household_id, user2_id, 'Savings', 'bank_account', 'USD', false, true)
-  ON CONFLICT DO NOTHING;
-
-  -- Seed default categories for the test household
-  INSERT INTO public.categories (household_id, name, category_type, icon, is_active) VALUES
-    (shared_household_id, 'Groceries', 'monthly', '🛒', TRUE),
-    (shared_household_id, 'Dining Out', 'monthly', '🍽️', TRUE),
-    (shared_household_id, 'Transportation', 'monthly', '🚗', TRUE),
-    (shared_household_id, 'Bills & Utilities', 'monthly', '💡', TRUE),
-    (shared_household_id, 'Shopping', 'monthly', '🛍️', TRUE),
-    (shared_household_id, 'Entertainment', 'monthly', '🎬', TRUE),
-    (shared_household_id, 'Healthcare', 'monthly', '⚕️', TRUE),
-    (shared_household_id, 'Personal Care', 'monthly', '💇', TRUE),
-    (shared_household_id, 'Education', 'monthly', '📚', TRUE),
-    (shared_household_id, 'Other', 'monthly', '📌', TRUE),
-    (shared_household_id, 'Emergency Fund', 'long_term', '🏦', TRUE),
-    (shared_household_id, 'Holiday Fund', 'long_term', '✈️', TRUE)
-  ON CONFLICT DO NOTHING;
+    (shared_household_id, user1_id, 'Credit Card', 'credit_card', 'USD', false, true),
+    (shared_household_id, user1_id, 'Cash', 'cash', 'USD', false, true),
+    (shared_household_id, user2_id, 'Debit Card', 'debit_card', 'USD', false, true),
+    (shared_household_id, user2_id, 'Savings', 'bank_account', 'USD', false, true);
 
   RAISE NOTICE '========================================';
   RAISE NOTICE 'Development seed: Users and accounts loaded';
