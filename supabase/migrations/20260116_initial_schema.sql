@@ -422,3 +422,48 @@ CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allo
 
 CREATE TRIGGER update_recurring_expenses_updated_at BEFORE UPDATE ON recurring_expenses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- BUDGET_SUMMARY VIEW
+-- ============================================================================
+-- Efficient view for budget tracking combining allocations with actual spending
+-- Used for JTBD #10: Check shared discretionary budget
+CREATE OR REPLACE VIEW budget_summary AS
+SELECT
+  ba.id,
+  ba.household_id,
+  ba.budget_month,
+  ba.category_id,
+  c.name as category_name,
+  c.icon as category_icon,
+  c.color as category_color,
+  c.category_type,
+  ba.allocated_amount,
+  ba.currency,
+  COALESCE(SUM(e.converted_amount), 0) as spent_amount,
+  ba.allocated_amount - COALESCE(SUM(e.converted_amount), 0) as remaining_amount,
+  CASE
+    WHEN ba.allocated_amount > 0
+    THEN (COALESCE(SUM(e.converted_amount), 0) / ba.allocated_amount) * 100
+    ELSE 0
+  END as percent_spent
+FROM budget_allocations ba
+JOIN categories c ON c.id = ba.category_id
+LEFT JOIN expenses e ON
+  e.category_id = ba.category_id
+  AND DATE_TRUNC('month', e.expense_date::date) = ba.budget_month
+GROUP BY
+  ba.id,
+  ba.household_id,
+  ba.budget_month,
+  ba.category_id,
+  c.name,
+  c.icon,
+  c.color,
+  c.category_type,
+  ba.allocated_amount,
+  ba.currency;
+
+-- Views don't support RLS directly, but security_invoker ensures
+-- RLS policies from underlying tables (budget_allocations, categories, expenses) are applied
+ALTER VIEW budget_summary SET (security_invoker = true);

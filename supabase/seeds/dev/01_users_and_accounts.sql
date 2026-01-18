@@ -122,6 +122,31 @@ BEGIN
     (shared_household_id, user2_id, 'Debit Card', 'debit_card', 'USD', false, true),
     (shared_household_id, user2_id, 'Savings', 'bank_account', 'USD', false, true);
 
+  -- Add sample budget allocations for current month
+  -- Using specific amounts from the plan for each category
+  INSERT INTO public.budget_allocations (household_id, category_id, budget_month, allocated_amount, currency)
+  SELECT
+    shared_household_id,
+    c.id,
+    DATE_TRUNC('month', CURRENT_DATE)::date,
+    CASE c.name
+      WHEN 'Groceries' THEN 600.00
+      WHEN 'Dining Out' THEN 300.00
+      WHEN 'Transportation' THEN 200.00
+      WHEN 'Bills & Utilities' THEN 250.00
+      WHEN 'Shopping' THEN 200.00
+      WHEN 'Entertainment' THEN 150.00
+      WHEN 'Healthcare' THEN 100.00
+      WHEN 'Personal Care' THEN 80.00
+      WHEN 'Education' THEN 50.00
+      WHEN 'Other' THEN 50.00
+      ELSE 0
+    END,
+    'USD'
+  FROM public.categories c
+  WHERE c.household_id = shared_household_id
+    AND c.category_type = 'monthly';
+
   RAISE NOTICE '========================================';
   RAISE NOTICE 'Development seed: Users and accounts loaded';
   RAISE NOTICE '  user1@test.com / password123';

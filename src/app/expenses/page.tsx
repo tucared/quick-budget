@@ -58,9 +58,14 @@ export default function ExpensesPage() {
               </p>
             )}
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            Log Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => router.push("/budget")}>
+              Budget
+            </Button>
+            <Button variant="outline" onClick={handleLogout}>
+              Log Out
+            </Button>
+          </div>
         </div>
       </header>
 
