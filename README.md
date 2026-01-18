@@ -76,7 +76,9 @@ src/
 
 supabase/
 ├── migrations/            # Database migrations
-├── seed.sql              # Test data (local dev only)
+├── seeds/
+│   ├── dev/              # Development seeds (test users, sample data)
+│   └── prod/             # Production seeds (real users, no sample data)
 └── config.toml           # Supabase config
 ```
 
@@ -100,6 +102,30 @@ supabase db reset
 
 # Push to production (see DEPLOYMENT.md)
 supabase db push
+```
+
+## Database Seeding
+
+Seeds are organized into two directories:
+
+### Development Seeds (`supabase/seeds/dev/`)
+- **Committed to git** for local development
+- Contains test users (user1@test.com, user2@test.com) with password123
+- Includes sample accounts, categories, and expenses
+- Runs automatically via `supabase db reset`
+
+### Production Seeds (`supabase/seeds/prod/`)
+- **NOT committed to git** (contains real user data)
+- Template file for creating real users and accounts
+- No sample expenses (will be imported from existing system)
+- Run manually in Supabase Studio SQL Editor
+
+```bash
+# Local development: Reset and reseed database
+supabase db reset
+
+# Production: Edit supabase/seeds/prod/01_users_and_accounts.sql
+# then run manually in Supabase Studio SQL Editor
 ```
 
 ## Other Documentation

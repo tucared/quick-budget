@@ -88,13 +88,10 @@ export default function Home() {
               />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+          <CardFooter>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Logging in..." : "Log In"}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">
-              Local development: Use user1@test.com or user2@test.com with password123
-            </p>
           </CardFooter>
         </form>
       </Card>

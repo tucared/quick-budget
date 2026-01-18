@@ -1,10 +1,8 @@
 -- ============================================================================
--- DEVELOPMENT ONLY: Sample Expenses for Testing
+-- DEVELOPMENT SEED: Sample Expenses for Testing
 -- ============================================================================
--- This file contains sample expense data for local development and testing.
--- DO NOT run this in production - expenses will be logged via the app.
---
--- This runs automatically in local dev via `supabase db reset`.
+-- Creates a few sample expenses for local development and testing.
+-- Runs automatically via `supabase db reset` in local development.
 -- ============================================================================
 
 DO $$
@@ -22,10 +20,8 @@ BEGIN
   SELECT id INTO dining_cat_id FROM public.categories WHERE name = 'Dining Out' LIMIT 1;
   SELECT id INTO transport_cat_id FROM public.categories WHERE name = 'Transportation' LIMIT 1;
 
-  -- Get User 1's default account
+  -- Get default accounts
   SELECT id INTO user1_account_id FROM public.accounts WHERE owner_user_id = user1_id AND is_default = true LIMIT 1;
-
-  -- Get User 2's default account
   SELECT id INTO user2_account_id FROM public.accounts WHERE owner_user_id = user2_id AND is_default = true LIMIT 1;
 
   -- Insert sample expenses for User 1
@@ -55,16 +51,6 @@ BEGIN
     ON CONFLICT DO NOTHING;
   END IF;
 
-END $$;
+  RAISE NOTICE 'Development seed: Sample expenses loaded';
 
--- Display seed summary for local development
-DO $$
-BEGIN
-  RAISE NOTICE '========================================';
-  RAISE NOTICE 'Development seed data loaded!';
-  RAISE NOTICE '========================================';
-  RAISE NOTICE 'Test Accounts:';
-  RAISE NOTICE '  User 1: user1@test.com / password123';
-  RAISE NOTICE '  User 2: user2@test.com / password123';
-  RAISE NOTICE '========================================';
 END $$;
