@@ -1,31 +1,103 @@
-import Link from "next/link"
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 export default function Home() {
+  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    try {
+      const supabase = createClient()
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (signInError) {
+        setError(signInError.message)
+        setLoading(false)
+        return
+      }
+
+      router.push("/expenses")
+      router.refresh()
+    } catch (err) {
+      setError("An unexpected error occurred")
+      setLoading(false)
+    }
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8">
-      <div className="text-center max-w-2xl">
-        <h1 className="text-4xl font-bold mb-4">Quick Budget</h1>
-        <p className="text-lg text-muted-foreground mb-8">
-          Frictionless expense tracking for couples
-        </p>
-        <div className="mb-8 p-6 bg-muted rounded-lg text-left">
-          <h2 className="font-semibold mb-3">Test Accounts (Local Development)</h2>
-          <div className="space-y-2 text-sm">
-            <div>
-              <strong>User 1:</strong> user1@test.com / password123
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Quick Budget</CardTitle>
+          <CardDescription>
+            Enter your email and password to access your account
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleLogin}>
+          <CardContent className="space-y-4">
+            {error && (
+              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
-            <div>
-              <strong>User 2:</strong> user2@test.com / password123
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
             </div>
-          </div>
-        </div>
-        <Link
-          href="/login"
-          className="inline-block px-8 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
-        >
-          Log In
-        </Link>
-      </div>
-    </main>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Logging in..." : "Log In"}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Local development: Use user1@test.com or user2@test.com with password123
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
   )
 }
