@@ -8,4 +8,5 @@
 # Development guidelines
 
 - Use Playwright MCP to verify your changes before commiting
-- Use Supbase MCP instead of docker for querying the db etc.
+- Use Supabase MCP instead of docker for querying the db etc.
+- DO NOT WRITE ANY migrations, just edit the initial migration file and run `supabase db reset`
