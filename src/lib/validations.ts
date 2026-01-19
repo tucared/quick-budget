@@ -27,7 +27,7 @@ export const expenseSchema = z.object({
   currency: z
     .string()
     .length(3, "Currency must be 3 characters")
-    .default("USD")
+    .default("EUR")
     .optional(),
 })
 

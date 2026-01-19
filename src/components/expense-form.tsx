@@ -7,6 +7,7 @@ import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
 import { STORAGE_KEYS, type Category, type Account } from "@/lib/types"
+import { convertToEUR, getExchangeRate } from "@/lib/currency"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -42,12 +43,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     defaultValues: {
       amount: 0,
       expense_date: format(new Date(), "yyyy-MM-dd"),
-      currency: "USD",
+      currency: "EUR",
     },
   })
 
   const selectedCategory = watch("category_id")
   const selectedAccount = watch("account_id")
+  const selectedCurrency = watch("currency")
 
   // Load categories and accounts on mount
   useEffect(() => {
@@ -79,6 +81,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       // Load smart defaults from localStorage
       const lastCategory = localStorage.getItem(STORAGE_KEYS.LAST_CATEGORY)
       const lastAccount = localStorage.getItem(STORAGE_KEYS.LAST_ACCOUNT)
+      const lastCurrency = localStorage.getItem(STORAGE_KEYS.LAST_CURRENCY)
 
       if (lastCategory) {
         setValue("category_id", lastCategory)
@@ -90,6 +93,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         // Default to the first account or the default account
         const defaultAccount = accountsData.find((a) => a.is_default)
         setValue("account_id", defaultAccount?.id || accountsData[0].id)
+      }
+
+      if (lastCurrency) {
+        setValue("currency", lastCurrency)
       }
     }
 
@@ -126,6 +133,11 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         return
       }
 
+      // Convert to EUR for consistent tracking
+      const currency = data.currency || "EUR"
+      const convertedAmount = convertToEUR(data.amount, currency)
+      const exchangeRate = getExchangeRate(currency, "EUR")
+
       // Insert expense
       const { error: insertError } = await supabase.from("expenses").insert({
         logged_by_user_id: user.id,
@@ -133,10 +145,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         category_id: data.category_id,
         account_id: data.account_id,
         amount: data.amount,
-        currency: data.currency || "USD",
-        converted_amount: data.amount, // For MVP, no conversion
-        converted_currency: data.currency || "USD",
-        exchange_rate: 1.0,
+        currency: currency,
+        converted_amount: convertedAmount,
+        converted_currency: "EUR",
+        exchange_rate: exchangeRate,
         expense_date: data.expense_date,
         description: data.description || null,
       })
@@ -201,19 +213,46 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         </div>
       )}
 
-      {/* Amount */}
+      {/* Amount with Currency Toggle */}
       <div className="space-y-2">
         <Label htmlFor="amount">Amount *</Label>
-        <Input
-          id="amount"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          inputMode="decimal"
-          autoFocus
-          {...register("amount", { valueAsNumber: true })}
-        />
+        <div className="flex gap-2">
+          <Input
+            id="amount"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            inputMode="decimal"
+            autoFocus
+            className="flex-1"
+            {...register("amount", { valueAsNumber: true })}
+          />
+          <div className="inline-flex rounded-md shadow-sm" role="group">
+            <button
+              type="button"
+              onClick={() => setValue("currency", "EUR")}
+              className={`px-4 py-2 text-sm font-medium border rounded-l-md transition-colors ${
+                selectedCurrency === "EUR"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              EUR
+            </button>
+            <button
+              type="button"
+              onClick={() => setValue("currency", "BRL")}
+              className={`px-4 py-2 text-sm font-medium border-l-0 border rounded-r-md transition-colors ${
+                selectedCurrency === "BRL"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              BRL
+            </button>
+          </div>
+        </div>
         {errors.amount && (
           <p className="text-sm text-destructive">{errors.amount.message}</p>
         )}
