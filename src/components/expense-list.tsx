@@ -17,13 +17,38 @@ export function ExpenseList() {
 
     // Load categories and accounts for lookup
     const loadReferenceData = async () => {
+      // Get user's household_id for explicit filtering
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("household_id")
+        .eq("id", user.id)
+        .single()
+
+      if (!userData?.household_id) {
+        setLoading(false)
+        return
+      }
+
+      const householdId = userData.household_id
+
       const { data: categoriesData } = await supabase
         .from("categories")
         .select("*")
+        .eq("household_id", householdId)
 
       const { data: accountsData } = await supabase
         .from("accounts")
         .select("*")
+        .eq("household_id", householdId)
 
       if (categoriesData) {
         const catMap = new Map<string, Category>()
@@ -36,13 +61,12 @@ export function ExpenseList() {
         accountsData.forEach((acc) => accMap.set(acc.id, acc))
         setAccounts(accMap)
       }
-    }
 
-    // Load initial expenses
-    const loadExpenses = async () => {
+      // Load expenses with explicit household filter
       const { data } = await supabase
         .from("expenses")
         .select("*")
+        .eq("household_id", householdId)
         .order("expense_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(20)
@@ -83,7 +107,6 @@ export function ExpenseList() {
       .subscribe()
 
     loadReferenceData()
-    loadExpenses()
 
     // Cleanup subscription
     return () => {
