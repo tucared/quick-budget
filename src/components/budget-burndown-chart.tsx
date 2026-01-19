@@ -223,11 +223,11 @@ export function BudgetBurndownChart({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <CardTitle>Budget Burndown</CardTitle>
           <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
@@ -240,12 +240,12 @@ export function BudgetBurndownChart({
           </Select>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="h-[350px]">
+      <CardContent className="pt-0 pb-4">
+        <div className="h-[300px] sm:h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData.data}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               {/* Weekend overlays */}
@@ -260,16 +260,17 @@ export function BudgetBurndownChart({
               ))}
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: "#e5e7eb" }}
                 interval="preserveStartEnd"
               />
               <YAxis
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: "#e5e7eb" }}
                 tickFormatter={(value) => `€${value}`}
+                width={45}
               />
               <Tooltip
                 contentStyle={{

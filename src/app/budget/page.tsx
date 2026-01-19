@@ -92,16 +92,18 @@ export default function BudgetPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Quick Budget</h1>
+        <div className="container mx-auto px-4 py-3">
+          {/* Top row: Title left, Welcome right - mobile friendly */}
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-2xl font-bold whitespace-nowrap">Quick Budget</h1>
             {user && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground whitespace-nowrap">
                 Welcome, {user.fullName}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          {/* Bottom row: Navigation buttons */}
+          <div className="flex items-center gap-2 justify-center">
             <Button variant="outline" onClick={() => router.push("/expenses")}>
               Expenses
             </Button>
