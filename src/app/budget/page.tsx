@@ -7,6 +7,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import type { BudgetSummary } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
+import { BudgetBurndownChart } from "@/components/budget-burndown-chart"
 import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { getCurrentBudgetMonth } from "@/lib/date-utils"
@@ -17,6 +18,7 @@ export default function BudgetPage() {
   const [budgets, setBudgets] = useState<BudgetSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState("")
+  const [budgetMonth, setBudgetMonth] = useState("")
 
   useEffect(() => {
     const supabase = createClient()
@@ -27,6 +29,7 @@ export default function BudgetPage() {
       const now = new Date()
 
       setCurrentMonth(format(now, "MMMM yyyy"))
+      setBudgetMonth(budgetMonth)
 
       const { data, error } = await supabase
         .from("budget_summary")
@@ -136,6 +139,15 @@ export default function BudgetPage() {
           <div className="space-y-6">
             {/* Total Budget Summary */}
             <BudgetSummaryCard budgets={budgets} />
+
+            {/* Burndown Chart */}
+            {user?.householdId && budgetMonth && (
+              <BudgetBurndownChart
+                budgets={budgets}
+                householdId={user.householdId}
+                currentMonth={budgetMonth}
+              />
+            )}
 
             {/* Category Budgets Grid */}
             <div>
