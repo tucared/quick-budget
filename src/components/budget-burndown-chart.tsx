@@ -12,6 +12,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceArea,
 } from "recharts"
 import {
   Select,
@@ -26,8 +27,13 @@ import type { BudgetSummary, Expense } from "@/lib/types"
 interface BurndownDataPoint {
   date: string // "Jan 1", "Jan 2", etc.
   dateKey: string // "2026-01-01" for sorting
-  planned: number // Linear projection
-  actual: number // Cumulative actual spending
+  planned: number // Remaining budget - linear burndown to zero
+  actual: number | null // Actual remaining budget (allocated - spent), null for future dates
+}
+
+interface WeekendRange {
+  start: string // Date label for start of weekend
+  end: string // Date label for end of weekend
 }
 
 interface BudgetBurndownChartProps {
@@ -79,7 +85,7 @@ export function BudgetBurndownChart({
   }, [householdId, currentMonth])
 
   const chartData = useMemo(() => {
-    if (budgets.length === 0) return []
+    if (budgets.length === 0) return { data: [], weekends: [] }
 
     // Calculate total allocated amount for selected category
     const totalAllocated =
@@ -94,9 +100,11 @@ export function BudgetBurndownChart({
         ? expenses
         : expenses.filter((e) => e.category_id === selectedCategoryId)
 
-    // Get number of days in the month
+    // Get number of days in the month and today's date
     const currentDate = parseISO(currentMonth)
     const daysInMonth = getDaysInMonth(currentDate)
+    const today = new Date()
+    const todayDateKey = format(today, "yyyy-MM-dd")
 
     // Group expenses by date and calculate cumulative totals
     const expensesByDate = new Map<string, number>()
@@ -107,7 +115,9 @@ export function BudgetBurndownChart({
 
     // Build data points for each day of the month
     const data: BurndownDataPoint[] = []
+    const weekends: WeekendRange[] = []
     let cumulativeActual = 0
+    let weekendStart: string | null = null
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(
@@ -117,23 +127,53 @@ export function BudgetBurndownChart({
       )
       const dateKey = format(date, "yyyy-MM-dd")
       const dateLabel = format(date, "MMM d")
+      const dayOfWeek = date.getDay() // 0 = Sunday, 6 = Saturday
+
+      // Track weekend ranges
+      if (dayOfWeek === 6 || dayOfWeek === 0) {
+        // Saturday or Sunday
+        if (!weekendStart) {
+          weekendStart = dateLabel
+        }
+      } else {
+        if (weekendStart) {
+          // End of weekend, save the range
+          weekends.push({
+            start: weekendStart,
+            end: data[data.length - 1]?.date || weekendStart,
+          })
+          weekendStart = null
+        }
+      }
 
       // Add daily expenses to cumulative total
       const dailyExpenses = expensesByDate.get(dateKey) || 0
       cumulativeActual += dailyExpenses
 
-      // Calculate planned amount (linear progression)
-      const planned = (totalAllocated / daysInMonth) * day
+      // Calculate planned remaining (linear burndown to zero)
+      const plannedRemaining = totalAllocated - (totalAllocated / daysInMonth) * day
+
+      // Calculate actual remaining (allocated - spent)
+      // Only show actual data up to today, not future days
+      const actualRemaining = totalAllocated - cumulativeActual
 
       data.push({
         date: dateLabel,
         dateKey,
-        planned: Math.round(planned * 100) / 100,
-        actual: Math.round(cumulativeActual * 100) / 100,
+        planned: Math.round(plannedRemaining * 100) / 100,
+        actual: dateKey <= todayDateKey ? Math.round(actualRemaining * 100) / 100 : null,
       })
     }
 
-    return data
+    // Close any open weekend at end of month
+    if (weekendStart) {
+      weekends.push({
+        start: weekendStart,
+        end: data[data.length - 1]?.date || weekendStart,
+      })
+    }
+
+    return { data, weekends }
   }, [budgets, expenses, selectedCategoryId, currentMonth])
 
   // Prepare category options for the filter
@@ -173,8 +213,12 @@ export function BudgetBurndownChart({
           ?.allocated_amount || 0
 
   // Determine line color based on whether we're over budget
-  const latestActual = chartData[chartData.length - 1]?.actual || 0
-  const isOverBudget = latestActual > totalAllocated
+  // In a burndown chart, over budget means remaining budget went negative
+  const latestActualPoint = chartData.data.find((d) => d.actual !== null && d.actual !== undefined)
+  const latestActual = chartData.data
+    .filter((d) => d.actual !== null)
+    .slice(-1)[0]?.actual ?? 0
+  const isOverBudget = latestActual < 0
   const actualLineColor = isOverBudget ? "#ef4444" : "#22c55e"
 
   return (
@@ -200,10 +244,20 @@ export function BudgetBurndownChart({
         <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={chartData}
+              data={chartData.data}
               margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              {/* Weekend overlays */}
+              {chartData.weekends.map((weekend, idx) => (
+                <ReferenceArea
+                  key={idx}
+                  x1={weekend.start}
+                  x2={weekend.end}
+                  fill="#f3f4f6"
+                  fillOpacity={0.5}
+                />
+              ))}
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: 12 }}
@@ -243,6 +297,7 @@ export function BudgetBurndownChart({
                 strokeWidth={2}
                 dot={false}
                 name="Actual"
+                connectNulls={false}
               />
             </LineChart>
           </ResponsiveContainer>
