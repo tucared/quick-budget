@@ -12,44 +12,30 @@ import { getTodayDateString, getCurrentBudgetMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
+import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combobox"
 
 interface ExpenseFormProps {
   onSuccess?: () => void
 }
 
+interface AccountWithUser extends Account {
+  owner_name?: string
+}
+
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [categories, setCategories] = useState<Category[]>([])
-  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accounts, setAccounts] = useState<AccountWithUser[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [loadError, setLoadError] = useState("")
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
-  const [showAllCategories, setShowAllCategories] = useState(false)
-  const [showAllAccounts, setShowAllAccounts] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
 
-  // Check if we're on mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
 
   const {
     register,
@@ -92,20 +78,29 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     }
   }
 
-  const getRecentlyUsed = (items: Category[] | Account[], usageKey: string, limit = 3): string[] => {
-    const usageMap = getUsageMap(usageKey)
-    const sorted = items
-      .map((item) => ({ id: item.id, lastUsed: usageMap[item.id] || 0 }))
-      .sort((a, b) => {
-        // Sort by most recent first, then alphabetically for unused items
-        if (a.lastUsed === 0 && b.lastUsed === 0) {
-          const aName = items.find((i) => i.id === a.id)?.name || ""
-          const bName = items.find((i) => i.id === b.id)?.name || ""
-          return aName.localeCompare(bName)
-        }
-        return b.lastUsed - a.lastUsed
-      })
-    return sorted.slice(0, limit).map((item) => item.id)
+  // Transform categories into grouped options with frequency
+  const getCategoryOptions = (): GroupedOption[] => {
+    const usageMap = getUsageMap(STORAGE_KEYS.CATEGORY_USAGE)
+
+    return categories.map((category) => ({
+      value: category.id,
+      label: category.name,
+      icon: category.icon || undefined,
+      group: category.category_type === "monthly" ? "Monthly Spending" : "Long-term Goals",
+      frequency: usageMap[category.id] || 0,
+    }))
+  }
+
+  // Transform accounts into grouped options with frequency
+  const getAccountOptions = (): GroupedOption[] => {
+    const usageMap = getUsageMap(STORAGE_KEYS.ACCOUNT_USAGE)
+
+    return accounts.map((account) => ({
+      value: account.id,
+      label: account.name,
+      group: account.owner_name || "Unknown",
+      frequency: usageMap[account.id] || 0,
+    }))
   }
 
   // Load categories and accounts on mount
@@ -174,7 +169,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         // Load accounts with explicit household filter
         const { data: accountsData, error: accountsError } = await supabase
           .from("accounts")
-          .select("*")
+          .select("*, users!accounts_owner_user_id_fkey(full_name)")
           .eq("household_id", householdId)
           .eq("is_active", true)
           .order("name")
@@ -186,7 +181,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         }
 
         if (accountsData) {
-          setAccounts(accountsData)
+          // Transform accounts data to include owner name
+          const accountsWithOwner: AccountWithUser[] = accountsData.map((account: any) => ({
+            ...account,
+            owner_name: account.users?.full_name || "Unknown",
+          }))
+          setAccounts(accountsWithOwner)
         }
 
         // Load smart defaults from localStorage
@@ -463,77 +463,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {/* Category */}
       <div className="space-y-2">
         <Label htmlFor="category">Category *</Label>
-        {!showAllCategories ? (
-          <div className="space-y-2">
-            {/* Quick-pick buttons for frequently used categories */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {getRecentlyUsed(categories, STORAGE_KEYS.CATEGORY_USAGE, isMobile ? 2 : 5).map((categoryId) => {
-                const category = categories.find((c) => c.id === categoryId)
-                if (!category) return null
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => {
-                      setValue("category_id", category.id)
-                      setShowAllCategories(false)
-                    }}
-                    className={`px-3 py-2.5 text-sm font-medium border rounded-md transition-colors flex items-center justify-center ${
-                      selectedCategory === category.id
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    {category.icon && <span className="mr-1.5">{category.icon}</span>}
-                    <span className="truncate">{category.name}</span>
-                  </button>
-                )
-              })}
-              <button
-                type="button"
-                onClick={() => setShowAllCategories(true)}
-                className="px-3 py-2.5 text-sm font-medium border rounded-md transition-colors bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground col-span-2 md:col-span-1"
-              >
-                Other...
-              </button>
-            </div>
-            {/* Show selected category if it's not in quick picks */}
-            {selectedCategory && !getRecentlyUsed(categories, STORAGE_KEYS.CATEGORY_USAGE, isMobile ? 2 : 5).includes(selectedCategory) && (
-              <div className="text-sm text-muted-foreground">
-                Selected: {categories.find((c) => c.id === selectedCategory)?.name}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Select
-              value={selectedCategory}
-              onValueChange={(value) => {
-                setValue("category_id", value)
-                setShowAllCategories(false)
-              }}
-            >
-              <SelectTrigger id="category">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.icon && <span className="mr-2">{category.icon}</span>}
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <button
-              type="button"
-              onClick={() => setShowAllCategories(false)}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← Back to quick picks
-            </button>
-          </div>
-        )}
+        <GroupedCombobox
+          options={getCategoryOptions()}
+          value={selectedCategory}
+          onValueChange={(value) => setValue("category_id", value)}
+          placeholder="Select a category"
+          searchPlaceholder="Search categories..."
+          emptyMessage="No category found."
+        />
         {errors.category_id && (
           <p className="text-sm text-destructive">
             {errors.category_id.message}
@@ -552,75 +489,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {/* Account */}
       <div className="space-y-2">
         <Label htmlFor="account">Account *</Label>
-        {!showAllAccounts ? (
-          <div className="space-y-2">
-            {/* Quick-pick buttons for frequently used accounts */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {getRecentlyUsed(accounts, STORAGE_KEYS.ACCOUNT_USAGE, isMobile ? 2 : 5).map((accountId) => {
-                const account = accounts.find((a) => a.id === accountId)
-                if (!account) return null
-                return (
-                  <button
-                    key={account.id}
-                    type="button"
-                    onClick={() => {
-                      setValue("account_id", account.id)
-                      setShowAllAccounts(false)
-                    }}
-                    className={`px-3 py-2.5 text-sm font-medium border rounded-md transition-colors ${
-                      selectedAccount === account.id
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    <span className="truncate">{account.name}</span>
-                  </button>
-                )
-              })}
-              <button
-                type="button"
-                onClick={() => setShowAllAccounts(true)}
-                className="px-3 py-2.5 text-sm font-medium border rounded-md transition-colors bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground col-span-2 md:col-span-1"
-              >
-                Other...
-              </button>
-            </div>
-            {/* Show selected account if it's not in quick picks */}
-            {selectedAccount && !getRecentlyUsed(accounts, STORAGE_KEYS.ACCOUNT_USAGE, isMobile ? 2 : 5).includes(selectedAccount) && (
-              <div className="text-sm text-muted-foreground">
-                Selected: {accounts.find((a) => a.id === selectedAccount)?.name}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Select
-              value={selectedAccount}
-              onValueChange={(value) => {
-                setValue("account_id", value)
-                setShowAllAccounts(false)
-              }}
-            >
-              <SelectTrigger id="account">
-                <SelectValue placeholder="Select an account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <button
-              type="button"
-              onClick={() => setShowAllAccounts(false)}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← Back to quick picks
-            </button>
-          </div>
-        )}
+        <GroupedCombobox
+          options={getAccountOptions()}
+          value={selectedAccount}
+          onValueChange={(value) => setValue("account_id", value)}
+          placeholder="Select an account"
+          searchPlaceholder="Search accounts..."
+          emptyMessage="No account found."
+        />
         {errors.account_id && (
           <p className="text-sm text-destructive">
             {errors.account_id.message}
