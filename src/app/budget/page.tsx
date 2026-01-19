@@ -3,15 +3,17 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
+import { useUser } from "@/lib/hooks/use-user"
 import type { BudgetSummary } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
 import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
+import { getCurrentBudgetMonth } from "@/lib/date-utils"
 
 export default function BudgetPage() {
   const router = useRouter()
-  const [userName, setUserName] = useState<string>("")
+  const { user } = useUser()
   const [budgets, setBudgets] = useState<BudgetSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState("")
@@ -19,37 +21,17 @@ export default function BudgetPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    const loadUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user) {
-        const { data: userData } = await supabase
-          .from("users")
-          .select("full_name")
-          .eq("id", user.id)
-          .single()
-
-        if (userData?.full_name) {
-          setUserName(userData.full_name)
-        } else {
-          setUserName(user.email?.split("@")[0] || "")
-        }
-      }
-    }
-
-    const loadBudgets = async () => {
-      // Get first day of current month in local timezone (avoid UTC conversion)
+    const loadBudgets = async (householdId: string) => {
+      // Get first day of current month in local timezone
+      const budgetMonth = getCurrentBudgetMonth()
       const now = new Date()
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-      const budgetMonth = format(firstDay, "yyyy-MM-dd")
 
-      setCurrentMonth(format(firstDay, "MMMM yyyy"))
+      setCurrentMonth(format(now, "MMMM yyyy"))
 
       const { data, error } = await supabase
         .from("budget_summary")
         .select("*")
+        .eq("household_id", householdId)
         .eq("budget_month", budgetMonth)
         .eq("category_type", "monthly")
         .order("category_name", { ascending: true })
@@ -61,6 +43,12 @@ export default function BudgetPage() {
       }
 
       setLoading(false)
+    }
+
+    // Only load budgets if user is loaded
+    if (!user?.householdId) {
+      setLoading(false)
+      return
     }
 
     // Set up real-time subscription to expenses table
@@ -76,18 +64,19 @@ export default function BudgetPage() {
         },
         () => {
           // Reload budgets when any expense is added/updated/deleted
-          loadBudgets()
+          if (user?.householdId) {
+            loadBudgets(user.householdId)
+          }
         }
       )
       .subscribe()
 
-    loadUser()
-    loadBudgets()
+    loadBudgets(user.householdId)
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -103,9 +92,9 @@ export default function BudgetPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Quick Budget</h1>
-            {userName && (
+            {user && (
               <p className="text-sm text-muted-foreground">
-                Welcome, {userName}
+                Welcome, {user.fullName}
               </p>
             )}
           </div>

@@ -62,7 +62,7 @@ BEGIN
 
   -- Create default account for the user
   INSERT INTO public.accounts (household_id, owner_user_id, name, account_type, is_default, currency)
-  VALUES (new_household_id, NEW.id, 'Primary Account', 'other', TRUE, 'USD');
+  VALUES (new_household_id, NEW.id, 'Primary Account', 'other', TRUE, 'EUR');
 
   RETURN NEW;
 END;
@@ -156,7 +156,7 @@ CREATE TABLE accounts (
   owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   account_type TEXT NOT NULL CHECK (account_type IN ('credit_card', 'debit_card', 'bank_account', 'cash', 'other')),
-  currency TEXT NOT NULL DEFAULT 'USD' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -207,11 +207,11 @@ CREATE TABLE expenses (
 
   -- Amount in original currency
   amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
-  currency TEXT NOT NULL DEFAULT 'USD' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
 
   -- Converted amount (for multi-currency support - MVP stores as 1:1)
   converted_amount DECIMAL(12, 2) NOT NULL CHECK (converted_amount > 0),
-  converted_currency TEXT NOT NULL DEFAULT 'USD' CHECK (LENGTH(converted_currency) = 3),
+  converted_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(converted_currency) = 3),
   exchange_rate DECIMAL(12, 6) NOT NULL DEFAULT 1.0 CHECK (exchange_rate > 0),
 
   -- Transaction details
@@ -266,7 +266,7 @@ CREATE TABLE budget_allocations (
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   budget_month DATE NOT NULL, -- First day of the month (e.g., 2026-01-01)
   allocated_amount DECIMAL(12, 2) NOT NULL CHECK (allocated_amount >= 0),
-  currency TEXT NOT NULL DEFAULT 'USD' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(household_id, category_id, budget_month)
@@ -316,7 +316,7 @@ CREATE TABLE recurring_expenses (
   account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
-  currency TEXT NOT NULL DEFAULT 'USD' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
   frequency TEXT NOT NULL CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'quarterly', 'yearly')),
   next_due_date DATE NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,

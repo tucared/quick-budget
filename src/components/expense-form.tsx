@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
 import { STORAGE_KEYS, type Category, type Account } from "@/lib/types"
 import { convertToEUR, getExchangeRate } from "@/lib/currency"
+import { getErrorMessage } from "@/lib/error-handler"
+import { getTodayDateString } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -28,6 +29,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingData, setLoadingData] = useState(true)
+  const [loadError, setLoadError] = useState("")
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
 
@@ -42,7 +45,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       amount: 0,
-      expense_date: format(new Date(), "yyyy-MM-dd"),
+      expense_date: getTodayDateString(),
       currency: "EUR",
     },
   })
@@ -54,49 +57,117 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   // Load categories and accounts on mount
   useEffect(() => {
     const loadData = async () => {
-      const supabase = createClient()
+      try {
+        const supabase = createClient()
 
-      // Load categories
-      const { data: categoriesData } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("is_active", true)
-        .order("name")
+        // Get user's household_id for explicit filtering
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser()
 
-      if (categoriesData) {
-        setCategories(categoriesData)
-      }
+        if (authError) {
+          setLoadError(getErrorMessage(authError))
+          setLoadingData(false)
+          return
+        }
 
-      // Load accounts
-      const { data: accountsData } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("is_active", true)
-        .order("name")
+        if (!user) {
+          setLoadError("You must be logged in to add expenses")
+          setLoadingData(false)
+          return
+        }
 
-      if (accountsData) {
-        setAccounts(accountsData)
-      }
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("household_id")
+          .eq("id", user.id)
+          .single()
 
-      // Load smart defaults from localStorage
-      const lastCategory = localStorage.getItem(STORAGE_KEYS.LAST_CATEGORY)
-      const lastAccount = localStorage.getItem(STORAGE_KEYS.LAST_ACCOUNT)
-      const lastCurrency = localStorage.getItem(STORAGE_KEYS.LAST_CURRENCY)
+        if (userError) {
+          setLoadError(getErrorMessage(userError))
+          setLoadingData(false)
+          return
+        }
 
-      if (lastCategory) {
-        setValue("category_id", lastCategory)
-      }
+        if (!userData?.household_id) {
+          setLoadError("Could not find your household")
+          setLoadingData(false)
+          return
+        }
 
-      if (lastAccount) {
-        setValue("account_id", lastAccount)
-      } else if (accountsData && accountsData.length > 0) {
-        // Default to the first account or the default account
-        const defaultAccount = accountsData.find((a) => a.is_default)
-        setValue("account_id", defaultAccount?.id || accountsData[0].id)
-      }
+        const householdId = userData.household_id
 
-      if (lastCurrency) {
-        setValue("currency", lastCurrency)
+        // Load categories with explicit household filter
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from("categories")
+          .select("*")
+          .eq("household_id", householdId)
+          .eq("is_active", true)
+          .order("name")
+
+        if (categoriesError) {
+          setLoadError(getErrorMessage(categoriesError))
+          setLoadingData(false)
+          return
+        }
+
+        if (categoriesData) {
+          setCategories(categoriesData)
+        }
+
+        // Load accounts with explicit household filter
+        const { data: accountsData, error: accountsError } = await supabase
+          .from("accounts")
+          .select("*")
+          .eq("household_id", householdId)
+          .eq("is_active", true)
+          .order("name")
+
+        if (accountsError) {
+          setLoadError(getErrorMessage(accountsError))
+          setLoadingData(false)
+          return
+        }
+
+        if (accountsData) {
+          setAccounts(accountsData)
+        }
+
+        // Load smart defaults from localStorage
+        try {
+          const lastCategory = localStorage.getItem(STORAGE_KEYS.LAST_CATEGORY)
+          const lastAccount = localStorage.getItem(STORAGE_KEYS.LAST_ACCOUNT)
+          const lastCurrency = localStorage.getItem(STORAGE_KEYS.LAST_CURRENCY)
+
+          if (lastCategory) {
+            setValue("category_id", lastCategory)
+          }
+
+          if (lastAccount) {
+            setValue("account_id", lastAccount)
+          } else if (accountsData && accountsData.length > 0) {
+            // Default to the first account or the default account
+            const defaultAccount = accountsData.find((a) => a.is_default)
+            setValue("account_id", defaultAccount?.id || accountsData[0].id)
+          }
+
+          if (lastCurrency) {
+            setValue("currency", lastCurrency)
+          }
+        } catch (err) {
+          // localStorage might be disabled (incognito mode, etc.)
+          // Fall back to defaults if available
+          if (accountsData && accountsData.length > 0) {
+            const defaultAccount = accountsData.find((a) => a.is_default)
+            setValue("account_id", defaultAccount?.id || accountsData[0].id)
+          }
+        }
+
+        setLoadingData(false)
+      } catch (err) {
+        setLoadError(getErrorMessage(err))
+        setLoadingData(false)
       }
     }
 
@@ -127,7 +198,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         .eq("id", user.id)
         .single()
 
-      if (userError || !userData?.household_id) {
+      if (userError) {
+        setError(getErrorMessage(userError))
+        setLoading(false)
+        return
+      }
+
+      if (!userData?.household_id) {
         setError("Could not find your household. Please contact support.")
         setLoading(false)
         return
@@ -154,16 +231,21 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       })
 
       if (insertError) {
-        setError(insertError.message)
+        setError(getErrorMessage(insertError))
         setLoading(false)
         return
       }
 
       // Save defaults to localStorage
-      localStorage.setItem(STORAGE_KEYS.LAST_CATEGORY, data.category_id)
-      localStorage.setItem(STORAGE_KEYS.LAST_ACCOUNT, data.account_id)
-      if (data.currency) {
-        localStorage.setItem(STORAGE_KEYS.LAST_CURRENCY, data.currency)
+      try {
+        localStorage.setItem(STORAGE_KEYS.LAST_CATEGORY, data.category_id)
+        localStorage.setItem(STORAGE_KEYS.LAST_ACCOUNT, data.account_id)
+        if (data.currency) {
+          localStorage.setItem(STORAGE_KEYS.LAST_CURRENCY, data.currency)
+        }
+      } catch (err) {
+        // localStorage might be disabled, silently fail
+        // This is not critical for functionality
       }
 
       // Show success message briefly
@@ -194,9 +276,25 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       setLoading(false)
     } catch (err) {
-      setError("An unexpected error occurred")
+      setError(getErrorMessage(err))
       setLoading(false)
     }
+  }
+
+  if (loadingData) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Loading form...
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+        {loadError}
+      </div>
+    )
   }
 
   return (

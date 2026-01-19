@@ -1,42 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
+import { useUser } from "@/lib/hooks/use-user"
 import { ExpenseForm } from "@/components/expense-form"
 import { ExpenseList } from "@/components/expense-list"
 import { Button } from "@/components/ui/button"
 
 export default function ExpensesPage() {
   const router = useRouter()
-  const [userName, setUserName] = useState<string>("")
+  const { user } = useUser()
   const [refreshKey, setRefreshKey] = useState(0)
-
-  useEffect(() => {
-    const loadUser = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user) {
-        // Try to get full name from users table
-        const { data: userData } = await supabase
-          .from("users")
-          .select("full_name")
-          .eq("id", user.id)
-          .single()
-
-        if (userData?.full_name) {
-          setUserName(userData.full_name)
-        } else {
-          setUserName(user.email?.split("@")[0] || "")
-        }
-      }
-    }
-
-    loadUser()
-  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -52,9 +27,9 @@ export default function ExpensesPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Quick Budget</h1>
-            {userName && (
+            {user && (
               <p className="text-sm text-muted-foreground">
-                Welcome, {userName}
+                Welcome, {user.fullName}
               </p>
             )}
           </div>
