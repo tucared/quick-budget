@@ -151,9 +151,9 @@ export function ExpenseList() {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <div className="font-semibold text-lg">
-                    ${expense.amount.toFixed(2)}
+                    €{expense.amount.toFixed(2)}
                   </div>
-                  {expense.currency !== "USD" && (
+                  {expense.currency !== "EUR" && (
                     <div className="text-xs text-muted-foreground">
                       {expense.currency}
                     </div>

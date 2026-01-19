@@ -52,16 +52,16 @@ export function BudgetCategoryCard({ budget }: BudgetCategoryCardProps) {
         <div className="grid grid-cols-3 gap-2 text-center text-sm">
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">Allocated</div>
-            <div className="font-semibold">${allocated.toFixed(0)}</div>
+            <div className="font-semibold">€{allocated.toFixed(0)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">Spent</div>
-            <div className="font-semibold">${spent.toFixed(2)}</div>
+            <div className="font-semibold">€{spent.toFixed(2)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">Left</div>
             <div className={`font-semibold ${getTextColor()}`}>
-              ${remaining.toFixed(2)}
+              €{remaining.toFixed(2)}
             </div>
           </div>
         </div>
