@@ -113,9 +113,23 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         return
       }
 
+      // Get user's household_id
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("household_id")
+        .eq("id", user.id)
+        .single()
+
+      if (userError || !userData?.household_id) {
+        setError("Could not find your household. Please contact support.")
+        setLoading(false)
+        return
+      }
+
       // Insert expense
       const { error: insertError } = await supabase.from("expenses").insert({
         logged_by_user_id: user.id,
+        household_id: userData.household_id,
         category_id: data.category_id,
         account_id: data.account_id,
         amount: data.amount,
