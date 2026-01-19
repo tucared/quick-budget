@@ -5,10 +5,10 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
-import { STORAGE_KEYS, type Category, type Account } from "@/lib/types"
+import { STORAGE_KEYS, type Category, type Account, type BudgetSummary } from "@/lib/types"
 import { convertToEUR, getExchangeRate } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
-import { getTodayDateString } from "@/lib/date-utils"
+import { getTodayDateString, getCurrentBudgetMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { CategoryBudgetStatus } from "@/components/category-budget-status"
 
 interface ExpenseFormProps {
   onSuccess?: () => void
@@ -36,6 +37,9 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [showAllCategories, setShowAllCategories] = useState(false)
   const [showAllAccounts, setShowAllAccounts] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
+  const [loadingBudget, setLoadingBudget] = useState(false)
+  const [householdId, setHouseholdId] = useState<string | null>(null)
 
   // Check if we're on mobile
   useEffect(() => {
@@ -66,6 +70,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const selectedCategory = watch("category_id")
   const selectedAccount = watch("account_id")
   const selectedCurrency = watch("currency")
+  const expenseAmount = watch("amount")
 
   // Helper functions for tracking usage recency (timestamp-based)
   const getUsageMap = (key: string): Record<string, number> => {
@@ -146,6 +151,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         }
 
         const householdId = userData.household_id
+        setHouseholdId(householdId)
 
         // Load categories with explicit household filter
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -222,6 +228,52 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
     loadData()
   }, [setValue])
+
+  // Load budget status when category is selected
+  useEffect(() => {
+    const loadCategoryBudget = async () => {
+      if (!selectedCategory || !householdId) {
+        setCategoryBudget(null)
+        return
+      }
+
+      // Check if selected category is a monthly category (not long_term)
+      const selectedCategoryObj = categories.find((c) => c.id === selectedCategory)
+      if (!selectedCategoryObj || selectedCategoryObj.category_type !== "monthly") {
+        setCategoryBudget(null)
+        return
+      }
+
+      setLoadingBudget(true)
+
+      try {
+        const supabase = createClient()
+        const budgetMonth = getCurrentBudgetMonth()
+
+        const { data, error } = await supabase
+          .from("budget_summary")
+          .select("*")
+          .eq("household_id", householdId)
+          .eq("category_id", selectedCategory)
+          .eq("budget_month", budgetMonth)
+          .single()
+
+        if (error && error.code !== "PGRST116") {
+          // PGRST116 = no rows returned, which is fine (no budget set)
+          console.error("Error loading category budget:", error)
+        }
+
+        setCategoryBudget(data || null)
+        setLoadingBudget(false)
+      } catch (err) {
+        console.error("Error loading category budget:", err)
+        setCategoryBudget(null)
+        setLoadingBudget(false)
+      }
+    }
+
+    loadCategoryBudget()
+  }, [selectedCategory, householdId, categories])
 
   const onSubmit = async (data: ExpenseFormValues) => {
     setError("")
@@ -486,6 +538,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           <p className="text-sm text-destructive">
             {errors.category_id.message}
           </p>
+        )}
+        {/* Budget status preview - only show for monthly categories */}
+        {selectedCategory && categories.find((c) => c.id === selectedCategory)?.category_type === "monthly" && (
+          <CategoryBudgetStatus
+            budget={categoryBudget}
+            additionalAmount={expenseAmount > 0 ? convertToEUR(expenseAmount, selectedCurrency || "EUR") : 0}
+            loading={loadingBudget}
+          />
         )}
       </div>
 
