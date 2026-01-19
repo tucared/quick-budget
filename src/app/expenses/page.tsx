@@ -34,6 +34,9 @@ export default function ExpensesPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="default" disabled>
+              Expenses
+            </Button>
             <Button variant="outline" onClick={() => router.push("/budget")}>
               Budget
             </Button>

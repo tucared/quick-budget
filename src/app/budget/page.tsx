@@ -105,6 +105,9 @@ export default function BudgetPage() {
             <Button variant="outline" onClick={() => router.push("/expenses")}>
               Expenses
             </Button>
+            <Button variant="default" disabled>
+              Budget
+            </Button>
             <Button variant="outline" onClick={handleLogout}>
               Log Out
             </Button>
@@ -114,16 +117,6 @@ export default function BudgetPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 max-w-6xl">
-        {/* Page Title */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">
-            Budget Overview - {currentMonth}
-          </h2>
-          <Button onClick={() => router.push("/expenses")}>
-            Add Expense
-          </Button>
-        </div>
-
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">
             Loading budget...

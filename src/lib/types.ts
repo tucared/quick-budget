@@ -129,4 +129,6 @@ export const STORAGE_KEYS = {
   LAST_CATEGORY: "quick_budget_last_category",
   LAST_ACCOUNT: "quick_budget_last_account",
   LAST_CURRENCY: "quick_budget_last_currency",
+  CATEGORY_USAGE: "quick_budget_category_usage",
+  ACCOUNT_USAGE: "quick_budget_account_usage",
 } as const

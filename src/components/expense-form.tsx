@@ -33,6 +33,19 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [loadError, setLoadError] = useState("")
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [showAllCategories, setShowAllCategories] = useState(false)
+  const [showAllAccounts, setShowAllAccounts] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Check if we're on mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const {
     register,
@@ -53,6 +66,42 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const selectedCategory = watch("category_id")
   const selectedAccount = watch("account_id")
   const selectedCurrency = watch("currency")
+
+  // Helper functions for tracking usage recency (timestamp-based)
+  const getUsageMap = (key: string): Record<string, number> => {
+    try {
+      const stored = localStorage.getItem(key)
+      return stored ? JSON.parse(stored) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  const recordUsage = (key: string, id: string) => {
+    try {
+      const usageMap = getUsageMap(key)
+      usageMap[id] = Date.now() // Store timestamp of last use
+      localStorage.setItem(key, JSON.stringify(usageMap))
+    } catch {
+      // localStorage might be disabled
+    }
+  }
+
+  const getRecentlyUsed = (items: Category[] | Account[], usageKey: string, limit = 3): string[] => {
+    const usageMap = getUsageMap(usageKey)
+    const sorted = items
+      .map((item) => ({ id: item.id, lastUsed: usageMap[item.id] || 0 }))
+      .sort((a, b) => {
+        // Sort by most recent first, then alphabetically for unused items
+        if (a.lastUsed === 0 && b.lastUsed === 0) {
+          const aName = items.find((i) => i.id === a.id)?.name || ""
+          const bName = items.find((i) => i.id === b.id)?.name || ""
+          return aName.localeCompare(bName)
+        }
+        return b.lastUsed - a.lastUsed
+      })
+    return sorted.slice(0, limit).map((item) => item.id)
+  }
 
   // Load categories and accounts on mount
   useEffect(() => {
@@ -236,13 +285,16 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         return
       }
 
-      // Save defaults to localStorage
+      // Save defaults to localStorage and track usage
       try {
         localStorage.setItem(STORAGE_KEYS.LAST_CATEGORY, data.category_id)
         localStorage.setItem(STORAGE_KEYS.LAST_ACCOUNT, data.account_id)
         if (data.currency) {
           localStorage.setItem(STORAGE_KEYS.LAST_CURRENCY, data.currency)
         }
+        // Track usage frequency
+        recordUsage(STORAGE_KEYS.CATEGORY_USAGE, data.category_id)
+        recordUsage(STORAGE_KEYS.ACCOUNT_USAGE, data.account_id)
       } catch (err) {
         // localStorage might be disabled, silently fail
         // This is not critical for functionality
@@ -359,22 +411,77 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {/* Category */}
       <div className="space-y-2">
         <Label htmlFor="category">Category *</Label>
-        <Select
-          value={selectedCategory}
-          onValueChange={(value) => setValue("category_id", value)}
-        >
-          <SelectTrigger id="category">
-            <SelectValue placeholder="Select a category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.icon && <span className="mr-2">{category.icon}</span>}
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!showAllCategories ? (
+          <div className="space-y-2">
+            {/* Quick-pick buttons for frequently used categories */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {getRecentlyUsed(categories, STORAGE_KEYS.CATEGORY_USAGE, isMobile ? 2 : 5).map((categoryId) => {
+                const category = categories.find((c) => c.id === categoryId)
+                if (!category) return null
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => {
+                      setValue("category_id", category.id)
+                      setShowAllCategories(false)
+                    }}
+                    className={`px-3 py-2.5 text-sm font-medium border rounded-md transition-colors flex items-center justify-center ${
+                      selectedCategory === category.id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    {category.icon && <span className="mr-1.5">{category.icon}</span>}
+                    <span className="truncate">{category.name}</span>
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => setShowAllCategories(true)}
+                className="px-3 py-2.5 text-sm font-medium border rounded-md transition-colors bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground col-span-2 md:col-span-1"
+              >
+                Other...
+              </button>
+            </div>
+            {/* Show selected category if it's not in quick picks */}
+            {selectedCategory && !getRecentlyUsed(categories, STORAGE_KEYS.CATEGORY_USAGE, isMobile ? 2 : 5).includes(selectedCategory) && (
+              <div className="text-sm text-muted-foreground">
+                Selected: {categories.find((c) => c.id === selectedCategory)?.name}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Select
+              value={selectedCategory}
+              onValueChange={(value) => {
+                setValue("category_id", value)
+                setShowAllCategories(false)
+              }}
+            >
+              <SelectTrigger id="category">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.icon && <span className="mr-2">{category.icon}</span>}
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              type="button"
+              onClick={() => setShowAllCategories(false)}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              ← Back to quick picks
+            </button>
+          </div>
+        )}
         {errors.category_id && (
           <p className="text-sm text-destructive">
             {errors.category_id.message}
@@ -385,21 +492,75 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {/* Account */}
       <div className="space-y-2">
         <Label htmlFor="account">Account *</Label>
-        <Select
-          value={selectedAccount}
-          onValueChange={(value) => setValue("account_id", value)}
-        >
-          <SelectTrigger id="account">
-            <SelectValue placeholder="Select an account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!showAllAccounts ? (
+          <div className="space-y-2">
+            {/* Quick-pick buttons for frequently used accounts */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {getRecentlyUsed(accounts, STORAGE_KEYS.ACCOUNT_USAGE, isMobile ? 2 : 5).map((accountId) => {
+                const account = accounts.find((a) => a.id === accountId)
+                if (!account) return null
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => {
+                      setValue("account_id", account.id)
+                      setShowAllAccounts(false)
+                    }}
+                    className={`px-3 py-2.5 text-sm font-medium border rounded-md transition-colors ${
+                      selectedAccount === account.id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <span className="truncate">{account.name}</span>
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => setShowAllAccounts(true)}
+                className="px-3 py-2.5 text-sm font-medium border rounded-md transition-colors bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground col-span-2 md:col-span-1"
+              >
+                Other...
+              </button>
+            </div>
+            {/* Show selected account if it's not in quick picks */}
+            {selectedAccount && !getRecentlyUsed(accounts, STORAGE_KEYS.ACCOUNT_USAGE, isMobile ? 2 : 5).includes(selectedAccount) && (
+              <div className="text-sm text-muted-foreground">
+                Selected: {accounts.find((a) => a.id === selectedAccount)?.name}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Select
+              value={selectedAccount}
+              onValueChange={(value) => {
+                setValue("account_id", value)
+                setShowAllAccounts(false)
+              }}
+            >
+              <SelectTrigger id="account">
+                <SelectValue placeholder="Select an account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              type="button"
+              onClick={() => setShowAllAccounts(false)}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              ← Back to quick picks
+            </button>
+          </div>
+        )}
         {errors.account_id && (
           <p className="text-sm text-destructive">
             {errors.account_id.message}
