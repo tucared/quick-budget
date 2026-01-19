@@ -34,7 +34,8 @@ BEGIN
   INSERT INTO auth.users (
     instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at, confirmation_token, recovery_token, email_change_token_new
+    created_at, updated_at, confirmation_token, email_change,
+    email_change_token_new, recovery_token
   ) VALUES (
     '00000000-0000-0000-0000-000000000000',
     gen_random_uuid(),
@@ -44,14 +45,28 @@ BEGIN
     NOW(),
     '{"provider":"email","providers":["email"]}',
     '{"full_name":"User One"}',
-    NOW(), NOW(), '', '', ''
+    NOW(), NOW(), '', '', '', ''
   ) RETURNING id INTO user1_id;
+
+  -- Create identity for User 1
+  INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+  VALUES (
+    user1_id,
+    user1_id,
+    format('{"sub": "%s", "email": "user1@example.com"}', user1_id)::jsonb,
+    'email',
+    user1_id,
+    NOW(),
+    NOW(),
+    NOW()
+  );
 
   -- Create User 2
   INSERT INTO auth.users (
     instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at, confirmation_token, recovery_token, email_change_token_new
+    created_at, updated_at, confirmation_token, email_change,
+    email_change_token_new, recovery_token
   ) VALUES (
     '00000000-0000-0000-0000-000000000000',
     gen_random_uuid(),
@@ -61,8 +76,21 @@ BEGIN
     NOW(),
     '{"provider":"email","providers":["email"]}',
     '{"full_name":"User Two"}',
-    NOW(), NOW(), '', '', ''
+    NOW(), NOW(), '', '', '', ''
   ) RETURNING id INTO user2_id;
+
+  -- Create identity for User 2
+  INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+  VALUES (
+    user2_id,
+    user2_id,
+    format('{"sub": "%s", "email": "user2@example.com"}', user2_id)::jsonb,
+    'email',
+    user2_id,
+    NOW(),
+    NOW(),
+    NOW()
+  );
 
   -- Get auto-created household IDs
   SELECT household_id INTO household1_id FROM public.users WHERE id = user1_id;

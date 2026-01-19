@@ -11,3 +11,4 @@
 - Use Playwright MCP to verify your changes before commiting
 - Use Supabase MCP instead of docker for querying the db etc.
 - DO NOT WRITE ANY migrations, just edit the initial migration file and run `supabase db reset`
+- When editing the seeds, dont forget to update .template files as well
