@@ -124,6 +124,26 @@ export interface ExpenseWithDetails extends Expense {
   account?: Account
 }
 
+// Goal-related types for tracking accumulation goals
+export interface GoalAllocation extends BudgetAllocation {
+  category?: Category
+}
+
+export interface GoalSummary {
+  category_id: string
+  category_name: string
+  category_icon: string | null
+  category_color: string | null
+  current_balance: number
+  last_contribution: number
+}
+
+export interface CumulativeGoalData {
+  month: string
+  [goalName: string]: number | string // number for goal amounts, string for month
+  total: number
+}
+
 // Local storage keys for remembering defaults
 export const STORAGE_KEYS = {
   LAST_CATEGORY: "quick_budget_last_category",
