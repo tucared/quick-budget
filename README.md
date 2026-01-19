@@ -23,11 +23,9 @@ supabase start
 npm run dev
 ```
 
-Visit http://localhost:3000 and log in with:
-- **user1@test.com** / password123
-- **user2@test.com** / password123
+Visit http://localhost:3000
 
-Database is pre-seeded with sample accounts and expenses for each user.
+Default credentials are configured in `supabase/seeds/prod/scripts/config.local.js`.
 
 ### Development URLs
 
@@ -77,8 +75,7 @@ src/
 supabase/
 ├── migrations/            # Database migrations
 ├── seeds/
-│   ├── dev/              # Development seeds (test users, sample data)
-│   └── prod/             # Production seeds (real users, no sample data)
+│   └── prod/             # Production seeds (real historical data)
 └── config.toml           # Supabase config
 ```
 
@@ -106,27 +103,16 @@ supabase db push
 
 ## Database Seeding
 
-Seeds are organized into two directories:
-
-### Development Seeds (`supabase/seeds/dev/`)
-- **Committed to git** for local development
-- Contains test users (user1@test.com, user2@test.com) with password123
-- Includes sample accounts, categories, and expenses
-- Runs automatically via `supabase db reset`
-
-### Production Seeds (`supabase/seeds/prod/`)
-- **NOT committed to git** (contains real user data)
-- Template file for creating real users and accounts
-- No sample expenses (will be imported from existing system)
-- Run manually in Supabase Studio SQL Editor
-
 ```bash
-# Local development: Reset and reseed database
-supabase db reset
+# Full workflow: Transform CSVs and reset database
+npm run seed:full
 
-# Production: Edit supabase/seeds/prod/01_users_and_accounts.sql
-# then run manually in Supabase Studio SQL Editor
+# Or run steps individually:
+npm run seed:transform  # Transform raw CSVs to SQL
+npm run seed:reset      # Reset database with migrations and seeds
 ```
+
+Seeds are automatically run when you execute `supabase db reset`.
 
 ## Other Documentation
 

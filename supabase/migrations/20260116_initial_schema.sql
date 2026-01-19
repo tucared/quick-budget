@@ -2,8 +2,14 @@
 -- Created: 2026-01-16
 -- Purpose: MVP schema for JTBD #17 (Frictionless Expense Logging)
 
+-- Suppress informational notices during migration
+SET client_min_messages = warning;
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Restore normal message level
+RESET client_min_messages;
 
 -- ============================================================================
 -- USERS TABLE
@@ -57,21 +63,6 @@ BEGIN
   -- Create default account for the user
   INSERT INTO public.accounts (household_id, owner_user_id, name, account_type, is_default, currency)
   VALUES (new_household_id, NEW.id, 'Primary Account', 'other', TRUE, 'USD');
-
-  -- Seed default categories for the household
-  INSERT INTO public.categories (household_id, name, category_type, icon, is_active) VALUES
-    (new_household_id, 'Groceries', 'monthly', '🛒', TRUE),
-    (new_household_id, 'Dining Out', 'monthly', '🍽️', TRUE),
-    (new_household_id, 'Transportation', 'monthly', '🚗', TRUE),
-    (new_household_id, 'Bills & Utilities', 'monthly', '💡', TRUE),
-    (new_household_id, 'Shopping', 'monthly', '🛍️', TRUE),
-    (new_household_id, 'Entertainment', 'monthly', '🎬', TRUE),
-    (new_household_id, 'Healthcare', 'monthly', '⚕️', TRUE),
-    (new_household_id, 'Personal Care', 'monthly', '💇', TRUE),
-    (new_household_id, 'Education', 'monthly', '📚', TRUE),
-    (new_household_id, 'Other', 'monthly', '📌', TRUE),
-    (new_household_id, 'Emergency Fund', 'long_term', '🏦', TRUE),
-    (new_household_id, 'Holiday Fund', 'long_term', '✈️', TRUE);
 
   RETURN NEW;
 END;
@@ -210,6 +201,7 @@ CREATE INDEX idx_accounts_owner ON accounts(owner_user_id);
 CREATE TABLE expenses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   logged_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
   account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
 
@@ -235,44 +227,29 @@ CREATE TABLE expenses (
 -- Enable RLS
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 
--- Household members can access expenses via account relationship
+-- Household members can access expenses via household_id
 CREATE POLICY "Household members can view expenses" ON expenses
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM accounts a
-      WHERE a.id = expenses.account_id
-      AND a.household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-    )
+    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "Household members can insert expenses" ON expenses
   FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM accounts a
-      WHERE a.id = expenses.account_id
-      AND a.household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-    )
+    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "Household members can update expenses" ON expenses
   FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM accounts a
-      WHERE a.id = expenses.account_id
-      AND a.household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-    )
+    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "Household members can delete expenses" ON expenses
   FOR DELETE USING (
-    EXISTS (
-      SELECT 1 FROM accounts a
-      WHERE a.id = expenses.account_id
-      AND a.household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-    )
+    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
   );
 
 -- Create indexes for common queries
+CREATE INDEX idx_expenses_household ON expenses(household_id);
 CREATE INDEX idx_expenses_logged_by ON expenses(logged_by_user_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
 CREATE INDEX idx_expenses_category ON expenses(category_id);
