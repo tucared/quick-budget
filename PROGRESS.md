@@ -57,7 +57,7 @@ When considering a big purchase right now, we want to see our overall financial 
 
 ## Mid-Month Adjustments & Rebalancing
 
-### [ ] JTBD #13: Get notified when overspending
+### [x] JTBD #13: Get notified when overspending
 When I log an expense that makes a category overspent, I want to be notified immediately, so I can take action before it affects our overall budget
 
 ### [ ] JTBD #14: Rebalance categories mid-month
