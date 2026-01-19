@@ -25,39 +25,39 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
   }
 
   return (
-    <Card className="border-2">
-      <CardHeader>
-        <CardTitle>Total Budget</CardTitle>
+    <Card className="border">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-medium">Total Budget</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="pt-0">
+        <div className="space-y-3">
           {/* Amount grid */}
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-3 gap-3 text-center">
             <div>
-              <div className="text-sm text-muted-foreground mb-1">Allocated</div>
-              <div className="text-xl font-bold">€{totalAllocated.toFixed(0)}</div>
+              <div className="text-xs text-muted-foreground mb-0.5">Allocated</div>
+              <div className="text-lg font-semibold">€{totalAllocated.toFixed(0)}</div>
             </div>
             <div>
-              <div className="text-sm text-muted-foreground mb-1">Spent</div>
-              <div className="text-xl font-bold">€{totalSpent.toFixed(0)}</div>
+              <div className="text-xs text-muted-foreground mb-0.5">Spent</div>
+              <div className="text-lg font-semibold">€{totalSpent.toFixed(0)}</div>
             </div>
             <div>
-              <div className="text-sm text-muted-foreground mb-1">Remaining</div>
-              <div className={`text-xl font-bold ${getStatusColor()}`}>
+              <div className="text-xs text-muted-foreground mb-0.5">Remaining</div>
+              <div className={`text-lg font-semibold ${getStatusColor()}`}>
                 €{totalRemaining.toFixed(0)}
               </div>
             </div>
           </div>
 
           {/* Progress bar */}
-          <div className="space-y-2">
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div className="space-y-1.5">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-300 ${getProgressBarColor()}`}
                 style={{ width: `${Math.min(percentSpent, 100)}%` }}
               />
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
                 {percentSpent.toFixed(0)}% spent
               </span>
