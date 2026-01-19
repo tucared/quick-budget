@@ -35,16 +35,16 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-sm text-muted-foreground mb-1">Allocated</div>
-              <div className="text-xl font-bold">${totalAllocated.toFixed(0)}</div>
+              <div className="text-xl font-bold">€{totalAllocated.toFixed(0)}</div>
             </div>
             <div>
               <div className="text-sm text-muted-foreground mb-1">Spent</div>
-              <div className="text-xl font-bold">${totalSpent.toFixed(0)}</div>
+              <div className="text-xl font-bold">€{totalSpent.toFixed(0)}</div>
             </div>
             <div>
               <div className="text-sm text-muted-foreground mb-1">Remaining</div>
               <div className={`text-xl font-bold ${getStatusColor()}`}>
-                ${totalRemaining.toFixed(0)}
+                €{totalRemaining.toFixed(0)}
               </div>
             </div>
           </div>
