@@ -110,6 +110,9 @@ export default function BudgetPage() {
             <Button variant="default" disabled>
               Budget
             </Button>
+            <Button variant="outline" onClick={() => router.push("/pots")}>
+              Pots
+            </Button>
             <Button variant="outline" onClick={handleLogout}>
               Log Out
             </Button>

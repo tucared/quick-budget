@@ -28,7 +28,7 @@ When planning our budget, we want to see our true baseline expenses (bills, subs
 
 ## Monthly Review & Progress Tracking
 
-### [ ] JTBD #6: Track accumulation goals
+### [x] JTBD #6: Track accumulation goals
 When reviewing our finances at month-end, we want to see if we're on track with our earmarked savings (holidays, house, retirement), so we can adjust our accumulation goals or monthly spending if we're falling behind
 
 ### [ ] JTBD #7: Ensure fairness between partners
