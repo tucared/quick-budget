@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:transform": "node supabase/seeds/prod/scripts/transform-csvs.js",
+    "seed:reset": "supabase db reset",
+    "seed:full": "npm run seed:transform && npm run seed:reset"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -31,6 +34,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
+    "csv-parse": "^5.6.0",
+    "csv-stringify": "^6.5.0",
     "eslint": "^8",
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.4.49",

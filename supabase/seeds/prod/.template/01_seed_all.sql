@@ -1,0 +1,134 @@
+-- ============================================================================
+-- 01_seed_all.sql - Automated Full Database Seeding
+-- ============================================================================
+-- Creates users, household, accounts, categories
+-- Fully automated - no manual UUID replacement needed
+-- ============================================================================
+
+DO $$
+DECLARE
+  user1_id UUID;
+  user2_id UUID;
+  household1_id UUID;
+  household2_id UUID;
+  shared_household_id UUID;
+  default_account_id UUID;
+  imported_count INTEGER;
+BEGIN
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'Starting automated database seeding...';
+  RAISE NOTICE '========================================';
+
+  -- ============================================================================
+  -- STEP 1: Create Users and Shared Household
+  -- ============================================================================
+  RAISE NOTICE '[1/5] Creating users and household...';
+
+  -- Clean up any existing users (for local re-runs)
+  DELETE FROM auth.users WHERE email IN (
+    'user1@example.com',
+    'user2@example.com'
+  );
+
+  -- Create User 1
+  INSERT INTO auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at, confirmation_token, recovery_token, email_change_token_new
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    gen_random_uuid(),
+    'authenticated', 'authenticated',
+    'user1@example.com',
+    crypt('password1', gen_salt('bf')),
+    NOW(),
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"User One"}',
+    NOW(), NOW(), '', '', ''
+  ) RETURNING id INTO user1_id;
+
+  -- Create User 2
+  INSERT INTO auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at, confirmation_token, recovery_token, email_change_token_new
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    gen_random_uuid(),
+    'authenticated', 'authenticated',
+    'user2@example.com',
+    crypt('password2', gen_salt('bf')),
+    NOW(),
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"User Two"}',
+    NOW(), NOW(), '', '', ''
+  ) RETURNING id INTO user2_id;
+
+  -- Get auto-created household IDs
+  SELECT household_id INTO household1_id FROM public.users WHERE id = user1_id;
+  SELECT household_id INTO household2_id FROM public.users WHERE id = user2_id;
+
+  -- Create shared household
+  INSERT INTO public.households (name) VALUES ('Home')
+  RETURNING id INTO shared_household_id;
+
+  -- Consolidate users into shared household
+  UPDATE public.users SET household_id = shared_household_id WHERE id IN (user1_id, user2_id);
+  UPDATE public.accounts SET household_id = shared_household_id WHERE owner_user_id IN (user1_id, user2_id);
+
+  -- Delete auto-created households
+  DELETE FROM public.households WHERE id IN (household1_id, household2_id);
+
+  RAISE NOTICE '  ✓ Created 2 users in shared household';
+
+  -- ============================================================================
+  -- STEP 2: Create Accounts
+  -- ============================================================================
+  RAISE NOTICE '[2/5] Creating accounts...';
+
+  -- Delete auto-created default accounts from trigger (2 accounts, 1 per user)
+  DELETE FROM public.accounts WHERE household_id = shared_household_id;
+
+  -- Create accounts (customize as needed)
+  INSERT INTO public.accounts (household_id, owner_user_id, name, account_type, currency, is_default, is_active) VALUES
+    (shared_household_id, user1_id, 'Checking Account', 'bank_account', 'EUR', TRUE, TRUE),
+    (shared_household_id, user1_id, 'Savings Account', 'bank_account', 'EUR', FALSE, TRUE),
+    (shared_household_id, user1_id, 'Cash', 'cash', 'EUR', FALSE, TRUE),
+    (shared_household_id, user2_id, 'Credit Card', 'credit_card', 'EUR', FALSE, TRUE);
+
+  RAISE NOTICE '  ✓ Created accounts';
+
+  -- ============================================================================
+  -- STEP 3: Create Categories
+  -- ============================================================================
+  RAISE NOTICE '[3/5] Creating categories...';
+
+  -- Monthly categories (customize as needed)
+  INSERT INTO public.categories (household_id, name, category_type, is_active) VALUES
+    (shared_household_id, 'Groceries', 'monthly', TRUE),
+    (shared_household_id, 'Dining Out', 'monthly', TRUE),
+    (shared_household_id, 'Transportation', 'monthly', TRUE),
+    (shared_household_id, 'Entertainment', 'monthly', TRUE),
+    (shared_household_id, 'Shopping', 'monthly', TRUE),
+    (shared_household_id, 'Bills', 'monthly', TRUE);
+
+  -- Long-term categories (customize as needed)
+  INSERT INTO public.categories (household_id, name, category_type, is_active) VALUES
+    (shared_household_id, 'Emergency Fund', 'long_term', TRUE),
+    (shared_household_id, 'Vacation Savings', 'long_term', TRUE),
+    (shared_household_id, 'Retirement', 'long_term', TRUE);
+
+  RAISE NOTICE '  ✓ Created categories';
+
+  -- ============================================================================
+  -- Summary
+  -- ============================================================================
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'Base seeding complete!';
+  RAISE NOTICE 'Data will be imported in next seed file...';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'Login credentials:';
+  RAISE NOTICE '  user1@example.com / password1';
+  RAISE NOTICE '  user2@example.com / password2';
+  RAISE NOTICE '========================================';
+END $$;

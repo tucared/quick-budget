@@ -36,7 +36,13 @@
       "mcp__playwright__browser_console_messages",
       "mcp__playwright__browser_evaluate",
       "mcp__playwright__browser_run_code",
-      "mcp__playwright__browser_network_requests"
+      "mcp__playwright__browser_network_requests",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(npm run seed:transform:*)",
+      "Bash(npm run seed:full:*)",
+      "Bash(jj show:*)",
+      "Bash(npm run seed:reset:*)"
     ]
   },
   "enabledMcpjsonServers": [

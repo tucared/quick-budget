@@ -1,0 +1,330 @@
+#!/usr/bin/env node
+
+/**
+ * CSV Transformation Pipeline
+ * Transforms raw CSV files from external app to database-ready format
+ *
+ * Usage: node transform-csvs.js
+ * Input: raw/*.csv
+ * Output: normalized/*.csv
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { parse } = require('csv-parse/sync');
+const { validateExpense, validateBudgetAllocation } = require('./validators');
+
+// Load config.local.js if it exists, otherwise use config.js template
+const SCRIPT_DIR_FOR_CONFIG = __dirname;
+let config;
+try {
+  config = require('./config.local');
+  console.log('Using config.local.js');
+} catch (e) {
+  config = require('./config');
+  console.log('Using config.js template');
+}
+
+// Resolve paths relative to script directory
+const SCRIPT_DIR = __dirname;
+const RAW_DIR = path.join(SCRIPT_DIR, '..', config.paths.raw);
+const NORMALIZED_DIR = path.join(SCRIPT_DIR, '..', config.paths.normalized);
+
+/**
+ * Reads and parses CSV file
+ */
+function readCsv(filePath) {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  // Remove BOM if present
+  const cleanContent = content.replace(/^\uFEFF/, '');
+  return parse(cleanContent, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true
+  });
+}
+
+/**
+ * Escapes string for SQL
+ */
+function escapeSql(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'NULL';
+  }
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+  // Escape single quotes by doubling them
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+/**
+ * Generates SQL INSERT statements for expenses
+ */
+function generateExpensesSql(data) {
+  const lines = [];
+  lines.push('-- Expense data from transformed CSV');
+  lines.push('INSERT INTO public.expenses (');
+  lines.push('  logged_by_user_id, household_id, category_id, account_id,');
+  lines.push('  amount, currency, converted_amount, converted_currency, exchange_rate,');
+  lines.push('  expense_date, description');
+  lines.push(') VALUES');
+
+  const values = data.map((row, index) => {
+    const isLast = index === data.length - 1;
+    return `  (
+    user1_id, shared_household_id,
+    (SELECT id FROM public.categories WHERE name = ${escapeSql(row.category)} AND household_id = shared_household_id),
+    (SELECT id FROM public.accounts WHERE name = ${escapeSql(row.account)} AND household_id = shared_household_id),
+    ${escapeSql(row.amount)}, ${escapeSql(row.currency)},
+    ${escapeSql(row.converted_amount)}, ${escapeSql(row.converted_currency)}, ${escapeSql(row.exchange_rate)},
+    ${escapeSql(row.expense_date)}, ${escapeSql(row.description)}
+  )${isLast ? ';' : ','}`;
+  });
+
+  lines.push(...values);
+  return lines.join('\n');
+}
+
+/**
+ * Generates SQL INSERT statements for budget allocations
+ */
+function generateBudgetSql(data) {
+  const lines = [];
+  lines.push('-- Budget allocation data from transformed CSV');
+  lines.push('INSERT INTO public.budget_allocations (');
+  lines.push('  household_id, category_id, budget_month, allocated_amount, currency');
+  lines.push(') VALUES');
+
+  const values = data.map((row, index) => {
+    const isLast = index === data.length - 1;
+    return `  (
+    shared_household_id,
+    (SELECT id FROM public.categories WHERE name = ${escapeSql(row.category)} AND household_id = shared_household_id),
+    ${escapeSql(row.budget_month)}, ${escapeSql(row.allocated_amount)}, ${escapeSql(row.currency)}
+  )${isLast ? ';' : ','}`;
+  });
+
+  lines.push(...values);
+  return lines.join('\n');
+}
+
+/**
+ * Transforms expense CSV files
+ */
+function transformExpenses() {
+  console.log('\n📊 Transforming expenses...');
+
+  const inputFile = path.join(RAW_DIR, 'expenses.csv');
+  const rows = readCsv(inputFile);
+  const transformed = [];
+  const stats = {
+    total: rows.length,
+    valid: 0,
+    skipped: 0,
+    errors: 0,
+    errorDetails: []
+  };
+
+  rows.forEach((row, index) => {
+    const result = validateExpense(row);
+
+    if (result.valid) {
+      transformed.push(result.data);
+      stats.valid++;
+    } else if (result.skip) {
+      stats.skipped++;
+    } else {
+      stats.errors++;
+      stats.errorDetails.push({
+        row: index + 2,  // +2 for header and 0-based index
+        errors: result.errors,
+        data: row
+      });
+    }
+  });
+
+  console.log(`  ✓ Processed ${stats.total} rows`);
+  console.log(`    • Valid: ${stats.valid}`);
+  console.log(`    • Skipped: ${stats.skipped}`);
+  console.log(`    • Errors: ${stats.errors}`);
+
+  if (stats.errors > 0) {
+    console.log('\n⚠️  Errors found:');
+    stats.errorDetails.slice(0, 5).forEach(err => {
+      console.log(`  Row ${err.row}: ${err.errors.join(', ')}`);
+    });
+    if (stats.errorDetails.length > 5) {
+      console.log(`  ... and ${stats.errorDetails.length - 5} more`);
+    }
+  }
+
+  return { stats, data: transformed };
+}
+
+/**
+ * Transforms budget allocation CSV files
+ */
+function transformBudgetAllocations() {
+  console.log('\n💰 Transforming budget allocations...');
+
+  const inputFiles = [
+    path.join(RAW_DIR, 'budget_allocations_1.csv'),
+    path.join(RAW_DIR, 'budget_allocations_2.csv')
+  ];
+
+  const transformed = [];
+  const stats = {
+    total: 0,
+    valid: 0,
+    skipped: 0,
+    errors: 0,
+    errorDetails: []
+  };
+
+  inputFiles.forEach(inputFile => {
+    if (!fs.existsSync(inputFile)) {
+      console.log(`  ⚠️  File not found: ${path.basename(inputFile)}`);
+      return;
+    }
+
+    const rows = readCsv(inputFile);
+    stats.total += rows.length;
+
+    rows.forEach((row, index) => {
+      const result = validateBudgetAllocation(row);
+
+      if (result.valid) {
+        transformed.push(result.data);
+        stats.valid++;
+      } else if (result.skip) {
+        stats.skipped++;
+      } else {
+        stats.errors++;
+        stats.errorDetails.push({
+          file: path.basename(inputFile),
+          row: index + 2,
+          errors: result.errors,
+          data: row
+        });
+      }
+    });
+  });
+
+  console.log(`  ✓ Processed ${stats.total} rows from 2 files`);
+  console.log(`    • Valid: ${stats.valid}`);
+  console.log(`    • Skipped: ${stats.skipped}`);
+  console.log(`    • Errors: ${stats.errors}`);
+
+  if (stats.errors > 0) {
+    console.log('\n⚠️  Errors found:');
+    stats.errorDetails.slice(0, 5).forEach(err => {
+      console.log(`  ${err.file} row ${err.row}: ${err.errors.join(', ')}`);
+    });
+    if (stats.errorDetails.length > 5) {
+      console.log(`  ... and ${stats.errorDetails.length - 5} more`);
+    }
+  }
+
+  return { stats, data: transformed };
+}
+
+/**
+ * Main transformation pipeline
+ */
+function main() {
+  console.log('========================================');
+  console.log('🔄 CSV Transformation Pipeline');
+  console.log('========================================');
+
+  const SEED_DIR = path.join(SCRIPT_DIR, '..');
+  const outputFile = path.join(SEED_DIR, '02_import_normalized.sql');
+
+  try {
+    const expenseResult = transformExpenses();
+    const budgetResult = transformBudgetAllocations();
+
+    // Generate SQL file
+    console.log('\n📝 Generating SQL seed file...');
+
+    const sqlLines = [];
+    sqlLines.push('-- ============================================================================');
+    sqlLines.push('-- 02_import_normalized.sql - Import Normalized Data');
+    sqlLines.push('-- ============================================================================');
+    sqlLines.push('-- Auto-generated by transform-csvs.js');
+    sqlLines.push(`-- Generated: ${new Date().toISOString()}`);
+    sqlLines.push('-- ============================================================================');
+    sqlLines.push('');
+    sqlLines.push('DO $$');
+    sqlLines.push('DECLARE');
+    sqlLines.push('  shared_household_id UUID;');
+    sqlLines.push('  user1_id UUID;');
+    sqlLines.push('  imported_count INTEGER;');
+    sqlLines.push('BEGIN');
+    sqlLines.push('  RAISE NOTICE \'========================================\';');
+    sqlLines.push('  RAISE NOTICE \'[4/5] Importing normalized data...\';');
+    sqlLines.push('  RAISE NOTICE \'========================================\';');
+    sqlLines.push('');
+    sqlLines.push('  -- Get IDs');
+    sqlLines.push('  SELECT id INTO shared_household_id FROM public.households LIMIT 1;');
+    sqlLines.push('  SELECT id INTO user1_id FROM public.users WHERE email = \'max.perdrigeat@gmail.com\';');
+    sqlLines.push('');
+    sqlLines.push('  -- ============================================================================');
+    sqlLines.push('  -- Import Budget Allocations');
+    sqlLines.push('  -- ============================================================================');
+    sqlLines.push('  RAISE NOTICE \'  Importing budget allocations...\';');
+    sqlLines.push('');
+    sqlLines.push(generateBudgetSql(budgetResult.data));
+    sqlLines.push('');
+    sqlLines.push('  GET DIAGNOSTICS imported_count = ROW_COUNT;');
+    sqlLines.push('  RAISE NOTICE \'  ✓ Imported % budget allocations\', imported_count;');
+    sqlLines.push('');
+    sqlLines.push('  -- ============================================================================');
+    sqlLines.push('  -- Import Expenses');
+    sqlLines.push('  -- ============================================================================');
+    sqlLines.push('  RAISE NOTICE \'  Importing expenses...\';');
+    sqlLines.push('');
+    sqlLines.push(generateExpensesSql(expenseResult.data));
+    sqlLines.push('');
+    sqlLines.push('  GET DIAGNOSTICS imported_count = ROW_COUNT;');
+    sqlLines.push('  RAISE NOTICE \'  ✓ Imported % expenses\', imported_count;');
+    sqlLines.push('');
+    sqlLines.push('  -- ============================================================================');
+    sqlLines.push('  -- Summary');
+    sqlLines.push('  -- ============================================================================');
+    sqlLines.push('  RAISE NOTICE \'========================================\';');
+    sqlLines.push('  RAISE NOTICE \'[5/5] Data import complete!\';');
+    sqlLines.push('  RAISE NOTICE \'========================================\';');
+    sqlLines.push('END $$;');
+    sqlLines.push('');
+
+    fs.writeFileSync(outputFile, sqlLines.join('\n'), 'utf-8');
+
+    console.log('\n========================================');
+    console.log('✅ Transformation complete!');
+    console.log('========================================');
+    console.log(`📁 Output: ${outputFile}`);
+    console.log(`  • ${budgetResult.stats.valid} budget allocations`);
+    console.log(`  • ${expenseResult.stats.valid} expenses`);
+    console.log('========================================\n');
+
+    // Exit with error if there were validation errors
+    if (expenseResult.stats.errors > 0 || budgetResult.stats.errors > 0) {
+      console.error('❌ Transformation completed with errors');
+      process.exit(1);
+    }
+
+  } catch (error) {
+    console.error('\n❌ Fatal error during transformation:');
+    console.error(error.message);
+    console.error(error.stack);
+    process.exit(1);
+  }
+}
+
+// Run if called directly
+if (require.main === module) {
+  main();
+}
+
+module.exports = { main, transformExpenses, transformBudgetAllocations };

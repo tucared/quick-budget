@@ -37,4 +37,11 @@ next-env.d.ts
 chrome/
 
 # Supabase production seeds (contain real user data)
-/supabase/seeds/prod/
+supabase/seeds/prod/*.sql
+supabase/seeds/prod/*.csv
+supabase/seeds/prod/raw/
+supabase/seeds/prod/normalized/
+supabase/seeds/prod/scripts/config.local.js
+# Keep scripts and templates
+!supabase/seeds/prod/scripts/
+!supabase/seeds/prod/.template/

@@ -89,5 +89,5 @@ When logging an expense in BRL, I want to enter the amount I actually paid, so I
 
 ## Data Migration & Import
 
-### [ ] JTBD #21: Import historical data from current app
+### [x] JTBD #21: Import historical data from current app
 When setting up the new system, I want to import my expense and budget data from CSV exports of my current app, so I have continuity of my financial history and can see trends without starting from zero
