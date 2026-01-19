@@ -27,13 +27,6 @@ CREATE TABLE users (
 -- Enable RLS
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
--- Users can only read and update their own profile
-CREATE POLICY "Users can view own profile" ON users
-  FOR SELECT USING ((SELECT auth.uid()) = id);
-
-CREATE POLICY "Users can update own profile" ON users
-  FOR UPDATE USING ((SELECT auth.uid()) = id);
-
 -- Automatically create user profile on signup
 -- NOTE: This function references households table which is defined below
 -- The function is created here but the trigger is created after households table exists
@@ -85,6 +78,30 @@ ALTER TABLE households ENABLE ROW LEVEL SECURITY;
 -- Now add household_id to users table (after households table exists)
 ALTER TABLE users ADD COLUMN household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE;
 CREATE INDEX idx_users_household ON users(household_id);
+
+-- Create a SECURITY DEFINER function to get household_id without triggering RLS
+CREATE OR REPLACE FUNCTION public.get_my_household_id()
+RETURNS UUID
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT household_id FROM users WHERE id = auth.uid() LIMIT 1;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.get_my_household_id() TO authenticated;
+
+-- Now create RLS policies for users (after household_id exists)
+-- Users can view members of their household
+CREATE POLICY "Users can view household members" ON users
+  FOR SELECT USING (
+    id = auth.uid() OR household_id = public.get_my_household_id()
+  );
+
+CREATE POLICY "Users can update own profile" ON users
+  FOR UPDATE USING (id = auth.uid());
 
 -- Now create RLS policy for households (after household_id exists on users)
 CREATE POLICY "Users can view own household" ON households
