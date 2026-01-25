@@ -217,11 +217,6 @@ function validateBudgetAllocation(row) {
     errors.push('Invalid budget amount');
   }
 
-  // Skip negative allocations (constraint violation)
-  if (allocatedAmount < 0) {
-    return { valid: false, skip: true, reason: 'Negative allocation excluded' };
-  }
-
   // Validate date format (should already be YYYY-MM-DD from CSV)
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(row.month)) {
