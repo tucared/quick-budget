@@ -145,6 +145,9 @@ export function getLatestBalances(
   if (cumulativeData.length === 0) return []
 
   const latestDataPoint = cumulativeData[cumulativeData.length - 1]
+  const previousDataPoint = cumulativeData.length > 1
+    ? cumulativeData[cumulativeData.length - 2]
+    : null
   const summaries: GoalSummary[] = []
 
   // Get unique categories
@@ -158,6 +161,10 @@ export function getLatestBalances(
   categoryMap.forEach((allocation) => {
     const categoryName = allocation.category?.name || "Unknown"
     const currentBalance = (latestDataPoint[categoryName] as number) || 0
+    const previousBalance = previousDataPoint
+      ? ((previousDataPoint[categoryName] as number) || 0)
+      : 0
+    const lastContribution = currentBalance - previousBalance
 
     summaries.push({
       category_id: allocation.category_id,
@@ -165,7 +172,7 @@ export function getLatestBalances(
       category_icon: allocation.category?.icon || null,
       category_color: allocation.category?.color || null,
       current_balance: currentBalance,
-      last_contribution: allocation.allocated_amount,
+      last_contribution: lastContribution,
     })
   })
 
