@@ -87,6 +87,9 @@ export function BudgetBurndownChart({
   const chartData = useMemo(() => {
     if (budgets.length === 0) return { data: [], weekends: [] }
 
+    // Get set of category IDs from budgets prop (these are the categories we're tracking)
+    const budgetCategoryIds = new Set(budgets.map((b) => b.category_id))
+
     // Calculate total allocated amount for selected category
     const totalAllocated =
       selectedCategoryId === "all"
@@ -94,10 +97,10 @@ export function BudgetBurndownChart({
         : budgets.find((b) => b.category_id === selectedCategoryId)
             ?.allocated_amount || 0
 
-    // Filter expenses by selected category
+    // Filter expenses by selected category AND only include expenses from budgeted categories
     const filteredExpenses =
       selectedCategoryId === "all"
-        ? expenses
+        ? expenses.filter((e) => budgetCategoryIds.has(e.category_id))
         : expenses.filter((e) => e.category_id === selectedCategoryId)
 
     // Get number of days in the month and today's date
