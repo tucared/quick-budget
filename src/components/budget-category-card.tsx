@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import type { BudgetSummary } from "@/lib/types"
+import { formatCurrency, formatNumber } from "@/lib/currency"
 
 interface BudgetCategoryCardProps {
   budget: BudgetSummary
@@ -34,7 +35,7 @@ export function BudgetCategoryCard({ budget }: BudgetCategoryCardProps) {
           )}
           <h3 className="font-semibold text-base flex-1">{budget.category_name}</h3>
           <span className={`text-sm font-medium ${getTextColor()}`}>
-            {percentSpent.toFixed(0)}%
+            {formatNumber(percentSpent, 0)} %
           </span>
         </div>
 
@@ -52,16 +53,16 @@ export function BudgetCategoryCard({ budget }: BudgetCategoryCardProps) {
         <div className="grid grid-cols-3 gap-2 text-center text-sm">
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">Allocated</div>
-            <div className="font-semibold">€{allocated.toFixed(0)}</div>
+            <div className="font-semibold">{formatCurrency(allocated, 0)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">Spent</div>
-            <div className="font-semibold">€{spent.toFixed(2)}</div>
+            <div className="font-semibold">{formatCurrency(spent)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">Left</div>
             <div className={`font-semibold ${getTextColor()}`}>
-              €{remaining.toFixed(2)}
+              {formatCurrency(remaining)}
             </div>
           </div>
         </div>

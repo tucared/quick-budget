@@ -5,6 +5,7 @@ import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency } from "@/lib/currency"
 
 export function ExpenseList() {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([])
@@ -174,11 +175,11 @@ export function ExpenseList() {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <div className="font-semibold text-lg">
-                    €{expense.converted_amount.toFixed(2)}
+                    {formatCurrency(expense.converted_amount)}
                   </div>
                   {expense.currency !== "EUR" && (
                     <div className="text-xs text-muted-foreground">
-                      {expense.currency} {expense.amount.toFixed(2)}
+                      {expense.currency} {formatCurrency(expense.amount).replace('€', '')}
                     </div>
                   )}
                 </div>

@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CumulativeGoalData, GoalAllocation } from "@/lib/types";
+import { formatCurrency } from "@/lib/currency";
 
 interface GoalsSummaryCardProps {
   cumulativeData: CumulativeGoalData[];
@@ -33,7 +34,7 @@ export function GoalsSummaryCard({
               Net Worth
             </div>
             <div className="text-2xl font-semibold text-green-600">
-              €{totalAccumulated.toFixed(0)}
+              {formatCurrency(totalAccumulated, 0)}
             </div>
           </div>
           <div>
@@ -41,7 +42,7 @@ export function GoalsSummaryCard({
               Last Contibution
             </div>
             <div className="text-2xl font-semibold">
-              €{totalMonthlyContribution.toFixed(0)}
+              {formatCurrency(totalMonthlyContribution, 0)}
             </div>
           </div>
         </div>

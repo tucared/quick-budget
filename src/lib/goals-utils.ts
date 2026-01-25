@@ -46,8 +46,8 @@ export function calculateMonthlyNetSavings(
   // Build monthly net savings
   const monthlyData: MonthlyNetSavings[] = []
   const allMonths = new Set([
-    ...allocationsByMonth.keys(),
-    ...expensesByMonth.keys(),
+    ...Array.from(allocationsByMonth.keys()),
+    ...Array.from(expensesByMonth.keys()),
   ])
 
   // Sort months chronologically
@@ -61,8 +61,8 @@ export function calculateMonthlyNetSavings(
 
     // Get all categories that have allocations or expenses this month
     const allCategories = new Set([
-      ...allocationsMap.keys(),
-      ...expensesMap.keys(),
+      ...Array.from(allocationsMap.keys()),
+      ...Array.from(expensesMap.keys()),
     ])
 
     allCategories.forEach((categoryId) => {

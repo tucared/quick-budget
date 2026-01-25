@@ -27,3 +27,29 @@ export function getExchangeRate(fromCurrency: string, toCurrency: string = "EUR"
 
   return rate
 }
+
+// European number formatting utilities
+// Format: €120 000,99 (space as thousands separator, comma as decimal separator)
+
+/**
+ * Format a number with European style (space as thousands separator, comma as decimal)
+ * @param value - The number to format
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Formatted number string (e.g., "120 000,99")
+ */
+export function formatNumber(value: number, decimals: number = 2): string {
+  const parts = value.toFixed(decimals).split('.')
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const decimalPart = parts[1]
+  return decimals > 0 ? `${integerPart},${decimalPart}` : integerPart
+}
+
+/**
+ * Format a currency amount with European style
+ * @param value - The amount to format
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Formatted currency string (e.g., "€120 000,99")
+ */
+export function formatCurrency(value: number, decimals: number = 2): string {
+  return `€${formatNumber(value, decimals)}`
+}
