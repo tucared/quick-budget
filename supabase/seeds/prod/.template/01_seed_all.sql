@@ -141,10 +141,10 @@ BEGIN
     (shared_household_id, 'Bills', 'monthly', TRUE);
 
   -- Long-term categories (customize as needed)
-  INSERT INTO public.categories (household_id, name, category_type, is_active) VALUES
-    (shared_household_id, 'Emergency Fund', 'long_term', TRUE),
-    (shared_household_id, 'Vacation Savings', 'long_term', TRUE),
-    (shared_household_id, 'Retirement', 'long_term', TRUE);
+  INSERT INTO public.categories (household_id, name, category_type, color, is_active) VALUES
+    (shared_household_id, 'Emergency Fund', 'long_term', '#3b82f6', TRUE),
+    (shared_household_id, 'Vacation Savings', 'long_term', '#8b5cf6', TRUE),
+    (shared_household_id, 'Retirement', 'long_term', '#ec4899', TRUE);
 
   RAISE NOTICE '  ✓ Created categories';
 
