@@ -1,9 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { CumulativeGoalData, GoalAllocation } from "@/lib/types"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { CumulativeGoalData, GoalAllocation } from "@/lib/types";
 
 interface GoalsSummaryCardProps {
-  cumulativeData: CumulativeGoalData[]
-  latestAllocations: Map<string, number>
+  cumulativeData: CumulativeGoalData[];
+  latestAllocations: Map<string, number>;
 }
 
 export function GoalsSummaryCard({
@@ -14,13 +14,12 @@ export function GoalsSummaryCard({
   const totalAccumulated =
     cumulativeData.length > 0
       ? cumulativeData[cumulativeData.length - 1].total
-      : 0
+      : 0;
 
   // Calculate total monthly contribution
-  const totalMonthlyContribution = Array.from(latestAllocations.values()).reduce(
-    (sum, amount) => sum + amount,
-    0
-  )
+  const totalMonthlyContribution = Array.from(
+    latestAllocations.values(),
+  ).reduce((sum, amount) => sum + amount, 0);
 
   return (
     <Card className="border">
@@ -39,7 +38,7 @@ export function GoalsSummaryCard({
           </div>
           <div>
             <div className="text-xs text-muted-foreground mb-0.5">
-              Monthly Contribution
+              Last Contibution
             </div>
             <div className="text-2xl font-semibold">
               €{totalMonthlyContribution.toFixed(0)}
@@ -48,5 +47,5 @@ export function GoalsSummaryCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
