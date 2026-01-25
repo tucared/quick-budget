@@ -76,8 +76,8 @@ export function GoalsCumulativeChart({
         <CardTitle>Net Worth Growth</CardTitle>
       </CardHeader>
       <CardContent className="pt-0 pb-4">
-        <div className="h-[300px] sm:h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full h-[300px]">
+          <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={data}
               margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
