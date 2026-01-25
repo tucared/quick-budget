@@ -97,11 +97,11 @@ GRANT EXECUTE ON FUNCTION public.get_my_household_id() TO authenticated;
 -- Users can view members of their household
 CREATE POLICY "Users can view household members" ON users
   FOR SELECT USING (
-    id = auth.uid() OR household_id = public.get_my_household_id()
+    id = (SELECT auth.uid()) OR household_id = public.get_my_household_id()
   );
 
 CREATE POLICY "Users can update own profile" ON users
-  FOR UPDATE USING (id = auth.uid());
+  FOR UPDATE USING (id = (SELECT auth.uid()));
 
 -- Now create RLS policy for households (after household_id exists on users)
 CREATE POLICY "Users can view own household" ON households
