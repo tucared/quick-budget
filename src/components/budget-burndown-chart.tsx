@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase"
 import { format, getDaysInMonth, parseISO } from "date-fns"
+import { formatCurrency } from "@/lib/currency"
 import {
   LineChart,
   Line,
@@ -100,7 +101,7 @@ export function BudgetBurndownChart({
     // Filter expenses by selected category AND only include expenses from budgeted categories
     const filteredExpenses =
       selectedCategoryId === "all"
-        ? expenses.filter((e) => budgetCategoryIds.has(e.category_id))
+        ? expenses.filter((e) => e.category_id && budgetCategoryIds.has(e.category_id))
         : expenses.filter((e) => e.category_id === selectedCategoryId)
 
     // Get number of days in the month and today's date
@@ -272,8 +273,8 @@ export function BudgetBurndownChart({
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: "#e5e7eb" }}
-                tickFormatter={(value) => `€${value}`}
-                width={45}
+                tickFormatter={(value) => formatCurrency(value, 0)}
+                width={60}
               />
               <Tooltip
                 contentStyle={{
@@ -281,7 +282,7 @@ export function BudgetBurndownChart({
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
                 }}
-                formatter={(value: number) => [`€${value.toFixed(2)}`, ""]}
+                formatter={(value: number | undefined) => [value !== undefined ? formatCurrency(value) : "", ""]}
                 labelStyle={{ color: "hsl(var(--foreground))" }}
               />
               <Legend />

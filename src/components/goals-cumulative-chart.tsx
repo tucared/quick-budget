@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { formatCurrency } from "@/lib/currency"
 import {
   BarChart,
   Bar,
@@ -97,8 +98,8 @@ export function GoalsCumulativeChart({
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: "#e5e7eb" }}
-                tickFormatter={(value) => `€${value}`}
-                width={60}
+                tickFormatter={(value) => formatCurrency(value, 0)}
+                width={75}
               />
               <Tooltip
                 contentStyle={{
@@ -106,7 +107,7 @@ export function GoalsCumulativeChart({
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
                 }}
-                formatter={(value: number) => `€${value.toFixed(2)}`}
+                formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ""}
                 labelStyle={{ color: "hsl(var(--foreground))", marginBottom: "8px" }}
               />
               <Legend

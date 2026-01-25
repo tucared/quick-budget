@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import type { GoalSummary } from "@/lib/types"
+import { formatCurrency } from "@/lib/currency"
 
 interface GoalCardProps {
   goal: GoalSummary
@@ -31,7 +32,7 @@ export function GoalCard({ goal }: GoalCardProps) {
         <div className="mb-3 text-center">
           <div className="text-xs text-muted-foreground mb-1">Current Balance</div>
           <div className={`text-2xl font-bold ${getTextColor()}`}>
-            €{currentBalance.toFixed(2)}
+            {formatCurrency(currentBalance)}
           </div>
         </div>
 
@@ -41,7 +42,7 @@ export function GoalCard({ goal }: GoalCardProps) {
             Last Contribution
           </div>
           <div className="text-sm font-semibold">
-            €{lastContribution.toFixed(2)}
+            {formatCurrency(lastContribution)}
           </div>
         </div>
       </CardContent>

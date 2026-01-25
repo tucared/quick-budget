@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BudgetSummary } from "@/lib/types"
+import { formatCurrency, formatNumber } from "@/lib/currency"
 
 interface BudgetSummaryCardProps {
   budgets: BudgetSummary[]
@@ -35,16 +36,16 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
               <div className="text-xs text-muted-foreground mb-0.5">Allocated</div>
-              <div className="text-lg font-semibold">€{totalAllocated.toFixed(0)}</div>
+              <div className="text-lg font-semibold">{formatCurrency(totalAllocated, 0)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-0.5">Spent</div>
-              <div className="text-lg font-semibold">€{totalSpent.toFixed(0)}</div>
+              <div className="text-lg font-semibold">{formatCurrency(totalSpent, 0)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-0.5">Remaining</div>
               <div className={`text-lg font-semibold ${getStatusColor()}`}>
-                €{totalRemaining.toFixed(0)}
+                {formatCurrency(totalRemaining, 0)}
               </div>
             </div>
           </div>
@@ -59,7 +60,7 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
-                {percentSpent.toFixed(0)}% spent
+                {formatNumber(percentSpent, 0)} % spent
               </span>
               {percentSpent >= 95 && (
                 <span className="text-red-600 font-medium">

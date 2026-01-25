@@ -1,4 +1,5 @@
 import type { BudgetSummary } from "@/lib/types"
+import { formatCurrency, formatNumber } from "@/lib/currency"
 
 interface CategoryBudgetStatusProps {
   budget: BudgetSummary | null
@@ -58,7 +59,7 @@ export function CategoryBudgetStatus({
           <span className="font-medium text-sm">{budget.category_name}</span>
         </div>
         <span className={`text-xs font-semibold ${statusColor.text}`}>
-          {newPercentSpent.toFixed(0)}%
+          {formatNumber(newPercentSpent, 0)} %
         </span>
       </div>
 
@@ -76,15 +77,15 @@ export function CategoryBudgetStatus({
       <div className="grid grid-cols-3 gap-2 text-xs mb-2">
         <div>
           <div className="text-muted-foreground">Allocated</div>
-          <div className="font-semibold">€{allocated.toFixed(0)}</div>
+          <div className="font-semibold">{formatCurrency(allocated, 0)}</div>
         </div>
         <div>
           <div className="text-muted-foreground">Spent</div>
-          <div className="font-semibold">€{spent.toFixed(2)}</div>
+          <div className="font-semibold">{formatCurrency(spent)}</div>
         </div>
         <div>
           <div className="text-muted-foreground">Left</div>
-          <div className="font-semibold">€{remaining.toFixed(2)}</div>
+          <div className="font-semibold">{formatCurrency(remaining)}</div>
         </div>
       </div>
 
@@ -94,13 +95,13 @@ export function CategoryBudgetStatus({
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">After this expense:</span>
             <span className={`font-bold ${willOverspend ? 'text-red-600' : statusColor.text}`}>
-              €{newRemaining.toFixed(2)} left
+              {formatCurrency(newRemaining)} left
               {willOverspend && " ⚠️"}
             </span>
           </div>
           {willOverspend && (
             <div className="mt-1 text-xs text-red-600 font-medium">
-              This will exceed your budget by €{Math.abs(newRemaining).toFixed(2)}
+              This will exceed your budget by {formatCurrency(Math.abs(newRemaining))}
             </div>
           )}
         </div>
