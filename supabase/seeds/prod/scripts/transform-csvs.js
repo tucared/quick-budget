@@ -90,14 +90,20 @@ function generateExpensesSql(data) {
  * Generates SQL INSERT statements for budget allocations
  */
 function generateBudgetSql(data) {
+  // Filter out allowance allocations - they were monthly budget items in the old system,
+  // not long-term savings that should affect net worth
+  const filteredData = data.filter(row =>
+    !row.category.startsWith('Allowance - ')
+  );
+
   const lines = [];
   lines.push('-- Budget allocation data from transformed CSV');
   lines.push('INSERT INTO public.budget_allocations (');
   lines.push('  household_id, category_id, budget_month, allocated_amount, currency');
   lines.push(') VALUES');
 
-  const values = data.map((row, index) => {
-    const isLast = index === data.length - 1;
+  const values = filteredData.map((row, index) => {
+    const isLast = index === filteredData.length - 1;
     return `  (
     shared_household_id,
     (SELECT id FROM public.categories WHERE name = ${escapeSql(row.category)} AND household_id = shared_household_id),
@@ -179,6 +185,7 @@ function transformBudgetAllocations() {
     valid: 0,
     skipped: 0,
     errors: 0,
+    allowanceFiltered: 0,
     errorDetails: []
   };
 
@@ -195,7 +202,12 @@ function transformBudgetAllocations() {
       const result = validateBudgetAllocation(row);
 
       if (result.valid) {
-        transformed.push(result.data);
+        // Filter out historical allowance allocations
+        if (result.data.category.startsWith('Allowance - ')) {
+          stats.allowanceFiltered++;
+        } else {
+          transformed.push(result.data);
+        }
         stats.valid++;
       } else if (result.skip) {
         stats.skipped++;
@@ -214,6 +226,7 @@ function transformBudgetAllocations() {
   console.log(`  ✓ Processed ${stats.total} rows from 2 files`);
   console.log(`    • Valid: ${stats.valid}`);
   console.log(`    • Skipped: ${stats.skipped}`);
+  console.log(`    • Allowance allocations filtered: ${stats.allowanceFiltered}`);
   console.log(`    • Errors: ${stats.errors}`);
 
   if (stats.errors > 0) {
