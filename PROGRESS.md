@@ -34,7 +34,7 @@ When reviewing our finances at month-end, we want to see if we're on track with 
 ### [ ] JTBD #7: Ensure fairness between partners
 When doing our monthly review, we want to see each person's allowance balance and spending, so we can ensure the system feels fair
 
-### [ ] JTBD #8: Feel progress together
+### [x] JTBD #8: Feel progress together
 When we discuss money, we want to see our net worth trend, so we can feel like we're making progress together
 
 ### [ ] JTBD #9: See impact of extra income
