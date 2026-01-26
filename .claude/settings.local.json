@@ -44,7 +44,10 @@
       "Bash(jj show:*)",
       "Bash(npm run seed:reset:*)",
       "mcp__playwright__browser_resize",
-      "mcp__playwright__browser_press_key"
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_drag",
+      "Bash(npm uninstall:*)",
+      "mcp__playwright__browser_hover"
     ]
   },
   "enabledMcpjsonServers": [
