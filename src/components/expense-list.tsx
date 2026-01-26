@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
+import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +13,34 @@ export function ExpenseList() {
   const [categories, setCategories] = useState<Map<string, Category>>(new Map())
   const [accounts, setAccounts] = useState<Map<string, Account>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+
+  const handleCardClick = (expenseId: string) => {
+    // Toggle delete button visibility on mobile
+    setShowingDeleteId(showingDeleteId === expenseId ? null : expenseId)
+  }
+
+  const handleDelete = async (expenseId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click from firing
+    setDeletingIds((prev) => new Set(prev).add(expenseId))
+    setShowingDeleteId(null)
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("expenses")
+      .delete()
+      .eq("id", expenseId)
+
+    if (error) {
+      console.error("Error deleting expense:", error)
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(expenseId)
+        return next
+      })
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -102,6 +131,11 @@ export function ExpenseList() {
           } else if (payload.eventType === "DELETE") {
             // Remove deleted expense
             setExpenses((prev) => prev.filter((exp) => exp.id !== payload.old.id))
+            setDeletingIds((prev) => {
+              const next = new Set(prev)
+              next.delete(payload.old.id)
+              return next
+            })
           }
         }
       )
@@ -135,8 +169,8 @@ export function ExpenseList() {
   }
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-lg font-semibold">Recent Expenses</h2>
+    <div>
+      <h2 className="text-lg font-semibold mb-3">Recent Expenses</h2>
       {expenses.map((expense) => {
         const category = expense.category_id
           ? categories.get(expense.category_id)
@@ -145,8 +179,25 @@ export function ExpenseList() {
           ? accounts.get(expense.account_id)
           : null
 
+        const isShowingDelete = showingDeleteId === expense.id
+        const isDeleting = deletingIds.has(expense.id)
+
         return (
-          <Card key={expense.id}>
+          <div
+            key={expense.id}
+            className={`overflow-hidden transition-all duration-300 ${
+              isDeleting ? 'max-h-0 opacity-0 mb-0' : 'max-h-96 opacity-100 mb-3'
+            }`}
+          >
+            <div
+              className={`transition-all duration-300 ${
+                isDeleting ? 'scale-95 -translate-x-4' : 'scale-100 translate-x-0'
+              }`}
+            >
+            <Card
+              className="group cursor-pointer md:cursor-default"
+              onClick={() => handleCardClick(expense.id)}
+            >
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -173,19 +224,36 @@ export function ExpenseList() {
                     )}
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="font-semibold text-lg">
-                    {formatCurrency(expense.converted_amount)}
-                  </div>
-                  {expense.currency !== "EUR" && (
-                    <div className="text-xs text-muted-foreground">
-                      {expense.currency} {formatCurrency(expense.amount).replace('€', '')}
+                <div className="relative flex items-start">
+                  {/* Amount */}
+                  <div className={`text-right transition-all ${isShowingDelete ? 'mr-10' : 'md:group-hover:mr-10'}`}>
+                    <div className="font-semibold text-lg">
+                      {formatCurrency(expense.converted_amount)}
                     </div>
-                  )}
+                    {expense.currency !== "EUR" && (
+                      <div className="text-xs text-muted-foreground">
+                        {expense.currency} {formatCurrency(expense.amount).replace('€', '')}
+                      </div>
+                    )}
+                  </div>
+                  {/* Delete button - shows on click (mobile) or hover (desktop) */}
+                  <button
+                    onClick={(e) => handleDelete(expense.id, e)}
+                    className={`absolute right-0 top-0 transition-opacity p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive ${
+                      isShowingDelete
+                        ? 'opacity-100 pointer-events-auto'
+                        : 'opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto'
+                    }`}
+                    aria-label="Delete expense"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </CardContent>
           </Card>
+            </div>
+          </div>
         )
       })}
     </div>
