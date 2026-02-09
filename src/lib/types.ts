@@ -16,13 +16,11 @@ export interface Household {
   updated_at: string
 }
 
-export type CategoryType = "monthly" | "long_term"
-
 export interface Category {
   id: string
   household_id: string
   name: string
-  category_type: CategoryType
+  exclude_from_budget_total: boolean
   icon: string | null
   color: string | null
   is_active: boolean
@@ -50,7 +48,6 @@ export interface Expense {
   logged_by_user_id: string
   category_id: string | null
   account_id: string | null
-  recurring_expense_id: string | null
   amount: number
   currency: string
   converted_amount: number
@@ -82,30 +79,12 @@ export interface BudgetSummary {
   category_name: string
   category_icon: string | null
   category_color: string | null
-  category_type: CategoryType
+  exclude_from_budget_total: boolean
   allocated_amount: number
   currency: string
   spent_amount: number
   remaining_amount: number
   percent_spent: number
-}
-
-export type RecurringExpenseFrequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly"
-
-export interface RecurringExpense {
-  id: string
-  household_id: string
-  category_id: string
-  account_id: string | null
-  name: string
-  amount: number
-  currency: string
-  frequency: RecurringExpenseFrequency
-  next_due_date: string // Date in YYYY-MM-DD format
-  is_active: boolean
-  notes: string | null
-  created_at: string
-  updated_at: string
 }
 
 // Form types for creating/updating expenses
@@ -122,26 +101,6 @@ export interface ExpenseFormData {
 export interface ExpenseWithDetails extends Expense {
   category?: Category
   account?: Account
-}
-
-// Goal-related types for tracking accumulation goals
-export interface GoalAllocation extends BudgetAllocation {
-  category?: Category
-}
-
-export interface GoalSummary {
-  category_id: string
-  category_name: string
-  category_icon: string | null
-  category_color: string | null
-  current_balance: number
-  last_contribution: number
-}
-
-export interface CumulativeGoalData {
-  month: string
-  [goalName: string]: number | string // number for goal amounts, string for month
-  total: number
 }
 
 // Local storage keys for remembering defaults

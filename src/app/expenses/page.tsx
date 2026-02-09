@@ -42,9 +42,6 @@ export default function ExpensesPage() {
             <Button variant="outline" onClick={() => router.push("/budget")}>
               Budget
             </Button>
-            <Button variant="outline" onClick={() => router.push("/pots")}>
-              Pots
-            </Button>
             <Button variant="outline" onClick={handleLogout}>
               Log Out
             </Button>

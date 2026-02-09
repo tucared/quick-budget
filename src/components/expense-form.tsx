@@ -86,7 +86,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       value: category.id,
       label: category.name,
       icon: category.icon || undefined,
-      group: category.category_type === "monthly" ? "Monthly Spending" : "Long-term Goals",
+      group: category.exclude_from_budget_total ? "Allowances" : "Spending",
       frequency: usageMap[category.id] || 0,
     }))
   }
@@ -239,7 +239,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       // Check if selected category is a monthly category (not long_term)
       const selectedCategoryObj = categories.find((c) => c.id === selectedCategory)
-      if (!selectedCategoryObj || selectedCategoryObj.category_type !== "monthly") {
+      if (!selectedCategoryObj || selectedCategoryObj.exclude_from_budget_total) {
         setCategoryBudget(null)
         return
       }
@@ -477,7 +477,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           </p>
         )}
         {/* Budget status preview - only show for monthly categories */}
-        {selectedCategory && categories.find((c) => c.id === selectedCategory)?.category_type === "monthly" && (
+        {selectedCategory && !categories.find((c) => c.id === selectedCategory)?.exclude_from_budget_total && (
           <CategoryBudgetStatus
             budget={categoryBudget}
             additionalAmount={expenseAmount > 0 ? convertToEUR(expenseAmount, selectedCurrency || "EUR") : 0}

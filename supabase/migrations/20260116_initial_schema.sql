@@ -117,13 +117,13 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================================
 -- CATEGORIES TABLE
 -- ============================================================================
--- Spending categories (both monthly and long-term goals)
+-- Spending categories and personal allowances
 -- Categories are household-scoped to allow customization (e.g., "Max's Allowance")
 CREATE TABLE categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  category_type TEXT NOT NULL CHECK (category_type IN ('monthly', 'long_term')),
+  exclude_from_budget_total BOOLEAN NOT NULL DEFAULT FALSE,
   icon TEXT, -- emoji or icon identifier
   color TEXT, -- hex color for UI
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -322,65 +322,6 @@ CREATE INDEX idx_budget_allocations_household_month ON budget_allocations(househ
 CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
 
 -- ============================================================================
--- RECURRING_EXPENSES TABLE
--- ============================================================================
--- Recurring expenses (bills, subscriptions)
--- Household-scoped: shared recurring bills for partners
-CREATE TABLE recurring_expenses (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
-  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
-  account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
-  name TEXT NOT NULL,
-  amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
-  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
-  frequency TEXT NOT NULL CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'quarterly', 'yearly')),
-  next_due_date DATE NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  notes TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Enable RLS
-ALTER TABLE recurring_expenses ENABLE ROW LEVEL SECURITY;
-
--- Household members can view recurring expenses
-CREATE POLICY "Household members can view recurring expenses" ON recurring_expenses
-  FOR SELECT USING (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
--- Household members can insert recurring expenses
-CREATE POLICY "Household members can insert recurring expenses" ON recurring_expenses
-  FOR INSERT WITH CHECK (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
--- Household members can update recurring expenses
-CREATE POLICY "Household members can update recurring expenses" ON recurring_expenses
-  FOR UPDATE USING (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
--- Household members can delete recurring expenses
-CREATE POLICY "Household members can delete recurring expenses" ON recurring_expenses
-  FOR DELETE USING (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
--- Create indexes
-CREATE INDEX idx_recurring_expenses_household ON recurring_expenses(household_id);
-CREATE INDEX idx_recurring_expenses_household_active ON recurring_expenses(household_id, is_active) WHERE is_active = TRUE;
-CREATE INDEX idx_recurring_expenses_next_due ON recurring_expenses(next_due_date) WHERE is_active = TRUE;
-CREATE INDEX idx_recurring_expenses_category ON recurring_expenses(category_id);
-CREATE INDEX idx_recurring_expenses_account ON recurring_expenses(account_id);
-
--- Add recurring_expense_id to expenses table to link generated expenses
-ALTER TABLE expenses ADD COLUMN recurring_expense_id UUID REFERENCES recurring_expenses(id) ON DELETE SET NULL;
-CREATE INDEX idx_expenses_recurring ON expenses(recurring_expense_id);
-
--- ============================================================================
 -- UPDATE TIMESTAMP TRIGGER
 -- ============================================================================
 -- Function to automatically update updated_at timestamp
@@ -414,9 +355,6 @@ CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_recurring_expenses_updated_at BEFORE UPDATE ON recurring_expenses
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- ============================================================================
 -- BUDGET_SUMMARY VIEW
 -- ============================================================================
@@ -431,7 +369,7 @@ SELECT
   c.name as category_name,
   c.icon as category_icon,
   c.color as category_color,
-  c.category_type,
+  c.exclude_from_budget_total,
   ba.allocated_amount,
   ba.currency,
   COALESCE(SUM(e.converted_amount), 0) as spent_amount,
@@ -454,7 +392,7 @@ GROUP BY
   c.name,
   c.icon,
   c.color,
-  c.category_type,
+  c.exclude_from_budget_total,
   ba.allocated_amount,
   ba.currency;
 
