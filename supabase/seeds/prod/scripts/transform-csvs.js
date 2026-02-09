@@ -89,12 +89,12 @@ function generateExpensesSql(data) {
 /**
  * Generates SQL INSERT statements for budget allocations
  */
+// Categories removed from the data model (no longer seeded)
+const REMOVED_CATEGORIES = ['Safety Net', 'Holidays Pot', 'Brazil Pot', 'Home Buy', 'Retirement'];
+
 function generateBudgetSql(data) {
-  // Filter out allowance allocations - they were monthly budget items in the old system,
-  // not long-term savings that should affect net worth
-  const filteredData = data.filter(row =>
-    !row.category.startsWith('Allowance - ')
-  );
+  // Filter out allocations for categories that no longer exist
+  const filteredData = data.filter(row => !REMOVED_CATEGORIES.includes(row.category));
 
   const lines = [];
   lines.push('-- Budget allocation data from transformed CSV');
@@ -185,7 +185,6 @@ function transformBudgetAllocations() {
     valid: 0,
     skipped: 0,
     errors: 0,
-    allowanceFiltered: 0,
     errorDetails: []
   };
 
@@ -202,12 +201,7 @@ function transformBudgetAllocations() {
       const result = validateBudgetAllocation(row);
 
       if (result.valid) {
-        // Filter out historical allowance allocations
-        if (result.data.category.startsWith('Allowance - ')) {
-          stats.allowanceFiltered++;
-        } else {
-          transformed.push(result.data);
-        }
+        transformed.push(result.data);
         stats.valid++;
       } else if (result.skip) {
         stats.skipped++;
@@ -226,7 +220,6 @@ function transformBudgetAllocations() {
   console.log(`  ✓ Processed ${stats.total} rows from 2 files`);
   console.log(`    • Valid: ${stats.valid}`);
   console.log(`    • Skipped: ${stats.skipped}`);
-  console.log(`    • Allowance allocations filtered: ${stats.allowanceFiltered}`);
   console.log(`    • Errors: ${stats.errors}`);
 
   if (stats.errors > 0) {

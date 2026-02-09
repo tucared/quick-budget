@@ -131,20 +131,19 @@ BEGIN
   -- ============================================================================
   RAISE NOTICE '[3/5] Creating categories...';
 
-  -- Monthly categories (customize as needed)
-  INSERT INTO public.categories (household_id, name, category_type, is_active) VALUES
-    (shared_household_id, 'Groceries', 'monthly', TRUE),
-    (shared_household_id, 'Dining Out', 'monthly', TRUE),
-    (shared_household_id, 'Transportation', 'monthly', TRUE),
-    (shared_household_id, 'Entertainment', 'monthly', TRUE),
-    (shared_household_id, 'Shopping', 'monthly', TRUE),
-    (shared_household_id, 'Bills', 'monthly', TRUE);
+  -- Spending categories (customize as needed)
+  INSERT INTO public.categories (household_id, name, is_active) VALUES
+    (shared_household_id, 'Groceries', TRUE),
+    (shared_household_id, 'Dining Out', TRUE),
+    (shared_household_id, 'Transportation', TRUE),
+    (shared_household_id, 'Entertainment', TRUE),
+    (shared_household_id, 'Shopping', TRUE),
+    (shared_household_id, 'Bills', TRUE);
 
-  -- Long-term categories (customize as needed)
-  INSERT INTO public.categories (household_id, name, category_type, color, is_active) VALUES
-    (shared_household_id, 'Emergency Fund', 'long_term', '#3b82f6', TRUE),
-    (shared_household_id, 'Vacation Savings', 'long_term', '#8b5cf6', TRUE),
-    (shared_household_id, 'Retirement', 'long_term', '#ec4899', TRUE);
+  -- Allowance categories (excluded from budget total, customize as needed)
+  INSERT INTO public.categories (household_id, name, exclude_from_budget_total, color, is_active) VALUES
+    (shared_household_id, 'User One Allowance', TRUE, '#6366f1', TRUE),
+    (shared_household_id, 'User Two Allowance', TRUE, '#f97316', TRUE);
 
   RAISE NOTICE '  ✓ Created categories';
 

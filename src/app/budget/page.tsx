@@ -36,7 +36,7 @@ export default function BudgetPage() {
         .select("*")
         .eq("household_id", householdId)
         .eq("budget_month", budgetMonth)
-        .eq("category_type", "monthly")
+        .eq("exclude_from_budget_total", false)
         .order("category_name", { ascending: true })
 
       if (error) {
@@ -109,9 +109,6 @@ export default function BudgetPage() {
             </Button>
             <Button variant="default" disabled>
               Budget
-            </Button>
-            <Button variant="outline" onClick={() => router.push("/pots")}>
-              Pots
             </Button>
             <Button variant="outline" onClick={handleLogout}>
               Log Out

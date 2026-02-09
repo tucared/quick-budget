@@ -32,7 +32,7 @@ erDiagram
 ## Key Design Decisions
 
 ### 1. Household-Based Sharing Model
-All financial data (accounts, categories, budget allocations, recurring expenses) is scoped to households. Users belong to exactly one household via `users.household_id`. All household members have full read/write access to household data. Audit trails (`accounts.owner_user_id`, `expenses.logged_by_user_id`) track who performed actions without restricting access. Default categories are auto-seeded on household creation.
+All financial data (accounts, categories, budget allocations) is scoped to households. Users belong to exactly one household via `users.household_id`. All household members have full read/write access to household data. Audit trails (`accounts.owner_user_id`, `expenses.logged_by_user_id`) track who performed actions without restricting access. Default categories are auto-seeded on household creation.
 
 ### 2. No Budgets Table - Monthly Cadence
 No separate budgets table. Monthly periods are represented by `budget_month` (date) fields on `budget_allocations`. Strongly oriented toward monthly planning cycle.
