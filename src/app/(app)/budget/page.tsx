@@ -11,12 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { getCurrentBudgetMonth } from "@/lib/date-utils"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
+import { getErrorMessage } from "@/lib/error-handler"
 
 export default function BudgetPage() {
   const { user } = useUser()
   const [budgets, setBudgets] = useState<BudgetSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [budgetMonth, setBudgetMonth] = useState("")
+  const [error, setError] = useState("")
 
   // Load budget data
   useEffect(() => {
@@ -26,7 +28,7 @@ export default function BudgetPage() {
       const budgetMonth = getCurrentBudgetMonth()
       setBudgetMonth(budgetMonth)
 
-      const { data, error } = await supabase
+      const { data, error: loadError } = await supabase
         .from("budget_summary")
         .select("*")
         .eq("household_id", householdId)
@@ -34,8 +36,8 @@ export default function BudgetPage() {
         .eq("exclude_from_budget_total", false)
         .order("category_name", { ascending: true })
 
-      if (error) {
-        console.error("Error loading budgets:", error)
+      if (loadError) {
+        setError(getErrorMessage(loadError))
       } else if (data) {
         setBudgets(data)
       }
@@ -65,9 +67,9 @@ export default function BudgetPage() {
           .eq("budget_month", budgetMonth)
           .eq("exclude_from_budget_total", false)
           .order("category_name", { ascending: true })
-          .then(({ data, error }) => {
-            if (error) {
-              console.error("Error reloading budgets:", error)
+          .then(({ data, error: reloadError }) => {
+            if (reloadError) {
+              setError(getErrorMessage(reloadError))
             } else if (data) {
               setBudgets(data)
             }
@@ -79,6 +81,11 @@ export default function BudgetPage() {
 
   return (
     <main className="container mx-auto px-4 py-6 max-w-6xl">
+      {error && (
+        <div className="mb-6 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+          {error}
+        </div>
+      )}
       {loading ? (
         <div className="space-y-6">
           {/* Total Budget Summary Skeleton */}
