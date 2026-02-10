@@ -107,7 +107,7 @@ When the user navigates between tabs, both subscriptions may be active simultane
 
 ---
 
-### 9. `any` type on Supabase joined query response
+### [x] 9. `any` type on Supabase joined query response
 
 **File:** `src/components/expense-form.tsx` (~line 185)
 
