@@ -51,7 +51,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [loadingBudget, setLoadingBudget] = useState(false)
 
   // Ref for amount input to manage focus without DOM queries
-  const amountInputRef = useRef<HTMLInputElement>(null)
+  const amountInputRef = useRef<HTMLInputElement | null>(null)
 
   // Ref to store success message timer for cleanup
   const successTimerRef = useRef<NodeJS.Timeout | null>(null)
