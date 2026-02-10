@@ -85,7 +85,7 @@ export function getBudgetStatusLabel(percentSpent: number): string // see issue 
 
 ---
 
-### 7. No React error boundaries
+### [x] 7. No React error boundaries
 
 **File:** `src/app/(app)/layout.tsx`
 
