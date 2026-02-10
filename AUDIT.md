@@ -68,7 +68,7 @@ Each component independently queries `users` to get `household_id` for the curre
 
 ---
 
-### 6. Budget status color logic duplicated in 3 places
+### [x] 6. Budget status color logic duplicated in 3 places
 
 **Files:**
 - `src/components/budget-summary-card.tsx` (~lines 16-26)
