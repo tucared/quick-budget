@@ -55,7 +55,7 @@ No test files exist anywhere in the project. For a financial app handling budget
 
 ## Medium Priority
 
-### 5. Household ID fetched redundantly across components
+### [x] 5. Household ID fetched redundantly across components
 
 **Files:**
 - `src/components/expense-form.tsx` (~lines 112-149 and ~296-312) — fetches household_id twice within the same component
