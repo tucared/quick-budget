@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BudgetSummary, Expense } from "@/lib/types"
+import { getErrorMessage } from "@/lib/error-handler"
 
 interface BurndownDataPoint {
   date: string // "Jan 1", "Jan 2", etc.
@@ -51,6 +52,7 @@ export function BudgetBurndownChart({
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     const loadExpenses = async () => {
@@ -65,7 +67,7 @@ export function BudgetBurndownChart({
       )
       const nextMonthStr = format(nextMonth, "yyyy-MM-dd")
 
-      const { data, error } = await supabase
+      const { data, error: loadError } = await supabase
         .from("expenses")
         .select("expense_date, converted_amount, category_id")
         .eq("household_id", householdId)
@@ -73,8 +75,8 @@ export function BudgetBurndownChart({
         .lt("expense_date", nextMonthStr)
         .order("expense_date", { ascending: true })
 
-      if (error) {
-        console.error("Error loading expenses:", error)
+      if (loadError) {
+        setError(getErrorMessage(loadError))
       } else if (data) {
         setExpenses(data as Expense[])
       }
@@ -197,6 +199,21 @@ export function BudgetBurndownChart({
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             Loading chart...
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Budget Burndown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+            {error}
           </div>
         </CardContent>
       </Card>
