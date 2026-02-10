@@ -1,92 +1,23 @@
-// Database entity types matching the Supabase schema
+// Database entity types derived from Supabase generated types
+// This ensures the application types stay in sync with the database schema
 
-export interface User {
-  id: string
-  email: string
-  full_name: string | null
-  household_id: string
-  created_at: string
-  updated_at: string
-}
+import type { Database } from './database.types'
 
-export interface Household {
-  id: string
-  name: string
-  created_at: string
-  updated_at: string
-}
+// Helper type to extract table rows from the generated Database type
+type Tables = Database['public']['Tables']
+type Views = Database['public']['Views']
 
-export interface Category {
-  id: string
-  household_id: string
-  name: string
-  exclude_from_budget_total: boolean
-  icon: string | null
-  color: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
+// Base entity types derived from generated database schema
+export type User = Tables['users']['Row']
+export type Household = Tables['households']['Row']
+export type Category = Tables['categories']['Row']
+export type Account = Tables['accounts']['Row']
+export type Expense = Tables['expenses']['Row']
+export type BudgetAllocation = Tables['budget_allocations']['Row']
+export type BudgetSummary = Views['budget_summary']['Row']
 
-export type AccountType = "credit_card" | "debit_card" | "bank_account" | "cash" | "other"
-
-export interface Account {
-  id: string
-  household_id: string
-  owner_user_id: string
-  name: string
-  account_type: AccountType
-  currency: string
-  is_default: boolean
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface Expense {
-  id: string
-  logged_by_user_id: string
-  household_id: string
-  category_id: string | null
-  account_id: string | null
-  amount: number
-  currency: string
-  converted_amount: number
-  converted_currency: string
-  exchange_rate: number
-  expense_date: string // Date in YYYY-MM-DD format
-  description: string | null
-  notes: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface BudgetAllocation {
-  id: string
-  household_id: string
-  category_id: string
-  budget_month: string // Date in YYYY-MM-DD format (first day of month)
-  allocated_amount: number
-  currency: string
-  created_at: string
-  updated_at: string
-}
-
-export interface BudgetSummary {
-  id: string
-  household_id: string
-  budget_month: string
-  category_id: string
-  category_name: string
-  category_icon: string | null
-  category_color: string | null
-  exclude_from_budget_total: boolean
-  allocated_amount: number
-  currency: string
-  spent_amount: number
-  remaining_amount: number
-  percent_spent: number
-}
+// Extract the account_type enum from the generated types
+export type AccountType = Account['account_type']
 
 // Form types for creating/updating expenses
 export interface ExpenseFormData {
