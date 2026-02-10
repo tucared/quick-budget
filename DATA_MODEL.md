@@ -16,7 +16,7 @@ erDiagram
 
     categories ||--o{ expenses : "categorizes"
     categories ||--o{ budget_allocations : "allocated in"
-    
+
     households ||--o{ accounts : "contains"
     households ||--o{ categories : "has"
     households ||--o{ budget_allocations : "plans"
@@ -27,6 +27,7 @@ erDiagram
     budget_allocations
     expenses
     accounts
+    exchange_rates
 ```
 
 ## Key Design Decisions
@@ -47,3 +48,11 @@ All categories receive monthly budget allocations via `budget_allocations` table
 
 ### 5. Multi-Currency Support
 Expenses store both original currency/amount and converted amount with exchange rate preserved directly on each expense record for historical accuracy.
+
+The `exchange_rates` table caches daily exchange rates fetched from an external API. This table is **not household-scoped** (exchange rates are universal). Rates are stored per currency per date with EUR as the base currency. The system:
+- Fetches rates on-demand when logging expenses
+- Caches rates in the database to minimize API calls
+- Falls back to hardcoded rates if API is unavailable
+- Preserves historical accuracy by storing the exact rate used on each expense record
+
+This approach supports both real-time expense logging with current rates and historical data imports with accurate past rates.
