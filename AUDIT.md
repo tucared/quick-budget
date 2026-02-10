@@ -179,7 +179,7 @@ A `setTimeout` is used (likely for the success feedback animation) without stori
 
 ---
 
-### 16. No skeleton loading states
+### [x] 16. No skeleton loading states
 
 **Files:**
 - `src/components/expense-form.tsx` (~lines 388-394) — shows "Loading form..." text
