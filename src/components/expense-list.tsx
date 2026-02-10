@@ -7,8 +7,10 @@ import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
+import { useUser } from "@/lib/contexts/user-context"
 
 export function ExpenseList() {
+  const { user } = useUser()
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([])
   const [categories, setCategories] = useState<Map<string, Category>>(new Map())
   const [accounts, setAccounts] = useState<Map<string, Account>>(new Map())
@@ -47,28 +49,12 @@ export function ExpenseList() {
 
     // Load categories and accounts for lookup
     const loadReferenceData = async () => {
-      // Get user's household_id for explicit filtering
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
+      if (!user?.householdId) {
         setLoading(false)
         return
       }
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("household_id")
-        .eq("id", user.id)
-        .single()
-
-      if (!userData?.household_id) {
-        setLoading(false)
-        return
-      }
-
-      const householdId = userData.household_id
+      const householdId = user.householdId
 
       const { data: categoriesData } = await supabase
         .from("categories")
@@ -147,7 +133,7 @@ export function ExpenseList() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user])
 
   if (loading) {
     return (
