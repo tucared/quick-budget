@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "types:generate": "supabase gen types typescript --local > src/lib/database.types.ts",
     "seed:transform": "node supabase/seeds/prod/scripts/transform-csvs.js",
     "seed:reset": "supabase db reset",
     "seed:full": "npm run seed:transform && npm run seed:reset"

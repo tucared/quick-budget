@@ -139,7 +139,7 @@ This 5-line server component just redirects to `/`. The middleware already handl
 
 ---
 
-### 12. Types manually maintained instead of generated
+### [x] 12. Types manually maintained instead of generated
 
 **File:** `src/lib/types.ts`
 

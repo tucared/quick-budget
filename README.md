@@ -51,6 +51,7 @@ open http://localhost:54323 # Open Supabase Studio
 npm run dev                 # Start Next.js dev server (port 3000)
 npm run build               # Build for production
 npm run lint                # Run ESLint
+npm run types:generate      # Generate TypeScript types from database schema
 ```
 
 ## Project Structure
@@ -67,7 +68,8 @@ src/
 │   └── expense-list.tsx   # Recent expenses list
 ├── lib/
 │   ├── supabase.ts        # Supabase client
-│   ├── types.ts           # TypeScript types
+│   ├── types.ts           # Application types
+│   ├── database.types.ts  # Generated Supabase database types
 │   ├── validations.ts     # Zod schemas
 │   └── utils.ts           # Utilities
 └── middleware.ts          # Auth middleware
@@ -100,6 +102,30 @@ supabase db reset
 # Push to production (see DEPLOYMENT.md)
 supabase db push
 ```
+
+## TypeScript Type Generation
+
+The project uses auto-generated TypeScript types from the Supabase schema to ensure type safety and prevent drift between the database and application code.
+
+```bash
+# Generate types from local database
+npm run types:generate
+```
+
+**Important:** After modifying the database schema (editing migrations or running `supabase db reset`), always regenerate types to keep them in sync:
+
+```bash
+supabase db reset           # Apply schema changes
+npm run types:generate      # Regenerate types
+```
+
+The generated types are stored in `src/lib/database.types.ts` and provide:
+- Row types for SELECT queries
+- Insert types for INSERT operations
+- Update types for UPDATE operations
+- Relationship metadata for joins
+
+Application-specific types in `src/lib/types.ts` can extend or compose these generated types as needed.
 
 ## Database Seeding
 
