@@ -25,6 +25,13 @@ interface AccountWithUser extends Account {
   owner_name?: string
 }
 
+// Type for Supabase response with joined users data
+interface AccountWithUserData extends Account {
+  users: {
+    full_name: string | null
+  } | null
+}
+
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const { user } = useUser()
   const storageKeys = useMemo(
@@ -145,6 +152,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           .eq("household_id", householdId)
           .eq("is_active", true)
           .order("name")
+          .returns<AccountWithUserData[]>()
 
         if (accountsError) {
           setLoadError(getErrorMessage(accountsError))
@@ -154,7 +162,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
         if (accountsData) {
           // Transform accounts data to include owner name
-          const accountsWithOwner: AccountWithUser[] = accountsData.map((account: any) => ({
+          const accountsWithOwner: AccountWithUser[] = accountsData.map((account: AccountWithUserData) => ({
             ...account,
             owner_name: account.users?.full_name || "Unknown",
           }))
