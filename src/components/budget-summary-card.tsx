@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
-import { getBudgetStatusColor, getBudgetProgressBarColor, getBudgetStatusLabel } from "@/lib/budget-utils"
+import { getBudgetStatusColor, getBudgetProgressBarColor, getBudgetStatusLabel, getBudgetStatusIcon } from "@/lib/budget-utils"
 
 interface BudgetSummaryCardProps {
   budgets: BudgetSummary[]
@@ -50,8 +50,9 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
               <span className="text-muted-foreground">
                 {formatNumber(percentSpent, 0)} % spent
               </span>
-              <span className={`${getBudgetStatusColor(percentSpent)} font-medium`}>
-                {getBudgetStatusLabel(percentSpent)}
+              <span className={`${getBudgetStatusColor(percentSpent)} font-medium flex items-center gap-1`}>
+                <span>{getBudgetStatusIcon(percentSpent)}</span>
+                <span>{getBudgetStatusLabel(percentSpent)}</span>
               </span>
             </div>
           </div>
