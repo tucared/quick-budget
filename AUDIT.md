@@ -159,7 +159,7 @@ Uses `document.getElementById("amount-input")?.focus()` to refocus the amount fi
 
 ---
 
-### 14. Uncleaned setTimeout on unmount
+### [x] 14. Uncleaned setTimeout on unmount
 
 **File:** `src/components/expense-form.tsx` (~line 357)
 
