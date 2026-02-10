@@ -225,11 +225,11 @@ The view computes `percent_spent` as `(spent / allocated) * 100` in SQL, but `bu
 
 ### Must Fix (blocking issues)
 
-| # | Finding | Location |
-|---|---------|----------|
-| 1 | TypeScript error: readonly ref assignment | `src/components/expense-form.tsx:451` |
-| 2 | Missing `/login` page (middleware redirects to non-existent route) | `src/middleware.ts:65`, `src/app/login/` missing |
-| 3 | 4 high-severity dependency vulnerabilities (Next.js DoS, glob injection) | `package.json` |
+| # | Finding | Location | Status |
+|---|---------|----------|--------|
+| 1 | TypeScript error: readonly ref assignment | `src/components/expense-form.tsx:451` | ✅ FIXED |
+| 2 | Missing `/login` page (middleware redirects to non-existent route) | `src/middleware.ts:65`, `src/app/login/` missing | |
+| 3 | 4 high-severity dependency vulnerabilities (Next.js DoS, glob injection) | `package.json` | |
 
 ### Should Fix (quality/correctness issues)
 
