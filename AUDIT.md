@@ -149,7 +149,7 @@ All TypeScript interfaces are hand-written and can drift from the actual databas
 
 ---
 
-### 13. DOM manipulation instead of React refs
+### [x] 13. DOM manipulation instead of React refs
 
 **File:** `src/components/expense-form.tsx` (~line 370-374)
 
