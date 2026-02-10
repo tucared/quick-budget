@@ -18,7 +18,7 @@ The `/budget` route is inside the `(app)` route group which assumes authenticati
 
 ---
 
-### 2. Missing `household_id` in Expense type
+### [x] 2. Missing `household_id` in Expense type
 
 **File:** `src/lib/types.ts` (~lines 46-61)
 
