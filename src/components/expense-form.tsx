@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createClient } from "@/lib/supabase"
@@ -49,6 +49,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
 
+  // Ref for amount input to manage focus without DOM queries
+  const amountInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -332,10 +334,9 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       })
 
       // Focus on amount input for next entry
-      const amountInput = document.getElementById("amount") as HTMLInputElement
-      if (amountInput) {
-        amountInput.focus()
-        amountInput.select()
+      if (amountInputRef.current) {
+        amountInputRef.current.focus()
+        amountInputRef.current.select()
       }
 
       // Call onSuccess callback
@@ -394,6 +395,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             autoFocus
             className="flex-1"
             {...register("amount", { valueAsNumber: true })}
+            ref={(e) => {
+              register("amount", { valueAsNumber: true }).ref(e)
+              amountInputRef.current = e
+            }}
           />
           <div className="inline-flex rounded-md shadow-sm" role="group">
             <button
