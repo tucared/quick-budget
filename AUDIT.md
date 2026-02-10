@@ -169,7 +169,7 @@ A `setTimeout` is used (likely for the success feedback animation) without stori
 
 ---
 
-### 15. Inconsistent currency formatting
+### [x] 15. Inconsistent currency formatting
 
 **Files:**
 - `src/lib/currency.ts` — has a proper `formatCurrency()` with European conventions (space separator, comma decimal)
