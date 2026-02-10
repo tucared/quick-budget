@@ -52,6 +52,9 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   // Ref for amount input to manage focus without DOM queries
   const amountInputRef = useRef<HTMLInputElement>(null)
 
+  // Ref to store success message timer for cleanup
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   const {
     register,
     handleSubmit,
@@ -262,6 +265,15 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     loadCategoryBudget()
   }, [selectedCategory, user, categories])
 
+  // Cleanup success message timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current)
+      }
+    }
+  }, [])
+
   const onSubmit = async (data: ExpenseFormValues) => {
     setError("")
     setSuccessMessage("")
@@ -321,7 +333,11 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       // Show success message briefly
       setSuccessMessage("Expense added!")
-      setTimeout(() => setSuccessMessage(""), 2000)
+      // Clear any existing timer before setting a new one
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current)
+      }
+      successTimerRef.current = setTimeout(() => setSuccessMessage(""), 2000)
 
       // Reset form but keep category, account, and date
       reset({
