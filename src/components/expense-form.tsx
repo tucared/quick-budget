@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
 import { getStorageKeys, type Category, type Account, type BudgetSummary } from "@/lib/types"
-import { convertToEUR, getExchangeRate } from "@/lib/currency"
+import { convertToEUR, fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { getTodayDateString, getCurrentBudgetMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -291,8 +291,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       // Convert to EUR for consistent tracking
       const currency = data.currency || "EUR"
-      const convertedAmount = convertToEUR(data.amount, currency)
-      const exchangeRate = getExchangeRate(currency, "EUR")
+
+      // Fetch exchange rate from API (with database caching)
+      const exchangeRate = await fetchExchangeRateFromAPI(currency, data.expense_date)
+      const convertedAmount = data.amount * exchangeRate
 
       // Insert expense
       const { error: insertError } = await supabase.from("expenses").insert({

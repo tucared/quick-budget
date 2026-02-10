@@ -1,14 +1,22 @@
 // Currency conversion utilities
 
-// Exchange rates to EUR (base currency)
-// These would ideally come from an API, but hardcoded for now
-const EXCHANGE_RATES_TO_EUR: Record<string, number> = {
+// ============================================================================
+// DEPRECATED FUNCTIONS - Use fetchExchangeRateFromAPI() instead
+// These fallback functions are kept for backwards compatibility only
+// ============================================================================
+
+const FALLBACK_RATES_TO_EUR: Record<string, number> = {
   EUR: 1.0,
-  BRL: 0.17, // 1 BRL = ~0.17 EUR
+  BRL: 0.17, // 1 BRL ≈ 0.17 EUR (fallback only)
+  USD: 0.92, // 1 USD ≈ 0.92 EUR (fallback only)
+  GBP: 1.17, // 1 GBP ≈ 1.17 EUR (fallback only)
 }
 
+/**
+ * @deprecated Use fetchExchangeRateFromAPI() instead
+ */
 export function convertToEUR(amount: number, fromCurrency: string): number {
-  const rate = EXCHANGE_RATES_TO_EUR[fromCurrency]
+  const rate = FALLBACK_RATES_TO_EUR[fromCurrency]
   if (!rate) {
     console.warn(`Exchange rate not found for ${fromCurrency}, using 1.0`)
     return amount
@@ -16,16 +24,61 @@ export function convertToEUR(amount: number, fromCurrency: string): number {
   return amount * rate
 }
 
+/**
+ * @deprecated Use fetchExchangeRateFromAPI() instead
+ */
 export function getExchangeRate(fromCurrency: string, toCurrency: string = "EUR"): number {
   if (fromCurrency === toCurrency) return 1.0
 
-  const rate = EXCHANGE_RATES_TO_EUR[fromCurrency]
+  const rate = FALLBACK_RATES_TO_EUR[fromCurrency]
   if (!rate) {
     console.warn(`Exchange rate not found for ${fromCurrency}, using 1.0`)
     return 1.0
   }
 
   return rate
+}
+
+// ============================================================================
+// NEW API-BASED EXCHANGE RATE FUNCTIONS
+// ============================================================================
+
+interface ExchangeRateResponse {
+  currency: string
+  date: string
+  rate: number
+  source: 'cache' | 'api' | 'fixed'
+  cachedAt?: string
+}
+
+/**
+ * Fetch exchange rate from API (with database caching)
+ * This is the recommended way to get exchange rates
+ */
+export async function fetchExchangeRateFromAPI(
+  currency: string,
+  date?: string
+): Promise<number> {
+  if (currency === 'EUR') {
+    return 1.0
+  }
+
+  const dateParam = date || new Date().toISOString().split('T')[0]
+  const url = `/api/exchange-rates?currency=${currency}&date=${dateParam}`
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`API responded with status ${response.status}`)
+    }
+
+    const data: ExchangeRateResponse = await response.json()
+    return data.rate
+  } catch (error) {
+    console.error('Failed to fetch exchange rate from API:', error)
+    // Fall back to hardcoded rate
+    return FALLBACK_RATES_TO_EUR[currency] || 1.0
+  }
 }
 
 // European number formatting utilities
