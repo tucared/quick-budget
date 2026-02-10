@@ -87,11 +87,11 @@ export function handleSupabaseError(error: unknown): AppError {
       }
     }
 
-    // Return the Supabase error message if available
+    // Fallback for other database errors - use generic message for security
     if (err.message) {
       return {
         type: "database",
-        message: err.message,
+        message: "A database error occurred. Please try again or contact support if the issue persists.",
         originalError: error,
       }
     }
