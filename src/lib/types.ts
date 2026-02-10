@@ -46,6 +46,7 @@ export interface Account {
 export interface Expense {
   id: string
   logged_by_user_id: string
+  household_id: string
   category_id: string | null
   account_id: string | null
   amount: number
