@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
 import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combobox"
+import { useUser } from "@/lib/contexts/user-context"
 
 interface ExpenseFormProps {
   onSuccess?: () => void
@@ -25,6 +26,7 @@ interface AccountWithUser extends Account {
 }
 
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
+  const { user } = useUser()
   const [categories, setCategories] = useState<Category[]>([])
   const [accounts, setAccounts] = useState<AccountWithUser[]>([])
   const [loading, setLoading] = useState(false)
@@ -34,7 +36,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [successMessage, setSuccessMessage] = useState("")
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
-  const [householdId, setHouseholdId] = useState<string | null>(null)
 
 
   const {
@@ -106,47 +107,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   // Load categories and accounts on mount
   useEffect(() => {
     const loadData = async () => {
+      if (!user?.householdId) {
+        setLoadingData(false)
+        return
+      }
+
       try {
         const supabase = createClient()
-
-        // Get user's household_id for explicit filtering
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser()
-
-        if (authError) {
-          setLoadError(getErrorMessage(authError))
-          setLoadingData(false)
-          return
-        }
-
-        if (!user) {
-          setLoadError("You must be logged in to add expenses")
-          setLoadingData(false)
-          return
-        }
-
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("household_id")
-          .eq("id", user.id)
-          .single()
-
-        if (userError) {
-          setLoadError(getErrorMessage(userError))
-          setLoadingData(false)
-          return
-        }
-
-        if (!userData?.household_id) {
-          setLoadError("Could not find your household")
-          setLoadingData(false)
-          return
-        }
-
-        const householdId = userData.household_id
-        setHouseholdId(householdId)
+        const householdId = user.householdId
 
         // Load categories with explicit household filter
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -227,12 +195,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     }
 
     loadData()
-  }, [setValue])
+  }, [setValue, user])
 
   // Load budget status when category is selected
   useEffect(() => {
     const loadCategoryBudget = async () => {
-      if (!selectedCategory || !householdId) {
+      if (!selectedCategory || !user?.householdId) {
         setCategoryBudget(null)
         return
       }
@@ -253,7 +221,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         const { data, error } = await supabase
           .from("budget_summary")
           .select("*")
-          .eq("household_id", householdId)
+          .eq("household_id", user.householdId)
           .eq("category_id", selectedCategory)
           .eq("budget_month", budgetMonth)
           .single()
@@ -273,43 +241,21 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     }
 
     loadCategoryBudget()
-  }, [selectedCategory, householdId, categories])
+  }, [selectedCategory, user, categories])
 
   const onSubmit = async (data: ExpenseFormValues) => {
     setError("")
     setSuccessMessage("")
     setLoading(true)
 
+    if (!user?.id || !user?.householdId) {
+      setError("You must be logged in to add expenses")
+      setLoading(false)
+      return
+    }
+
     try {
       const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        setError("You must be logged in to add expenses")
-        setLoading(false)
-        return
-      }
-
-      // Get user's household_id
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("household_id")
-        .eq("id", user.id)
-        .single()
-
-      if (userError) {
-        setError(getErrorMessage(userError))
-        setLoading(false)
-        return
-      }
-
-      if (!userData?.household_id) {
-        setError("Could not find your household. Please contact support.")
-        setLoading(false)
-        return
-      }
 
       // Convert to EUR for consistent tracking
       const currency = data.currency || "EUR"
@@ -319,7 +265,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       // Insert expense
       const { error: insertError } = await supabase.from("expenses").insert({
         logged_by_user_id: user.id,
-        household_id: userData.household_id,
+        household_id: user.householdId,
         category_id: data.category_id,
         account_id: data.account_id,
         amount: data.amount,
