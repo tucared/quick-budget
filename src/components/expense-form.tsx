@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
 import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combobox"
 import { useUser } from "@/lib/contexts/user-context"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 
 interface ExpenseFormProps {
   onSuccess?: () => void
@@ -69,6 +70,9 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const selectedAccount = watch("account_id")
   const selectedCurrency = watch("currency")
   const expenseAmount = watch("amount")
+
+  // Debounce the amount for budget calculations to avoid re-rendering on every keystroke
+  const debouncedAmount = useDebouncedValue(expenseAmount, 300)
 
   // Helper functions for tracking usage recency (timestamp-based)
   const getUsageMap = (key: string): Record<string, number> => {
@@ -441,7 +445,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         {selectedCategory && !categories.find((c) => c.id === selectedCategory)?.exclude_from_budget_total && (
           <CategoryBudgetStatus
             budget={categoryBudget}
-            additionalAmount={expenseAmount > 0 ? convertToEUR(expenseAmount, selectedCurrency || "EUR") : 0}
+            additionalAmount={debouncedAmount > 0 ? convertToEUR(debouncedAmount, selectedCurrency || "EUR") : 0}
             loading={loadingBudget}
           />
         )}
