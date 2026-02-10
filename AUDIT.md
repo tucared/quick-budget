@@ -95,7 +95,7 @@ If any component in the `(app)` route group throws during render, the entire app
 
 ---
 
-### 8. Duplicate real-time subscriptions to the same table
+### [x] 8. Duplicate real-time subscriptions to the same table
 
 **Files:**
 - `src/components/expense-list.tsx` (~line 123) — subscribes to `expenses` table changes

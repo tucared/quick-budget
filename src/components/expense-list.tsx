@@ -8,6 +8,7 @@ import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
 import { useUser } from "@/lib/contexts/user-context"
+import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 export function ExpenseList() {
   const { user } = useUser()
@@ -44,10 +45,10 @@ export function ExpenseList() {
     }
   }
 
+  // Load initial data
   useEffect(() => {
     const supabase = createClient()
 
-    // Load categories and accounts for lookup
     const loadReferenceData = async () => {
       if (!user?.householdId) {
         setLoading(false)
@@ -93,47 +94,34 @@ export function ExpenseList() {
       setLoading(false)
     }
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel("expenses_changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "expenses",
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            // Add new expense to the top of the list
-            setExpenses((prev) => [payload.new as ExpenseWithDetails, ...prev.slice(0, 19)])
-          } else if (payload.eventType === "UPDATE") {
-            // Update existing expense
-            setExpenses((prev) =>
-              prev.map((exp) =>
-                exp.id === payload.new.id ? (payload.new as ExpenseWithDetails) : exp
-              )
-            )
-          } else if (payload.eventType === "DELETE") {
-            // Remove deleted expense
-            setExpenses((prev) => prev.filter((exp) => exp.id !== payload.old.id))
-            setDeletingIds((prev) => {
-              const next = new Set(prev)
-              next.delete(payload.old.id)
-              return next
-            })
-          }
-        }
-      )
-      .subscribe()
-
     loadReferenceData()
-
-    // Cleanup subscription
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [user])
+
+  // Subscribe to real-time expense changes
+  useExpenseSubscription(
+    (event) => {
+      if (event.type === "INSERT") {
+        // Add new expense to the top of the list
+        setExpenses((prev) => [event.new as ExpenseWithDetails, ...prev.slice(0, 19)])
+      } else if (event.type === "UPDATE") {
+        // Update existing expense
+        setExpenses((prev) =>
+          prev.map((exp) =>
+            exp.id === event.new.id ? (event.new as ExpenseWithDetails) : exp
+          )
+        )
+      } else if (event.type === "DELETE") {
+        // Remove deleted expense
+        setExpenses((prev) => prev.filter((exp) => exp.id !== event.old.id))
+        setDeletingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(event.old.id)
+          return next
+        })
+      }
+    },
+    !!user?.householdId
+  )
 
   if (loading) {
     return (
