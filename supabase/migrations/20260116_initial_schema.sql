@@ -282,7 +282,7 @@ CREATE TABLE budget_allocations (
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   budget_month DATE NOT NULL, -- First day of the month (e.g., 2026-01-01)
-  allocated_amount DECIMAL(12, 2) NOT NULL,
+  allocated_amount DECIMAL(12, 2) NOT NULL CHECK (allocated_amount > 0),
   currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
