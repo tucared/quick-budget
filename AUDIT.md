@@ -129,7 +129,7 @@ A Supabase query with `.select('*, categories(*)')` or similar join returns a co
 
 ## Low Priority
 
-### 11. Dead login redirect page
+### [x] 11. Dead login redirect page
 
 **File:** `src/app/login/page.tsx`
 
