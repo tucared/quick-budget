@@ -40,6 +40,17 @@ export function getBudgetStatusLabel(percentSpent: number): string {
   return statusLabels[getBudgetStatus(percentSpent)]
 }
 
+const statusIcons: Record<BudgetStatus, string> = {
+  over: "✕",
+  critical: "⚠",
+  warning: "⚠",
+  on_track: "✓",
+}
+
+export function getBudgetStatusIcon(percentSpent: number): string {
+  return statusIcons[getBudgetStatus(percentSpent)]
+}
+
 export interface BudgetStatusTheme {
   bg: string
   border: string
