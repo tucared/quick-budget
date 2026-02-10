@@ -117,7 +117,7 @@ A Supabase query with `.select('*, categories(*)')` or similar join returns a co
 
 ---
 
-### 10. No debouncing on amount input budget recalculation
+### [x] 10. No debouncing on amount input budget recalculation
 
 **File:** `src/components/expense-form.tsx` (~line 59, ~483)
 
