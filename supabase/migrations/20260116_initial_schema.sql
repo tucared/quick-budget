@@ -273,6 +273,35 @@ CREATE INDEX idx_expenses_category ON expenses(category_id);
 CREATE INDEX idx_expenses_account ON expenses(account_id);
 
 -- ============================================================================
+-- EXCHANGE_RATES TABLE
+-- ============================================================================
+-- Daily exchange rates for currency conversion
+-- Not household-scoped: exchange rates are universal
+CREATE TABLE exchange_rates (
+  currency TEXT NOT NULL CHECK (LENGTH(currency) = 3),
+  rate_date DATE NOT NULL,
+  rate_to_eur DECIMAL(12, 6) NOT NULL CHECK (rate_to_eur > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (currency, rate_date)
+);
+
+-- Enable RLS
+ALTER TABLE exchange_rates ENABLE ROW LEVEL SECURITY;
+
+-- All authenticated users can view exchange rates (rates are public data)
+CREATE POLICY "Authenticated users can view exchange rates" ON exchange_rates
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+-- Only authenticated users can insert rates (for API route to cache rates)
+CREATE POLICY "Authenticated users can insert exchange rates" ON exchange_rates
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Create indexes
+CREATE INDEX idx_exchange_rates_currency_date ON exchange_rates(currency, rate_date DESC);
+CREATE INDEX idx_exchange_rates_date ON exchange_rates(rate_date DESC);
+
+-- ============================================================================
 -- BUDGET_ALLOCATIONS TABLE
 -- ============================================================================
 -- Monthly budget allocations for categories
@@ -347,6 +376,9 @@ CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON accounts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_exchange_rates_updated_at BEFORE UPDATE ON exchange_rates
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses

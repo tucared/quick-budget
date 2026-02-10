@@ -245,9 +245,9 @@ The view computes `percent_spent` as `(spent / allocated) * 100` in SQL, but `bu
 
 ### Consider (improvements, not bugs)
 
-| # | Finding | Location |
-|---|---------|----------|
-| 11 | Currency conversion hardcoded for only EUR/BRL | `src/lib/currency.ts:5-8` |
+| # | Finding | Location | Status |
+|---|---------|----------|--------|
+| 11 | Currency conversion hardcoded for only EUR/BRL | `src/lib/currency.ts:5-8` | ✅ FIXED |
 | 12 | No server-side rendering; all data fetched client-side | All pages |
 | 13 | `date-fns` imported alongside manual date utils | `src/lib/date-utils.ts` vs imports in components |
 | 14 | Real-time subscription has no household-level filter | `src/lib/hooks/use-expense-subscription.ts:48-52` |

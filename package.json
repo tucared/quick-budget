@@ -10,8 +10,9 @@
     "lint": "next lint",
     "types:generate": "supabase gen types typescript --local > src/lib/database.types.ts",
     "seed:transform": "node supabase/seeds/prod/scripts/transform-csvs.js",
+    "seed:exchange-rates": "node supabase/seeds/prod/scripts/generate-exchange-rates.js",
     "seed:reset": "supabase db reset",
-    "seed:full": "npm run seed:transform && npm run seed:reset"
+    "seed:full": "npm run seed:transform && npm run seed:exchange-rates && npm run seed:reset"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
