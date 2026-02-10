@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
 import { useUser } from "@/lib/contexts/user-context"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
+import { getErrorMessage } from "@/lib/error-handler"
 
 export function ExpenseList() {
   const { user } = useUser()
@@ -18,6 +19,7 @@ export function ExpenseList() {
   const [loading, setLoading] = useState(true)
   const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [deleteError, setDeleteError] = useState("")
 
   const handleCardClick = (expenseId: string) => {
     // Toggle delete button visibility on mobile
@@ -28,6 +30,7 @@ export function ExpenseList() {
     e.stopPropagation() // Prevent card click from firing
     setDeletingIds((prev) => new Set(prev).add(expenseId))
     setShowingDeleteId(null)
+    setDeleteError("")
 
     const supabase = createClient()
     const { error } = await supabase
@@ -36,7 +39,7 @@ export function ExpenseList() {
       .eq("id", expenseId)
 
     if (error) {
-      console.error("Error deleting expense:", error)
+      setDeleteError(getErrorMessage(error))
       setDeletingIds((prev) => {
         const next = new Set(prev)
         next.delete(expenseId)
@@ -145,6 +148,11 @@ export function ExpenseList() {
   return (
     <div>
       <h2 className="text-lg font-semibold mb-3">Recent Expenses</h2>
+      {deleteError && (
+        <div className="mb-3 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+          {deleteError}
+        </div>
+      )}
       {expenses.map((expense) => {
         const category = expense.category_id
           ? categories.get(expense.category_id)
