@@ -2,7 +2,7 @@
 
 ## High Priority
 
-### 1. `/budget` route is unprotected in middleware
+### [x] 1. `/budget` route is unprotected in middleware
 
 **File:** `src/middleware.ts` (~line 62)
 
