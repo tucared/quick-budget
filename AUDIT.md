@@ -235,7 +235,7 @@ The view computes `percent_spent` as `(spent / allocated) * 100` in SQL, but `bu
 
 | # | Finding | Location | Status |
 |---|---------|----------|--------|
-| 4 | ESLint not configured (`.eslintrc.json` missing) | Project root | |
+| 4 | ESLint not configured (`.eslintrc.json` missing) | Project root | ✅ FIXED |
 | 5 | Manual types not derived from generated database types (drift risk) | `src/lib/types.ts` vs `src/lib/database.types.ts` | ✅ FIXED |
 | 6 | Silent error swallowing on expense delete, budget load, chart load | `expense-list.tsx:39`, `budget/page.tsx:38`, `budget-burndown-chart.tsx:77` | |
 | 7 | Unused variable `latestActualPoint` | `src/components/budget-burndown-chart.tsx:221` |
