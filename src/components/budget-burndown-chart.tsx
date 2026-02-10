@@ -235,7 +235,6 @@ export function BudgetBurndownChart({
 
   // Determine line color based on whether we're over budget
   // In a burndown chart, over budget means remaining budget went negative
-  const latestActualPoint = chartData.data.find((d) => d.actual !== null && d.actual !== undefined)
   const latestActual = chartData.data
     .filter((d) => d.actual !== null)
     .slice(-1)[0]?.actual ?? 0

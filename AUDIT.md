@@ -238,7 +238,7 @@ The view computes `percent_spent` as `(spent / allocated) * 100` in SQL, but `bu
 | 4 | ESLint not configured (`.eslintrc.json` missing) | Project root | ✅ FIXED |
 | 5 | Manual types not derived from generated database types (drift risk) | `src/lib/types.ts` vs `src/lib/database.types.ts` | ✅ FIXED |
 | 6 | Silent error swallowing on expense delete, budget load, chart load | `expense-list.tsx:39`, `budget/page.tsx:38`, `budget-burndown-chart.tsx:77` | ✅ FIXED |
-| 7 | Unused variable `latestActualPoint` | `src/components/budget-burndown-chart.tsx:221` |
+| 7 | Unused variable `latestActualPoint` | `src/components/budget-burndown-chart.tsx:221` | ✅ FIXED |
 | 8 | `budget_allocations.allocated_amount` allows negative values | `20260116_initial_schema.sql` |
 | 9 | Error handler passes raw Supabase messages to UI as fallback | `src/lib/error-handler.ts:91-96` |
 | 10 | Weak password policy (min 6, no complexity) | `supabase/config.toml:172-175` |
