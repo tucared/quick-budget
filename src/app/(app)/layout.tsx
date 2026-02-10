@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
+import { clearStorageKeys } from "@/lib/types"
 import { Receipt, Wallet, LogOut } from "lucide-react"
 import { UserProvider } from "@/lib/contexts/user-context"
 
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   const handleLogout = async () => {
+    clearStorageKeys()
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push("/")

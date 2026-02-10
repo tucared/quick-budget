@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
-import { STORAGE_KEYS, type Category, type Account, type BudgetSummary } from "@/lib/types"
+import { getStorageKeys, type Category, type Account, type BudgetSummary } from "@/lib/types"
 import { convertToEUR, getExchangeRate } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { getTodayDateString, getCurrentBudgetMonth } from "@/lib/date-utils"
@@ -27,6 +27,10 @@ interface AccountWithUser extends Account {
 
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const { user } = useUser()
+  const storageKeys = useMemo(
+    () => (user?.householdId ? getStorageKeys(user.householdId) : null),
+    [user?.householdId]
+  )
   const [categories, setCategories] = useState<Category[]>([])
   const [accounts, setAccounts] = useState<AccountWithUser[]>([])
   const [loading, setLoading] = useState(false)
@@ -81,7 +85,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
   // Transform categories into grouped options with frequency
   const getCategoryOptions = (): GroupedOption[] => {
-    const usageMap = getUsageMap(STORAGE_KEYS.CATEGORY_USAGE)
+    const usageMap = storageKeys ? getUsageMap(storageKeys.CATEGORY_USAGE) : {}
 
     return categories.map((category) => ({
       value: category.id,
@@ -94,7 +98,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
   // Transform accounts into grouped options with frequency
   const getAccountOptions = (): GroupedOption[] => {
-    const usageMap = getUsageMap(STORAGE_KEYS.ACCOUNT_USAGE)
+    const usageMap = storageKeys ? getUsageMap(storageKeys.ACCOUNT_USAGE) : {}
 
     return accounts.map((account) => ({
       value: account.id,
@@ -157,11 +161,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           setAccounts(accountsWithOwner)
         }
 
-        // Load smart defaults from localStorage
+        // Load smart defaults from localStorage (namespaced by household)
         try {
-          const lastCategory = localStorage.getItem(STORAGE_KEYS.LAST_CATEGORY)
-          const lastAccount = localStorage.getItem(STORAGE_KEYS.LAST_ACCOUNT)
-          const lastCurrency = localStorage.getItem(STORAGE_KEYS.LAST_CURRENCY)
+          const keys = getStorageKeys(householdId)
+          const lastCategory = localStorage.getItem(keys.LAST_CATEGORY)
+          const lastAccount = localStorage.getItem(keys.LAST_ACCOUNT)
+          const lastCurrency = localStorage.getItem(keys.LAST_CURRENCY)
 
           if (lastCategory) {
             setValue("category_id", lastCategory)
@@ -283,16 +288,18 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         return
       }
 
-      // Save defaults to localStorage and track usage
+      // Save defaults to localStorage and track usage (namespaced by household)
       try {
-        localStorage.setItem(STORAGE_KEYS.LAST_CATEGORY, data.category_id)
-        localStorage.setItem(STORAGE_KEYS.LAST_ACCOUNT, data.account_id)
-        if (data.currency) {
-          localStorage.setItem(STORAGE_KEYS.LAST_CURRENCY, data.currency)
+        if (storageKeys) {
+          localStorage.setItem(storageKeys.LAST_CATEGORY, data.category_id)
+          localStorage.setItem(storageKeys.LAST_ACCOUNT, data.account_id)
+          if (data.currency) {
+            localStorage.setItem(storageKeys.LAST_CURRENCY, data.currency)
+          }
+          // Track usage frequency
+          recordUsage(storageKeys.CATEGORY_USAGE, data.category_id)
+          recordUsage(storageKeys.ACCOUNT_USAGE, data.account_id)
         }
-        // Track usage frequency
-        recordUsage(STORAGE_KEYS.CATEGORY_USAGE, data.category_id)
-        recordUsage(STORAGE_KEYS.ACCOUNT_USAGE, data.account_id)
       } catch (err) {
         // localStorage might be disabled, silently fail
         // This is not critical for functionality

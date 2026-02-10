@@ -28,7 +28,7 @@ The `Expense` interface doesn't include `household_id`, but the DB schema (`supa
 
 ---
 
-### 3. localStorage not namespaced by user/household
+### [x] 3. localStorage not namespaced by user/household
 
 **File:** `src/components/expense-form.tsx` (~lines 62-79, 342-353)
 
