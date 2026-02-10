@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
-import { getBudgetStatusColor, getBudgetProgressBarColor } from "@/lib/budget-utils"
+import { getBudgetStatusColor, getBudgetProgressBarColor, getBudgetStatusIcon, getBudgetStatusLabel } from "@/lib/budget-utils"
 
 interface BudgetCategoryCardProps {
   budget: BudgetSummary
@@ -22,8 +22,9 @@ export function BudgetCategoryCard({ budget }: BudgetCategoryCardProps) {
             <span className="text-2xl">{budget.category_icon}</span>
           )}
           <h3 className="font-semibold text-base flex-1">{budget.category_name}</h3>
-          <span className={`text-sm font-medium ${getBudgetStatusColor(percentSpent)}`}>
-            {formatNumber(percentSpent, 0)} %
+          <span className={`text-sm font-medium ${getBudgetStatusColor(percentSpent)} flex items-center gap-1`}>
+            <span>{getBudgetStatusIcon(percentSpent)}</span>
+            <span>{formatNumber(percentSpent, 0)} %</span>
           </span>
         </div>
 
