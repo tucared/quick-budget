@@ -8,6 +8,7 @@ import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
 import { BudgetBurndownChart } from "@/components/budget-burndown-chart"
 import { getCurrentBudgetMonth } from "@/lib/date-utils"
+import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 export default function BudgetPage() {
   const { user } = useUser()
@@ -15,6 +16,7 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(true)
   const [budgetMonth, setBudgetMonth] = useState("")
 
+  // Load budget data
   useEffect(() => {
     const supabase = createClient()
 
@@ -44,29 +46,34 @@ export default function BudgetPage() {
       return
     }
 
-    const channel = supabase
-      .channel("budget_expenses_changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "expenses",
-        },
-        () => {
-          if (user?.householdId) {
-            loadBudgets(user.householdId)
-          }
-        }
-      )
-      .subscribe()
-
     loadBudgets(user.householdId)
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [user])
+
+  // Reload budgets when expenses change
+  useExpenseSubscription(
+    () => {
+      if (user?.householdId) {
+        const supabase = createClient()
+        const budgetMonth = getCurrentBudgetMonth()
+
+        supabase
+          .from("budget_summary")
+          .select("*")
+          .eq("household_id", user.householdId)
+          .eq("budget_month", budgetMonth)
+          .eq("exclude_from_budget_total", false)
+          .order("category_name", { ascending: true })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error("Error reloading budgets:", error)
+            } else if (data) {
+              setBudgets(data)
+            }
+          })
+      }
+    },
+    !!user?.householdId
+  )
 
   return (
     <main className="container mx-auto px-4 py-6 max-w-6xl">
