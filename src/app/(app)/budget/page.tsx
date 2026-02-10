@@ -7,6 +7,8 @@ import type { BudgetSummary } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
 import { BudgetBurndownChart } from "@/components/budget-burndown-chart"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { getCurrentBudgetMonth } from "@/lib/date-utils"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
@@ -78,8 +80,86 @@ export default function BudgetPage() {
   return (
     <main className="container mx-auto px-4 py-6 max-w-6xl">
       {loading ? (
-        <div className="text-center py-8 text-muted-foreground">
-          Loading budget...
+        <div className="space-y-6">
+          {/* Total Budget Summary Skeleton */}
+          <Card className="border">
+            <CardHeader className="pb-3">
+              <Skeleton className="h-5 w-32" />
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-3">
+                {/* Amount grid skeleton */}
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <Skeleton className="h-3 w-16 mx-auto mb-1" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
+                  </div>
+                  <div>
+                    <Skeleton className="h-3 w-16 mx-auto mb-1" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
+                  </div>
+                  <div>
+                    <Skeleton className="h-3 w-20 mx-auto mb-1" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
+                  </div>
+                </div>
+                {/* Progress bar skeleton */}
+                <div className="space-y-1.5">
+                  <Skeleton className="h-2 w-full rounded-full" />
+                  <div className="flex justify-between">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Burndown Chart Skeleton */}
+          <Card className="border">
+            <CardHeader>
+              <Skeleton className="h-5 w-40" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+
+          {/* Category Budgets Grid Skeleton */}
+          <div>
+            <Skeleton className="h-6 w-24 mb-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-4">
+                    {/* Category header skeleton */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <Skeleton className="h-8 w-8 rounded" />
+                      <Skeleton className="h-5 flex-1" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                    {/* Progress bar skeleton */}
+                    <Skeleton className="h-2.5 w-full rounded-full mb-3" />
+                    {/* Amount details skeleton */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <Skeleton className="h-3 w-16 mx-auto mb-1" />
+                        <Skeleton className="h-5 w-14 mx-auto" />
+                      </div>
+                      <div>
+                        <Skeleton className="h-3 w-12 mx-auto mb-1" />
+                        <Skeleton className="h-5 w-14 mx-auto" />
+                      </div>
+                      <div>
+                        <Skeleton className="h-3 w-16 mx-auto mb-1" />
+                        <Skeleton className="h-5 w-14 mx-auto" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
       ) : budgets.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">

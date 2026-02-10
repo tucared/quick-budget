@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
 import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combobox"
 import { useUser } from "@/lib/contexts/user-context"
@@ -369,8 +370,42 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
   if (loadingData) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        Loading form...
+      <div className="space-y-4">
+        {/* Amount with Currency Toggle Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-20" />
+          <div className="flex gap-2">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+
+        {/* Category Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+
+        {/* Account Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+
+        {/* Date Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+
+        {/* Description Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+
+        {/* Submit Button Skeleton */}
+        <Skeleton className="h-12 w-full" />
       </div>
     )
   }
