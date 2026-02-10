@@ -104,11 +104,36 @@ export interface ExpenseWithDetails extends Expense {
   account?: Account
 }
 
-// Local storage keys for remembering defaults
-export const STORAGE_KEYS = {
-  LAST_CATEGORY: "quick_budget_last_category",
-  LAST_ACCOUNT: "quick_budget_last_account",
-  LAST_CURRENCY: "quick_budget_last_currency",
-  CATEGORY_USAGE: "quick_budget_category_usage",
-  ACCOUNT_USAGE: "quick_budget_account_usage",
-} as const
+// Local storage keys for remembering defaults, namespaced by household
+const STORAGE_KEY_NAMES = [
+  "last_category",
+  "last_account",
+  "last_currency",
+  "category_usage",
+  "account_usage",
+] as const
+
+export function getStorageKeys(householdId: string) {
+  const prefix = `qb:${householdId}`
+  return {
+    LAST_CATEGORY: `${prefix}:last_category`,
+    LAST_ACCOUNT: `${prefix}:last_account`,
+    LAST_CURRENCY: `${prefix}:last_currency`,
+    CATEGORY_USAGE: `${prefix}:category_usage`,
+    ACCOUNT_USAGE: `${prefix}:account_usage`,
+  } as const
+}
+
+/** Clear all quick-budget localStorage entries (call on logout) */
+export function clearStorageKeys() {
+  try {
+    const keys = Object.keys(localStorage)
+    for (const key of keys) {
+      if (key.startsWith("qb:")) {
+        localStorage.removeItem(key)
+      }
+    }
+  } catch {
+    // localStorage might be disabled
+  }
+}
