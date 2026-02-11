@@ -1,13 +1,3 @@
-/**
- * Database types generated from Supabase schema
- *
- * This file should be regenerated whenever the database schema changes by running:
- * npm run types:generate
- *
- * Or manually with:
- * supabase gen types typescript --local > src/lib/database.types.ts
- */
-
 export type Json =
   | string
   | number
@@ -17,43 +7,68 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       accounts: {
         Row: {
-          id: string
-          household_id: string
-          owner_user_id: string
-          name: string
-          account_type: 'credit_card' | 'debit_card' | 'bank_account' | 'cash' | 'other'
-          currency: string
-          is_default: boolean
-          is_active: boolean
+          account_type: string
           created_at: string
+          currency: string
+          household_id: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          owner_user_id: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          household_id: string
-          owner_user_id: string
-          name: string
-          account_type: 'credit_card' | 'debit_card' | 'bank_account' | 'cash' | 'other'
-          currency?: string
-          is_default?: boolean
-          is_active?: boolean
+          account_type: string
           created_at?: string
+          currency?: string
+          household_id: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          owner_user_id: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          household_id?: string
-          owner_user_id?: string
-          name?: string
-          account_type?: 'credit_card' | 'debit_card' | 'bank_account' | 'cash' | 'other'
-          currency?: string
-          is_default?: boolean
-          is_active?: boolean
+          account_type?: string
           created_at?: string
+          currency?: string
+          household_id?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          owner_user_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -70,41 +85,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       budget_allocations: {
         Row: {
-          id: string
-          household_id: string
-          category_id: string
-          budget_month: string
           allocated_amount: number
-          currency: string
+          budget_month: string
+          category_id: string
           created_at: string
+          currency: string
+          household_id: string
+          id: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          household_id: string
-          category_id: string
-          budget_month: string
           allocated_amount: number
-          currency?: string
+          budget_month: string
+          category_id: string
           created_at?: string
+          currency?: string
+          household_id: string
+          id?: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          household_id?: string
-          category_id?: string
-          budget_month?: string
           allocated_amount?: number
-          currency?: string
+          budget_month?: string
+          category_id?: string
           created_at?: string
+          currency?: string
+          household_id?: string
+          id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "budget_allocations_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "budget_allocations_household_id_fkey"
             columns: ["household_id"]
@@ -112,47 +134,40 @@ export type Database = {
             referencedRelation: "households"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "budget_allocations_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          }
         ]
       }
       categories: {
         Row: {
-          id: string
-          household_id: string
-          name: string
-          exclude_from_budget_total: boolean
-          icon: string | null
           color: string | null
-          is_active: boolean
           created_at: string
+          exclude_from_budget_total: boolean
+          household_id: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          household_id: string
-          name: string
-          exclude_from_budget_total?: boolean
-          icon?: string | null
           color?: string | null
-          is_active?: boolean
           created_at?: string
+          exclude_from_budget_total?: boolean
+          household_id: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          household_id?: string
-          name?: string
-          exclude_from_budget_total?: boolean
-          icon?: string | null
           color?: string | null
-          is_active?: boolean
           created_at?: string
+          exclude_from_budget_total?: boolean
+          household_id?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
           updated_at?: string
         }
         Relationships: [
@@ -162,74 +177,91 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "households"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
-      expenses: {
+      exchange_rates: {
         Row: {
-          id: string
-          logged_by_user_id: string
-          household_id: string
-          category_id: string | null
-          account_id: string | null
-          amount: number
-          currency: string
-          converted_amount: number
-          converted_currency: string
-          exchange_rate: number
-          expense_date: string
-          description: string | null
-          notes: string | null
           created_at: string
+          currency: string
+          rate_date: string
+          rate_to_eur: number
           updated_at: string
         }
         Insert: {
-          id?: string
-          logged_by_user_id: string
-          household_id: string
-          category_id?: string | null
-          account_id?: string | null
-          amount: number
-          currency?: string
-          converted_amount: number
-          converted_currency?: string
-          exchange_rate?: number
-          expense_date?: string
-          description?: string | null
-          notes?: string | null
           created_at?: string
+          currency: string
+          rate_date: string
+          rate_to_eur: number
           updated_at?: string
         }
         Update: {
-          id?: string
-          logged_by_user_id?: string
-          household_id?: string
-          category_id?: string | null
-          account_id?: string | null
-          amount?: number
+          created_at?: string
           currency?: string
-          converted_amount?: number
+          rate_date?: string
+          rate_to_eur?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          account_id: string | null
+          amount: number
+          category_id: string | null
+          converted_amount: number
+          converted_currency: string
+          created_at: string
+          currency: string
+          description: string | null
+          exchange_rate: number
+          expense_date: string
+          household_id: string
+          id: string
+          logged_by_user_id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          category_id?: string | null
+          converted_amount: number
           converted_currency?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
           exchange_rate?: number
           expense_date?: string
-          description?: string | null
+          household_id: string
+          id?: string
+          logged_by_user_id: string
           notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          category_id?: string | null
+          converted_amount?: number
+          converted_currency?: string
           created_at?: string
+          currency?: string
+          description?: string | null
+          exchange_rate?: number
+          expense_date?: string
+          household_id?: string
+          id?: string
+          logged_by_user_id?: string
+          notes?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "expenses_logged_by_user_id_fkey"
-            columns: ["logged_by_user_id"]
+            foreignKeyName: "expenses_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "expenses_household_id_fkey"
-            columns: ["household_id"]
-            isOneToOne: false
-            referencedRelation: "households"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
           {
@@ -240,96 +272,103 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "expenses_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: "expenses_household_id_fkey"
+            columns: ["household_id"]
             isOneToOne: false
-            referencedRelation: "accounts"
+            referencedRelation: "households"
             referencedColumns: ["id"]
-          }
+          },
+          {
+            foreignKeyName: "expenses_logged_by_user_id_fkey"
+            columns: ["logged_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       households: {
         Row: {
+          created_at: string
           id: string
           name: string
-          created_at: string
           updated_at: string
         }
         Insert: {
+          created_at?: string
           id?: string
           name: string
-          created_at?: string
           updated_at?: string
         }
         Update: {
+          created_at?: string
           id?: string
           name?: string
-          created_at?: string
           updated_at?: string
         }
         Relationships: []
       }
       users: {
         Row: {
-          id: string
+          created_at: string
           email: string
           full_name: string | null
           household_id: string
-          created_at: string
+          id: string
           updated_at: string
         }
         Insert: {
-          id: string
+          created_at?: string
           email: string
           full_name?: string | null
           household_id: string
-          created_at?: string
+          id: string
           updated_at?: string
         }
         Update: {
-          id?: string
+          created_at?: string
           email?: string
           full_name?: string | null
           household_id?: string
-          created_at?: string
+          id?: string
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "users_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "users_household_id_fkey"
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
     }
     Views: {
       budget_summary: {
         Row: {
-          id: string
-          household_id: string
-          budget_month: string
-          category_id: string
-          category_name: string
-          category_icon: string | null
+          allocated_amount: number | null
+          budget_month: string | null
           category_color: string | null
-          exclude_from_budget_total: boolean
-          allocated_amount: number
-          currency: string
-          spent_amount: number
-          remaining_amount: number
-          percent_spent: number
+          category_icon: string | null
+          category_id: string | null
+          category_name: string | null
+          currency: string | null
+          exclude_from_budget_total: boolean | null
+          household_id: string | null
+          id: string | null
+          percent_spent: number | null
+          remaining_amount: number | null
+          spent_amount: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "budget_allocations_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "budget_allocations_household_id_fkey"
             columns: ["household_id"]
@@ -337,21 +376,11 @@ export type Database = {
             referencedRelation: "households"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "budget_allocations_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          }
         ]
       }
     }
     Functions: {
-      get_my_household_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_my_household_id: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -362,84 +391,129 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
-    : never = never
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-      PublicSchema["Views"])
-  ? (PublicSchema["Tables"] &
-      PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-      Row: infer R
-    }
-    ? R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
     : never
-  : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-    : never = never
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-      Insert: infer I
-    }
-    ? I
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
     : never
-  : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-    : never = never
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-      Update: infer U
-    }
-    ? U
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
     : never
-  : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
-    : never = never
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-  ? PublicSchema["Enums"][PublicEnumNameOrOptions]
-  : never
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {},
+  },
+} as const
+
