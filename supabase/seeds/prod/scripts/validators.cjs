@@ -3,12 +3,12 @@
  * Pure functions for transforming CSV data to database format
  */
 
-// Load config.local.js if it exists, otherwise use config.js template
+// Load config.local.cjs if it exists, otherwise use config.cjs template
 let config;
 try {
-  config = require('./config.local');
+  config = require('./config.local.cjs');
 } catch (e) {
-  config = require('./config');
+  config = require('./config.cjs');
 }
 
 /**

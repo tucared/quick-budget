@@ -12,17 +12,17 @@
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse/sync');
-const { validateExpense, validateBudgetAllocation } = require('./validators');
+const { validateExpense, validateBudgetAllocation } = require('./validators.cjs');
 
-// Load config.local.js if it exists, otherwise use config.js template
+// Load config.local.cjs if it exists, otherwise use config.cjs template
 const SCRIPT_DIR_FOR_CONFIG = __dirname;
 let config;
 try {
-  config = require('./config.local');
-  console.log('Using config.local.js');
+  config = require('./config.local.cjs');
+  console.log('Using config.local.cjs');
 } catch (e) {
-  config = require('./config');
-  console.log('Using config.js template');
+  config = require('./config.cjs');
+  console.log('Using config.cjs template');
 }
 
 // Resolve paths relative to script directory
@@ -93,8 +93,11 @@ function generateExpensesSql(data) {
 const REMOVED_CATEGORIES = ['Safety Net', 'Holidays Pot', 'Brazil Pot', 'Home Buy', 'Retirement'];
 
 function generateBudgetSql(data) {
-  // Filter out allocations for categories that no longer exist
-  const filteredData = data.filter(row => !REMOVED_CATEGORIES.includes(row.category));
+  // Filter out allocations for categories that no longer exist and zero/negative allocations
+  const filteredData = data.filter(row =>
+    !REMOVED_CATEGORIES.includes(row.category) &&
+    parseFloat(row.allocated_amount) > 0
+  );
 
   const lines = [];
   lines.push('-- Budget allocation data from transformed CSV');
