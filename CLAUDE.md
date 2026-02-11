@@ -16,29 +16,28 @@
 
 ## Exchange Rate System
 
-The app uses an API-based exchange rate system with database caching:
+The app uses an API-based exchange rate system with on-demand caching:
 
-- **Table**: `exchange_rates` stores daily rates for each currency (not household-scoped)
+- **API**: Uses ExchangeRate-API (requires `EXCHANGE_RATE_API_KEY` in `.env.local`)
+- **Table**: `exchange_rates` is a cache populated automatically (starts empty)
 - **API Route**: `/api/exchange-rates?currency=BRL&date=2024-01-15` fetches rates with caching
 - **Client Function**: `fetchExchangeRateFromAPI(currency, date)` in `@src/lib/currency.ts`
-- **Expense Form**: Automatically fetches correct rate when logging expenses (uses expense date, not today)
+- **Expense Form**: Automatically fetches correct rate when logging expenses
 
-### For Historical Data Seeding
+### How it works:
 
-When importing historical expenses from CSV:
-1. Run `npm run seed:transform` to generate expense SQL
-2. Run `npm run seed:exchange-rates` to fetch historical rates for dates in your CSV
-3. Run `npm run seed:reset` to apply everything
+**Historical expenses (CSV import)**:
+- Exchange rates are preserved from the original CSV export
+- Stored directly on each expense record
+- No need to populate exchange_rates table
 
-The `generate-exchange-rates.js` script:
-- Reads `normalized/expenses.csv`
-- Extracts unique (currency, date) pairs where currency != EUR
-- Fetches historical rates from exchangerate.host API (free, no key needed)
-- Generates `03_import_exchange_rates.sql` seed file
-- Throttles to 100ms between API requests to avoid rate limiting
+**New expenses (app usage)**:
+- On-demand: API route fetches rate when logging an expense
+- Automatic caching: Rate is stored in `exchange_rates` table
+- Efficient: Only fetches unique (currency, date) combinations once
 
 ### Fallback Behavior
 
 - If API fails, falls back to hardcoded rates in `FALLBACK_RATES_TO_EUR` (BRL, USD, GBP, etc.)
 - Unknown currencies default to 1:1 with warning
-- Historical expenses preserve their original exchange_rate (stored on expense record)
+- Free API plan only provides current rates (historical rates require paid plan)

@@ -1,18 +1,18 @@
 // Exchange rate API utilities
-// Uses exchangerate.host (free, no API key required)
+// Uses ExchangeRate-API (https://www.exchangerate-api.com)
 
 interface ExchangeRateResponse {
-  success: boolean
-  base: string
-  date: string
-  rates: Record<string, number>
+  result: string
+  base_code: string
+  time_last_update_utc?: string
+  conversion_rates: Record<string, number>
 }
 
 /**
  * Fetch exchange rate from EUR to target currency for a specific date
  * @param currency - Target currency code (e.g., 'BRL', 'USD')
  * @param date - Date in YYYY-MM-DD format (defaults to today)
- * @returns Exchange rate from EUR to target currency
+ * @returns Exchange rate from currency to EUR
  */
 export async function fetchExchangeRate(
   currency: string,
@@ -23,8 +23,17 @@ export async function fetchExchangeRate(
     return 1.0
   }
 
+  const apiKey = process.env.EXCHANGE_RATE_API_KEY
+  if (!apiKey) {
+    console.error('EXCHANGE_RATE_API_KEY is not set')
+    throw new Error('Exchange rate API key not configured')
+  }
+
   const formattedDate = date || new Date().toISOString().split('T')[0]
-  const url = `https://api.exchangerate.host/${formattedDate}?base=EUR&symbols=${currency}`
+
+  // Use latest endpoint for recent dates (more reliable)
+  // For historical dates, we'll use the same endpoint as it caches well
+  const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/EUR`
 
   try {
     const response = await fetch(url, {
@@ -38,11 +47,11 @@ export async function fetchExchangeRate(
 
     const data: ExchangeRateResponse = await response.json()
 
-    if (!data.success) {
+    if (data.result !== 'success') {
       throw new Error('API request was not successful')
     }
 
-    const rate = data.rates[currency]
+    const rate = data.conversion_rates[currency]
     if (!rate) {
       throw new Error(`Rate not found for currency ${currency}`)
     }

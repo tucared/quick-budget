@@ -49,10 +49,11 @@ All categories receive monthly budget allocations via `budget_allocations` table
 ### 5. Multi-Currency Support
 Expenses store both original currency/amount and converted amount with exchange rate preserved directly on each expense record for historical accuracy.
 
-The `exchange_rates` table caches daily exchange rates fetched from an external API. This table is **not household-scoped** (exchange rates are universal). Rates are stored per currency per date with EUR as the base currency. The system:
-- Fetches rates on-demand when logging expenses
-- Caches rates in the database to minimize API calls
+The `exchange_rates` table is an **on-demand cache** for exchange rates. This table is **not household-scoped** (exchange rates are universal). The system:
+- Starts with an empty `exchange_rates` table
+- Fetches rates on-demand from ExchangeRate-API when logging new expenses
+- Caches rates in the database to minimize API calls (only fetches each (currency, date) combination once)
 - Falls back to hardcoded rates if API is unavailable
-- Preserves historical accuracy by storing the exact rate used on each expense record
+- Historical imported expenses have rates baked into the expense record (not in exchange_rates table)
 
-This approach supports both real-time expense logging with current rates and historical data imports with accurate past rates.
+This approach minimizes API usage while supporting accurate multi-currency expense logging.
