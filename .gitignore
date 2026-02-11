@@ -46,3 +46,6 @@ supabase/seeds/prod/scripts/config.local.js
 # Keep scripts and templates
 !supabase/seeds/prod/scripts/
 !supabase/seeds/prod/.template/
+
+# Claude
+.claude/settings.local.json
