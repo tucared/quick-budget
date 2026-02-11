@@ -247,10 +247,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           .eq("household_id", user.householdId)
           .eq("category_id", selectedCategory)
           .eq("budget_month", budgetMonth)
-          .single()
+          .maybeSingle()
 
-        if (error && error.code !== "PGRST116") {
-          // PGRST116 = no rows returned, which is fine (no budget set)
+        if (error) {
+          // maybeSingle returns null when no rows found, only errors on actual failures
           console.error("Error loading category budget:", error)
         }
 
