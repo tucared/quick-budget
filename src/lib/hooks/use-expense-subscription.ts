@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase"
 import type { RealtimeChannel } from "@supabase/supabase-js"
+import { useUser } from "./use-user"
 
 // Expense change event types
 export type ExpenseChangeEvent = {
@@ -14,41 +15,57 @@ export type ExpenseChangeEvent = {
 // Callback type for expense changes
 export type ExpenseChangeCallback = (event: ExpenseChangeEvent) => void
 
-// Module-level subscription manager
+// Module-level subscription manager with household-scoped channels
 class ExpenseSubscriptionManager {
-  private subscribers = new Set<ExpenseChangeCallback>()
-  private channel: RealtimeChannel | null = null
+  private householdSubscribers = new Map<
+    string,
+    Set<ExpenseChangeCallback>
+  >()
+  private channels = new Map<string, RealtimeChannel>()
   private supabase = createClient()
 
-  subscribe(callback: ExpenseChangeCallback): () => void {
-    // Add subscriber
-    this.subscribers.add(callback)
+  subscribe(
+    householdId: string,
+    callback: ExpenseChangeCallback
+  ): () => void {
+    // Get or create subscriber set for this household
+    if (!this.householdSubscribers.has(householdId)) {
+      this.householdSubscribers.set(householdId, new Set())
+    }
+    const subscribers = this.householdSubscribers.get(householdId)!
 
-    // Create subscription if this is the first subscriber
-    if (this.subscribers.size === 1 && !this.channel) {
-      this.createSubscription()
+    // Add subscriber
+    subscribers.add(callback)
+
+    // Create subscription if this is the first subscriber for this household
+    if (subscribers.size === 1 && !this.channels.has(householdId)) {
+      this.createSubscription(householdId)
     }
 
     // Return unsubscribe function
     return () => {
-      this.subscribers.delete(callback)
+      subscribers.delete(callback)
 
-      // Clean up subscription if no more subscribers
-      if (this.subscribers.size === 0) {
-        this.cleanup()
+      // Clean up subscription if no more subscribers for this household
+      if (subscribers.size === 0) {
+        this.cleanup(householdId)
       }
     }
   }
 
-  private createSubscription() {
-    this.channel = this.supabase
-      .channel("shared_expenses_subscription")
+  private createSubscription(householdId: string) {
+    // Create a household-specific channel
+    const channelName = `expenses_household_${householdId}`
+
+    const channel = this.supabase
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "expenses",
+          filter: `household_id=eq.${householdId}`,
         },
         (payload) => {
           const event: ExpenseChangeEvent = {
@@ -57,8 +74,9 @@ class ExpenseSubscriptionManager {
             old: payload.old,
           }
 
-          // Notify all subscribers
-          this.subscribers.forEach((callback) => {
+          // Notify all subscribers for this household
+          const subscribers = this.householdSubscribers.get(householdId)
+          subscribers?.forEach((callback) => {
             try {
               callback(event)
             } catch (error) {
@@ -68,13 +86,17 @@ class ExpenseSubscriptionManager {
         }
       )
       .subscribe()
+
+    this.channels.set(householdId, channel)
   }
 
-  private cleanup() {
-    if (this.channel) {
-      this.supabase.removeChannel(this.channel)
-      this.channel = null
+  private cleanup(householdId: string) {
+    const channel = this.channels.get(householdId)
+    if (channel) {
+      this.supabase.removeChannel(channel)
+      this.channels.delete(householdId)
     }
+    this.householdSubscribers.delete(householdId)
   }
 }
 
@@ -82,8 +104,8 @@ class ExpenseSubscriptionManager {
 const subscriptionManager = new ExpenseSubscriptionManager()
 
 /**
- * Hook to subscribe to real-time expense changes.
- * Uses a shared subscription that's created when the first component subscribes
+ * Hook to subscribe to real-time expense changes for the current user's household.
+ * Uses a household-scoped subscription that's created when the first component subscribes
  * and cleaned up when the last component unsubscribes.
  *
  * @param callback - Function to call when an expense changes (insert/update/delete)
@@ -100,6 +122,7 @@ export function useExpenseSubscription(
   callback: ExpenseChangeCallback,
   enabled = true
 ) {
+  const { user, loading } = useUser()
   const callbackRef = useRef(callback)
 
   // Keep callback ref up to date
@@ -108,13 +131,17 @@ export function useExpenseSubscription(
   }, [callback])
 
   useEffect(() => {
-    if (!enabled) return
+    // Don't subscribe if disabled, still loading, or no user
+    if (!enabled || loading || !user?.householdId) return
 
     // Subscribe with a stable wrapper that uses the ref
-    const unsubscribe = subscriptionManager.subscribe((event) => {
-      callbackRef.current(event)
-    })
+    const unsubscribe = subscriptionManager.subscribe(
+      user.householdId,
+      (event) => {
+        callbackRef.current(event)
+      }
+    )
 
     return unsubscribe
-  }, [enabled])
+  }, [enabled, loading, user?.householdId])
 }
