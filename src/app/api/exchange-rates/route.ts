@@ -3,16 +3,40 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { fetchExchangeRate } from '@/lib/exchange-rate-api'
 
 /**
+ * Adjust date to previous working day if it falls on a weekend
+ * Forex markets are closed on weekends, so we use Friday's rate for Sat/Sun
+ */
+function adjustToWorkingDay(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00')
+  const dayOfWeek = date.getUTCDay() // 0 = Sunday, 6 = Saturday
+
+  // If Saturday (6), go back 1 day to Friday
+  if (dayOfWeek === 6) {
+    date.setUTCDate(date.getUTCDate() - 1)
+  }
+  // If Sunday (0), go back 2 days to Friday
+  else if (dayOfWeek === 0) {
+    date.setUTCDate(date.getUTCDate() - 2)
+  }
+
+  return date.toISOString().split('T')[0]
+}
+
+/**
  * GET /api/exchange-rates?currency=BRL&date=2024-01-15
  *
  * Fetches exchange rate for a currency on a specific date.
  * Checks database cache first, fetches from API and caches if not found.
+ * Weekend dates are automatically adjusted to the previous Friday.
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const currency = searchParams.get('currency')
-    const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
+    const requestedDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
+
+    // Adjust weekend dates to previous working day
+    const date = adjustToWorkingDay(requestedDate)
 
     if (!currency) {
       return NextResponse.json(
@@ -43,7 +67,8 @@ export async function GET(request: NextRequest) {
         currency,
         date,
         rate: 1.0,
-        source: 'fixed'
+        source: 'fixed',
+        ...(date !== requestedDate && { adjustedFrom: requestedDate })
       })
     }
 
@@ -70,14 +95,15 @@ export async function GET(request: NextRequest) {
         date,
         rate: Number(cachedRate.rate_to_eur),
         source: 'cache',
-        cachedAt: cachedRate.created_at
+        cachedAt: cachedRate.created_at,
+        ...(date !== requestedDate && { adjustedFrom: requestedDate })
       })
     }
 
     // Not in cache, fetch from API
     const rate = await fetchExchangeRate(currency, date)
 
-    // Store in database for future use
+    // Store in database for future use (using working day date)
     const { error: insertError } = await supabase
       .from('exchange_rates')
       .insert({
@@ -95,7 +121,8 @@ export async function GET(request: NextRequest) {
       currency,
       date,
       rate,
-      source: 'api'
+      source: 'api',
+      ...(date !== requestedDate && { adjustedFrom: requestedDate })
     })
 
   } catch (error) {
