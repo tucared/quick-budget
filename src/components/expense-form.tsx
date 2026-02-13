@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
 import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combobox"
+import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 
@@ -76,9 +77,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const selectedAccount = watch("account_id")
   const selectedCurrency = watch("currency")
   const expenseAmount = watch("amount")
+  const expenseDate = watch("expense_date")
 
   // Debounce the amount for budget calculations to avoid re-rendering on every keystroke
   const debouncedAmount = useDebouncedValue(expenseAmount, 300)
+
+  // Convert string date to Date object for DatePicker
+  const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
 
   // Helper functions for tracking usage recency (timestamp-based)
   const getUsageMap = (key: string): Record<string, number> => {
@@ -530,10 +535,18 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {/* Date */}
       <div className="space-y-2">
         <Label htmlFor="expense_date">Date *</Label>
-        <Input
-          id="expense_date"
-          type="date"
-          {...register("expense_date")}
+        <DatePicker
+          date={dateAsObject}
+          onDateChange={(date) => {
+            if (date) {
+              // Convert Date to YYYY-MM-DD string
+              const year = date.getFullYear()
+              const month = String(date.getMonth() + 1).padStart(2, "0")
+              const day = String(date.getDate()).padStart(2, "0")
+              setValue("expense_date", `${year}-${month}-${day}`)
+            }
+          }}
+          placeholder="Select expense date"
         />
         {errors.expense_date && (
           <p className="text-sm text-destructive">
