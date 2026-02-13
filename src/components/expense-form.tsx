@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Check } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
 import { getStorageKeys, type Category, type Account, type BudgetSummary } from "@/lib/types"
@@ -47,14 +48,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [loadingData, setLoadingData] = useState(true)
   const [loadError, setLoadError] = useState("")
   const [error, setError] = useState("")
-  const [successMessage, setSuccessMessage] = useState("")
+  const [showSuccess, setShowSuccess] = useState(false)
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
 
   // Ref for amount input to manage focus without DOM queries
   const amountInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Ref to store success message timer for cleanup
+  // Ref to store success state timer for cleanup
   const successTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const {
@@ -271,7 +272,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     loadCategoryBudget()
   }, [selectedCategory, user, categories])
 
-  // Cleanup success message timer on unmount
+  // Cleanup success state timer on unmount
   useEffect(() => {
     return () => {
       if (successTimerRef.current) {
@@ -282,7 +283,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
   const onSubmit = async (data: ExpenseFormValues) => {
     setError("")
-    setSuccessMessage("")
     setLoading(true)
 
     if (!user?.id || !user?.householdId) {
@@ -339,13 +339,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         // This is not critical for functionality
       }
 
-      // Show success message briefly
-      setSuccessMessage("Expense added!")
+      // Show success state in button
+      setShowSuccess(true)
       // Clear any existing timer before setting a new one
       if (successTimerRef.current) {
         clearTimeout(successTimerRef.current)
       }
-      successTimerRef.current = setTimeout(() => setSuccessMessage(""), 2000)
+      successTimerRef.current = setTimeout(() => setShowSuccess(false), 1500)
 
       // Reset form but keep category, account, and date
       reset({
@@ -430,12 +430,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {error && (
         <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {error}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-3 text-sm text-green-700 bg-green-50 rounded-md">
-          {successMessage}
         </div>
       )}
 
@@ -574,10 +568,19 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {/* Submit Button - Large touch target for mobile */}
       <Button
         type="submit"
-        className="w-full h-12 text-lg font-semibold"
-        disabled={loading}
+        className="w-full h-12 text-lg font-semibold transition-colors"
+        disabled={loading || showSuccess}
       >
-        {loading ? "Saving..." : "Save Expense"}
+        {showSuccess ? (
+          <span className="flex items-center gap-2">
+            <Check className="h-5 w-5" />
+            Saved!
+          </span>
+        ) : loading ? (
+          "Saving..."
+        ) : (
+          "Save Expense"
+        )}
       </Button>
     </form>
   )
