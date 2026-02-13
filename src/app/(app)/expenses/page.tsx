@@ -17,7 +17,7 @@ export default async function ExpensesPage() {
 
   // Fetch all data in parallel
   const [expenses, categories, accounts] = await Promise.all([
-    getRecentExpenses(user.householdId, 20),
+    getRecentExpenses(user.householdId, 50),
     getCategories(user.householdId),
     getAccounts(user.householdId),
   ])
