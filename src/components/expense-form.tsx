@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Check } from "lucide-react"
+import { format, startOfMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
 import { getStorageKeys, type Category, type Account, type BudgetSummary } from "@/lib/types"
 import { convertToEUR, fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
-import { getTodayDateString, getCurrentBudgetMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -69,7 +69,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       amount: 0,
-      expense_date: getTodayDateString(),
+      expense_date: format(new Date(), 'yyyy-MM-dd'),
       currency: "EUR",
     },
   })
@@ -245,7 +245,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       try {
         const supabase = createClient()
-        const budgetMonth = getCurrentBudgetMonth()
+        const budgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
         const { data, error } = await supabase
           .from("budget_summary")
@@ -533,11 +533,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           date={dateAsObject}
           onDateChange={(date) => {
             if (date) {
-              // Convert Date to YYYY-MM-DD string
-              const year = date.getFullYear()
-              const month = String(date.getMonth() + 1).padStart(2, "0")
-              const day = String(date.getDate()).padStart(2, "0")
-              setValue("expense_date", `${year}-${month}-${day}`)
+              setValue("expense_date", format(date, 'yyyy-MM-dd'))
             }
           }}
           placeholder="Select expense date"

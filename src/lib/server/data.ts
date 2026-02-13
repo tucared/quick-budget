@@ -1,6 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
-import { getCurrentBudgetMonth } from "@/lib/date-utils"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, startOfMonth } from "date-fns"
 import type {
   BudgetSummary,
   Category,
@@ -56,7 +55,7 @@ export async function getBudgetSummary(
   householdId: string
 ): Promise<BudgetSummary[]> {
   const supabase = await createServerSupabaseClient()
-  const budgetMonth = getCurrentBudgetMonth()
+  const budgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
   const { data, error } = await supabase
     .from("budget_summary")

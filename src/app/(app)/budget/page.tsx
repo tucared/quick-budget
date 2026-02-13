@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation"
+import { format, startOfMonth } from "date-fns"
 import {
   getServerUser,
   getBudgetSummary,
   getMonthlyExpenses,
 } from "@/lib/server/data"
 import { BudgetPageContent } from "@/components/budget-page-content"
-import { getCurrentBudgetMonth } from "@/lib/date-utils"
 
 export default async function BudgetPage() {
   const user = await getServerUser()
@@ -14,7 +14,7 @@ export default async function BudgetPage() {
     redirect("/login")
   }
 
-  const budgetMonth = getCurrentBudgetMonth()
+  const budgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
   // Fetch all data in parallel
   const [budgets, expenses] = await Promise.all([

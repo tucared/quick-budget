@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
+import { format, startOfMonth } from "date-fns"
 import type { BudgetSummary, Expense } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
 import { BudgetBurndownChartClient } from "@/components/budget-burndown-chart-client"
 import { Card, CardContent } from "@/components/ui/card"
-import { getCurrentBudgetMonth } from "@/lib/date-utils"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { getErrorMessage } from "@/lib/error-handler"
 
@@ -36,7 +36,7 @@ export function BudgetPageContent({
   useExpenseSubscription(
     () => {
       const supabase = createClient()
-      const currentBudgetMonth = getCurrentBudgetMonth()
+      const currentBudgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
       supabase
         .from("budget_summary")
