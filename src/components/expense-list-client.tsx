@@ -196,7 +196,7 @@ export function ExpenseListClient({
                     </div>
                     {expense.currency !== "EUR" && (
                       <div className="text-xs text-muted-foreground">
-                        {expense.currency} {formatCurrency(expense.amount).replace('€', '')}
+                        {formatCurrency(expense.amount, 2, expense.currency)}
                       </div>
                     )}
                   </div>

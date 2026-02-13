@@ -84,6 +84,14 @@ export async function fetchExchangeRateFromAPI(
 // European number formatting utilities
 // Format: €120 000,99 (space as thousands separator, comma as decimal separator)
 
+// Currency symbol mapping
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  EUR: '€',
+  USD: '$',
+  GBP: '£',
+  BRL: 'R$',
+}
+
 /**
  * Format a number with European style (space as thousands separator, comma as decimal)
  * @param value - The number to format
@@ -101,8 +109,14 @@ export function formatNumber(value: number, decimals: number = 2): string {
  * Format a currency amount with European style
  * @param value - The amount to format
  * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted currency string (e.g., "€120 000,99")
+ * @param currency - The currency code (default: 'EUR')
+ * @returns Formatted currency string (e.g., "€120 000,99" or "$120 000,99")
  */
-export function formatCurrency(value: number, decimals: number = 2): string {
-  return `€${formatNumber(value, decimals)}`
+export function formatCurrency(
+  value: number,
+  decimals: number = 2,
+  currency: string = 'EUR'
+): string {
+  const symbol = CURRENCY_SYMBOLS[currency] || currency
+  return `${symbol}${formatNumber(value, decimals)}`
 }
