@@ -251,4 +251,4 @@ The view computes `percent_spent` as `(spent / allocated) * 100` in SQL, but `bu
 | 12 | No server-side rendering; all data fetched client-side | All pages | ✅ FIXED |
 | 13 | `date-fns` imported alongside manual date utils | `src/lib/date-utils.ts` vs imports in components | ✅ FIXED |
 | 14 | Real-time subscription has no household-level filter | `src/lib/hooks/use-expense-subscription.ts:48-52` | ✅ FIXED |
-| 15 | `formatCurrency()` hardcodes EUR symbol regardless of currency | `src/lib/currency.ts:53-55` |
+| 15 | `formatCurrency()` hardcodes EUR symbol regardless of currency | `src/lib/currency.ts:53-55` | ✅ FIXED |
