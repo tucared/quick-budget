@@ -9,10 +9,35 @@ interface ExchangeRateResponse {
 }
 
 /**
+ * Adjust date to previous working day if it falls on a weekend
+ * Forex markets are closed on weekends, so we use Friday's rate for Sat/Sun
+ * @param dateStr - Date in YYYY-MM-DD format
+ * @returns Adjusted date as YYYY-MM-DD
+ */
+function adjustToWorkingDay(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00')
+  const dayOfWeek = date.getUTCDay() // 0 = Sunday, 6 = Saturday
+
+  // If Saturday (6), go back 1 day to Friday
+  if (dayOfWeek === 6) {
+    date.setUTCDate(date.getUTCDate() - 1)
+  }
+  // If Sunday (0), go back 2 days to Friday
+  else if (dayOfWeek === 0) {
+    date.setUTCDate(date.getUTCDate() - 2)
+  }
+
+  return date.toISOString().split('T')[0]
+}
+
+/**
  * Fetch exchange rate from EUR to target currency for a specific date
  * @param currency - Target currency code (e.g., 'BRL', 'USD')
  * @param date - Date in YYYY-MM-DD format (defaults to today)
  * @returns Exchange rate from currency to EUR
+ *
+ * Note: Free API plan only provides current rates. For historical rates, a paid plan is required.
+ * Weekend dates are automatically adjusted to the previous Friday (forex markets closed on weekends).
  */
 export async function fetchExchangeRate(
   currency: string,
@@ -29,10 +54,16 @@ export async function fetchExchangeRate(
     throw new Error('Exchange rate API key not configured')
   }
 
-  const formattedDate = date || new Date().toISOString().split('T')[0]
+  const requestedDate = date || new Date().toISOString().split('T')[0]
+  const workingDayDate = adjustToWorkingDay(requestedDate)
 
-  // Use latest endpoint for recent dates (more reliable)
-  // For historical dates, we'll use the same endpoint as it caches well
+  // Log if we adjusted the date for weekend
+  if (workingDayDate !== requestedDate) {
+    console.log(`Adjusted weekend date ${requestedDate} to working day ${workingDayDate} for forex rate`)
+  }
+
+  // Use latest endpoint (free plan doesn't support historical rates)
+  // For true historical rates, a paid API plan is required
   const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/EUR`
 
   try {
@@ -61,7 +92,7 @@ export async function fetchExchangeRate(
     return 1 / rate
 
   } catch (error) {
-    console.error(`Failed to fetch exchange rate for ${currency} on ${formattedDate}:`, error)
+    console.error(`Failed to fetch exchange rate for ${currency} on ${workingDayDate}:`, error)
 
     // Fall back to hardcoded rates for common currencies
     const fallbackRates: Record<string, number> = {
