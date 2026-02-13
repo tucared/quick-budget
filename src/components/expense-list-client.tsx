@@ -37,6 +37,7 @@ export function ExpenseListClient({
   const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [deleteError, setDeleteError] = useState("")
+  const [visibleCount, setVisibleCount] = useState(10)
 
   // Update state when initial data changes
   useEffect(() => {
@@ -119,6 +120,13 @@ export function ExpenseListClient({
     )
   }
 
+  const visibleExpenses = expenses.slice(0, visibleCount)
+  const hasMore = expenses.length > visibleCount
+
+  const handleShowMore = () => {
+    setVisibleCount((prev) => prev + 10)
+  }
+
   return (
     <div>
       <h2 className="text-lg font-semibold mb-3">Recent Expenses</h2>
@@ -127,7 +135,7 @@ export function ExpenseListClient({
           {deleteError}
         </div>
       )}
-      {expenses.map((expense) => {
+      {visibleExpenses.map((expense) => {
         const category = expense.category_id
           ? categories.get(expense.category_id)
           : null
@@ -212,6 +220,18 @@ export function ExpenseListClient({
           </div>
         )
       })}
+
+      {/* Show More Button */}
+      {hasMore && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={handleShowMore}
+            className="px-6 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-accent transition-colors"
+          >
+            Show More
+          </button>
+        </div>
+      )}
     </div>
   )
 }
