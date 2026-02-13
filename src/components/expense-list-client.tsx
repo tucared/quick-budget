@@ -7,19 +7,53 @@ import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
-import { useUser } from "@/lib/contexts/user-context"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { getErrorMessage } from "@/lib/error-handler"
 
-export function ExpenseList() {
-  const { user } = useUser()
-  const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([])
-  const [categories, setCategories] = useState<Map<string, Category>>(new Map())
-  const [accounts, setAccounts] = useState<Map<string, Account>>(new Map())
-  const [loading, setLoading] = useState(true)
+interface ExpenseListClientProps {
+  initialExpenses: ExpenseWithDetails[]
+  initialCategories: Category[]
+  initialAccounts: Account[]
+  householdId: string
+}
+
+export function ExpenseListClient({
+  initialExpenses,
+  initialCategories,
+  initialAccounts,
+  householdId,
+}: ExpenseListClientProps) {
+  const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
+  const [categories, setCategories] = useState<Map<string, Category>>(() => {
+    const map = new Map<string, Category>()
+    initialCategories.forEach((cat) => map.set(cat.id, cat))
+    return map
+  })
+  const [accounts, setAccounts] = useState<Map<string, Account>>(() => {
+    const map = new Map<string, Account>()
+    initialAccounts.forEach((acc) => map.set(acc.id, acc))
+    return map
+  })
   const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [deleteError, setDeleteError] = useState("")
+
+  // Update state when initial data changes
+  useEffect(() => {
+    setExpenses(initialExpenses)
+  }, [initialExpenses])
+
+  useEffect(() => {
+    const map = new Map<string, Category>()
+    initialCategories.forEach((cat) => map.set(cat.id, cat))
+    setCategories(map)
+  }, [initialCategories])
+
+  useEffect(() => {
+    const map = new Map<string, Account>()
+    initialAccounts.forEach((acc) => map.set(acc.id, acc))
+    setAccounts(map)
+  }, [initialAccounts])
 
   const handleCardClick = (expenseId: string) => {
     // Toggle delete button visibility on mobile
@@ -48,58 +82,6 @@ export function ExpenseList() {
     }
   }
 
-  // Load initial data
-  useEffect(() => {
-    const supabase = createClient()
-
-    const loadReferenceData = async () => {
-      if (!user?.householdId) {
-        setLoading(false)
-        return
-      }
-
-      const householdId = user.householdId
-
-      const { data: categoriesData } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("household_id", householdId)
-
-      const { data: accountsData } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("household_id", householdId)
-
-      if (categoriesData) {
-        const catMap = new Map<string, Category>()
-        categoriesData.forEach((cat) => catMap.set(cat.id, cat))
-        setCategories(catMap)
-      }
-
-      if (accountsData) {
-        const accMap = new Map<string, Account>()
-        accountsData.forEach((acc) => accMap.set(acc.id, acc))
-        setAccounts(accMap)
-      }
-
-      // Load expenses with explicit household filter
-      const { data } = await supabase
-        .from("expenses")
-        .select("*")
-        .eq("household_id", householdId)
-        .order("expense_date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(20)
-
-      if (data) {
-        setExpenses(data)
-      }
-      setLoading(false)
-    }
-
-    loadReferenceData()
-  }, [user])
-
   // Subscribe to real-time expense changes
   useExpenseSubscription(
     (event) => {
@@ -123,16 +105,8 @@ export function ExpenseList() {
         })
       }
     },
-    !!user?.householdId
+    true
   )
-
-  if (loading) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        Loading expenses...
-      </div>
-    )
-  }
 
   if (expenses.length === 0) {
     return (

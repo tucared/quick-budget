@@ -38,24 +38,33 @@ interface WeekendRange {
   end: string // Date label for end of weekend
 }
 
-interface BudgetBurndownChartProps {
+interface BudgetBurndownChartClientProps {
   budgets: BudgetSummary[]
   householdId: string
   currentMonth: string // "2026-01-01" format
+  initialExpenses: Expense[]
 }
 
-export function BudgetBurndownChart({
+export function BudgetBurndownChartClient({
   budgets,
   householdId,
   currentMonth,
-}: BudgetBurndownChartProps) {
-  const [expenses, setExpenses] = useState<Expense[]>([])
+  initialExpenses,
+}: BudgetBurndownChartClientProps) {
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all")
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  // Update expenses when initial data changes
+  useEffect(() => {
+    setExpenses(initialExpenses)
+  }, [initialExpenses])
+
+  // Reload expenses when month or household changes
   useEffect(() => {
     const loadExpenses = async () => {
+      setLoading(true)
       const supabase = createClient()
 
       // Calculate next month for range query
@@ -84,8 +93,18 @@ export function BudgetBurndownChart({
       setLoading(false)
     }
 
+    // Only reload if month/household changed from initial
+    if (
+      initialExpenses.length > 0 &&
+      expenses.length > 0 &&
+      expenses[0].household_id === householdId
+    ) {
+      // Already have correct data
+      return
+    }
+
     loadExpenses()
-  }, [householdId, currentMonth])
+  }, [householdId, currentMonth, initialExpenses, expenses])
 
   const chartData = useMemo(() => {
     if (budgets.length === 0) return { data: [], weekends: [] }
@@ -96,9 +115,9 @@ export function BudgetBurndownChart({
     // Calculate total allocated amount for selected category
     const totalAllocated =
       selectedCategoryId === "all"
-        ? budgets.reduce((sum, b) => sum + b.allocated_amount, 0)
+        ? budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
         : budgets.find((b) => b.category_id === selectedCategoryId)
-            ?.allocated_amount || 0
+            ?.allocated_amount ?? 0
 
     // Filter expenses by selected category AND only include expenses from budgeted categories
     const filteredExpenses =
@@ -186,7 +205,9 @@ export function BudgetBurndownChart({
   const categoryOptions = useMemo(() => {
     return [
       { id: "all", name: "All Categories" },
-      ...budgets.map((b) => ({ id: b.category_id, name: b.category_name })),
+      ...budgets
+        .filter((b) => b.category_id && b.category_name)
+        .map((b) => ({ id: b.category_id!, name: b.category_name! })),
     ]
   }, [budgets])
 
@@ -229,9 +250,9 @@ export function BudgetBurndownChart({
   )
   const totalAllocated =
     selectedCategoryId === "all"
-      ? budgets.reduce((sum, b) => sum + b.allocated_amount, 0)
+      ? budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
       : budgets.find((b) => b.category_id === selectedCategoryId)
-          ?.allocated_amount || 0
+          ?.allocated_amount ?? 0
 
   // Determine line color based on whether we're over budget
   // In a burndown chart, over budget means remaining budget went negative
