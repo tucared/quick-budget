@@ -83,11 +83,18 @@ supabase/
 
 ## Stack
 
-- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
+- **Frontend**: Next.js 16 + TypeScript + Tailwind CSS v4
 - **Backend**: Supabase (PostgreSQL + Auth + Real-time)
-- **UI**: shadcn/ui (Radix UI + Tailwind)
+- **UI**: shadcn/ui (Radix UI + Tailwind v4)
 - **Forms**: React Hook Form + Zod
 - **Deployment**: Vercel (see [DEPLOYMENT.md](./DEPLOYMENT.md))
+
+### Tailwind CSS v4 Configuration
+
+This project uses Tailwind CSS v4 with CSS-first configuration:
+- Configuration is in `src/app/globals.css` via `@theme inline` directive
+- No JavaScript config file needed (`tailwind.config.ts` has been removed)
+- Uses `tw-animate-css` for animations (replaces `tailwindcss-animate`)
 
 ## Database Migrations
 
