@@ -452,7 +452,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
               amountInputRef.current = e
             }}
           />
-          <div className="inline-flex rounded-md shadow-sm" role="group">
+          <div className="inline-flex rounded-md shadow-xs" role="group">
             <button
               type="button"
               onClick={() => setValue("currency", "EUR")}

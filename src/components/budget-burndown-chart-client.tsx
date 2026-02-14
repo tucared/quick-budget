@@ -260,7 +260,9 @@ export function BudgetBurndownChartClient({
     .filter((d) => d.actual !== null)
     .slice(-1)[0]?.actual ?? 0
   const isOverBudget = latestActual < 0
-  const actualLineColor = isOverBudget ? "#ef4444" : "#22c55e"
+  const actualLineColor = isOverBudget
+    ? "var(--destructive)"
+    : "hsl(142.1 76.2% 36.3%)" // green-600
 
   return (
     <Card>
@@ -295,7 +297,7 @@ export function BudgetBurndownChartClient({
                   key={idx}
                   x1={weekend.start}
                   x2={weekend.end}
-                  fill="#f3f4f6"
+                  fill="var(--muted)"
                   fillOpacity={0.5}
                 />
               ))}
@@ -303,30 +305,30 @@ export function BudgetBurndownChartClient({
                 dataKey="date"
                 tick={{ fontSize: 11 }}
                 tickLine={false}
-                axisLine={{ stroke: "#e5e7eb" }}
+                axisLine={{ stroke: "var(--border)" }}
                 interval="preserveStartEnd"
               />
               <YAxis
                 tick={{ fontSize: 11 }}
                 tickLine={false}
-                axisLine={{ stroke: "#e5e7eb" }}
+                axisLine={{ stroke: "var(--border)" }}
                 tickFormatter={(value) => formatCurrency(value, 0)}
                 width={60}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
+                  backgroundColor: "var(--card)",
+                  border: "1px solid var(--border)",
                   borderRadius: "8px",
                 }}
                 formatter={(value: number | undefined) => [value !== undefined ? formatCurrency(value) : "", ""]}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
+                labelStyle={{ color: "var(--foreground)" }}
               />
               <Legend />
               <Line
                 type="monotone"
                 dataKey="planned"
-                stroke="#9ca3af"
+                stroke="var(--muted-foreground)"
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 dot={false}
