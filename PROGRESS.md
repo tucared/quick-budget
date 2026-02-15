@@ -49,7 +49,7 @@ When I have a purchase that's partly personal and partly shared (like a lunch al
 ### [ ] JTBD #9: Stay accountable to each other
 When either of us hasn't logged any expenses in several days, we want to be notified, so we know our shared financial picture might be incomplete and trigger a catch up
 
-### [ ] JTBD #10: Enter foreign currency naturally
+### [x] JTBD #10: Enter foreign currency naturally
 When logging an expense in BRL, I want to enter the amount I actually paid, so I don't have to calculate conversions or delay entering it
 
 ---
