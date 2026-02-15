@@ -148,7 +148,7 @@ export async function getMonthlyExpenses(
 
   const { data, error } = await supabase
     .from("expenses")
-    .select("expense_date, converted_amount, category_id")
+    .select("*")
     .eq("household_id", householdId)
     .gte("expense_date", budgetMonth)
     .lt("expense_date", nextMonthStr)

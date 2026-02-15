@@ -4,13 +4,14 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { format, startOfMonth } from "date-fns"
 import { Pencil, ArrowRightLeft } from "lucide-react"
-import type { BudgetSummary, Expense, Category } from "@/lib/types"
+import type { BudgetSummary, Expense, Category, Account } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
 import { BudgetBurndownChartClient } from "@/components/budget-burndown-chart-client"
 import { MonthNavigator } from "@/components/month-navigator"
 import { BudgetEditDialog } from "@/components/budget-edit-dialog"
 import { RebalanceDialog } from "@/components/rebalance-dialog"
+import { CategoryExpenseDialog } from "@/components/category-expense-dialog"
 import { Button } from "@/components/ui/button"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { getErrorMessage } from "@/lib/error-handler"
@@ -19,6 +20,7 @@ interface BudgetPageContentProps {
   initialBudgets: BudgetSummary[]
   initialExpenses: Expense[]
   categories: Category[]
+  accounts: Account[]
   householdId: string
   budgetMonth: string
 }
@@ -27,6 +29,7 @@ export function BudgetPageContent({
   initialBudgets,
   initialExpenses,
   categories,
+  accounts,
   householdId,
   budgetMonth,
 }: BudgetPageContentProps) {
@@ -34,6 +37,8 @@ export function BudgetPageContent({
   const [error, setError] = useState("")
   const [editOpen, setEditOpen] = useState(false)
   const [rebalanceOpen, setRebalanceOpen] = useState(false)
+  const [selectedBudget, setSelectedBudget] = useState<BudgetSummary | null>(null)
+  const [categoryExpenseDialogOpen, setCategoryExpenseDialogOpen] = useState(false)
 
   const isCurrentMonth =
     format(startOfMonth(new Date()), "yyyy-MM-dd") === budgetMonth
@@ -65,6 +70,11 @@ export function BudgetPageContent({
     },
     true
   )
+
+  const handleCategoryClick = (budget: BudgetSummary) => {
+    setSelectedBudget(budget)
+    setCategoryExpenseDialogOpen(true)
+  }
 
   const isEmpty = budgets.length === 0
 
@@ -127,7 +137,11 @@ export function BudgetPageContent({
             <h3 className="text-lg font-semibold mb-4">Categories</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {budgets.map((budget) => (
-                <BudgetCategoryCard key={budget.id} budget={budget} />
+                <BudgetCategoryCard
+                  key={budget.id}
+                  budget={budget}
+                  onClick={handleCategoryClick}
+                />
               ))}
             </div>
           </div>
@@ -150,6 +164,18 @@ export function BudgetPageContent({
         budgets={budgets}
         householdId={householdId}
         budgetMonth={budgetMonth}
+      />
+
+      {/* Category Expense Detail Dialog */}
+      <CategoryExpenseDialog
+        open={categoryExpenseDialogOpen}
+        onOpenChange={setCategoryExpenseDialogOpen}
+        budget={selectedBudget}
+        householdId={householdId}
+        budgetMonth={budgetMonth}
+        allExpenses={initialExpenses}
+        categories={categories}
+        accounts={accounts}
       />
     </>
   )
