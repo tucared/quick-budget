@@ -1,25 +1,39 @@
 import { redirect } from "next/navigation"
-import { format, startOfMonth } from "date-fns"
+import { format, startOfMonth, parseISO } from "date-fns"
 import {
   getServerUser,
   getBudgetSummary,
   getMonthlyExpenses,
+  getCategories,
 } from "@/lib/server/data"
 import { BudgetPageContent } from "@/components/budget-page-content"
 
-export default async function BudgetPage() {
+interface BudgetPageProps {
+  searchParams: Promise<{ month?: string }>
+}
+
+export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   const user = await getServerUser()
 
   if (!user) {
     redirect("/login")
   }
 
-  const budgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+  const { month } = await searchParams
+
+  // Parse month from searchParams (format: yyyy-MM) or default to current month
+  let budgetMonth: string
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    budgetMonth = format(parseISO(`${month}-01`), "yyyy-MM-dd")
+  } else {
+    budgetMonth = format(startOfMonth(new Date()), "yyyy-MM-dd")
+  }
 
   // Fetch all data in parallel
-  const [budgets, expenses] = await Promise.all([
-    getBudgetSummary(user.householdId),
+  const [budgets, expenses, categories] = await Promise.all([
+    getBudgetSummary(user.householdId, budgetMonth),
     getMonthlyExpenses(user.householdId, budgetMonth),
+    getCategories(user.householdId),
   ])
 
   return (
@@ -27,6 +41,7 @@ export default async function BudgetPage() {
       <BudgetPageContent
         initialBudgets={budgets}
         initialExpenses={expenses}
+        categories={categories}
         householdId={user.householdId}
         budgetMonth={budgetMonth}
       />

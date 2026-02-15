@@ -10,7 +10,7 @@
 ## Monthly Planning & Budget Setting
 
 
-### [ ] JTBD #1: Set realistic targets based on history
+### [x] JTBD #1: Set realistic targets based on history
 When planning next month, we want to see how our spending targets compared to actuals in previous months, so we can set more realistic budgets
 
 ---
@@ -30,7 +30,7 @@ When I'm about to spend on something personal, I want to see my allowance balanc
 ### [x] JTBD #4: Get notified when overspending
 When I log an expense that makes a category overspent, I want to be notified immediately, so I can take action before it affects our overall budget
 
-### [ ] JTBD #5: Rebalance categories mid-month
+### [x] JTBD #5: Rebalance categories mid-month
 When we want to spend in a category that's exhausted or about to, we want to quickly move money from categories we're underspending, so we can enjoy what we want without guilt or breaking our plan
 
 ### [ ] JTBD #6: Understand why categories run out
