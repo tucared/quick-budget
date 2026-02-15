@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { createClient } from "@/lib/supabase"
 import { format, getDaysInMonth, parseISO } from "date-fns"
 import { formatCurrency } from "@/lib/currency"
@@ -25,6 +25,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BudgetSummary, Expense } from "@/lib/types"
 import { getErrorMessage } from "@/lib/error-handler"
+import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface BurndownDataPoint {
   date: string // "Jan 1", "Jan 2", etc.
@@ -53,58 +54,42 @@ export function BudgetBurndownChartClient({
 }: BudgetBurndownChartClientProps) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all")
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  // Update expenses when initial data changes
+  // Update expenses when server data changes (month navigation)
   useEffect(() => {
     setExpenses(initialExpenses)
   }, [initialExpenses])
 
-  // Reload expenses when month or household changes
-  useEffect(() => {
-    const loadExpenses = async () => {
-      setLoading(true)
-      const supabase = createClient()
+  // Reload expenses on real-time changes
+  const reloadExpenses = useCallback(() => {
+    const supabase = createClient()
 
-      // Calculate next month for range query
-      const currentDate = parseISO(currentMonth)
-      const nextMonth = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        1
-      )
-      const nextMonthStr = format(nextMonth, "yyyy-MM-dd")
+    const currentDate = parseISO(currentMonth)
+    const nextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1
+    )
+    const nextMonthStr = format(nextMonth, "yyyy-MM-dd")
 
-      const { data, error: loadError } = await supabase
-        .from("expenses")
-        .select("expense_date, converted_amount, category_id")
-        .eq("household_id", householdId)
-        .gte("expense_date", currentMonth)
-        .lt("expense_date", nextMonthStr)
-        .order("expense_date", { ascending: true })
+    supabase
+      .from("expenses")
+      .select("expense_date, converted_amount, category_id")
+      .eq("household_id", householdId)
+      .gte("expense_date", currentMonth)
+      .lt("expense_date", nextMonthStr)
+      .order("expense_date", { ascending: true })
+      .then(({ data, error: loadError }) => {
+        if (loadError) {
+          setError(getErrorMessage(loadError))
+        } else if (data) {
+          setExpenses(data as Expense[])
+        }
+      })
+  }, [householdId, currentMonth])
 
-      if (loadError) {
-        setError(getErrorMessage(loadError))
-      } else if (data) {
-        setExpenses(data as Expense[])
-      }
-
-      setLoading(false)
-    }
-
-    // Only reload if month/household changed from initial
-    if (
-      initialExpenses.length > 0 &&
-      expenses.length > 0 &&
-      expenses[0].household_id === householdId
-    ) {
-      // Already have correct data
-      return
-    }
-
-    loadExpenses()
-  }, [householdId, currentMonth, initialExpenses, expenses])
+  useExpenseSubscription(reloadExpenses, true)
 
   const chartData = useMemo(() => {
     if (budgets.length === 0) return { data: [], weekends: [] }
@@ -211,21 +196,6 @@ export function BudgetBurndownChartClient({
     ]
   }, [budgets])
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Budget Burndown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            Loading chart...
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   if (error) {
     return (
       <Card>
@@ -245,9 +215,6 @@ export function BudgetBurndownChartClient({
     return null
   }
 
-  const selectedCategory = categoryOptions.find(
-    (c) => c.id === selectedCategoryId
-  )
   const totalAllocated =
     selectedCategoryId === "all"
       ? budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
