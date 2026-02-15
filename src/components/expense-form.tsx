@@ -234,9 +234,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         return
       }
 
-      // Check if selected category is a monthly category (not long_term)
       const selectedCategoryObj = categories.find((c) => c.id === selectedCategory)
-      if (!selectedCategoryObj || selectedCategoryObj.exclude_from_budget_total) {
+      if (!selectedCategoryObj) {
         setCategoryBudget(null)
         return
       }
@@ -498,8 +497,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             {errors.category_id.message}
           </p>
         )}
-        {/* Budget status preview - only show for monthly categories */}
-        {selectedCategory && !categories.find((c) => c.id === selectedCategory)?.exclude_from_budget_total && (
+        {/* Budget status preview */}
+        {selectedCategory && (
           <CategoryBudgetStatus
             budget={categoryBudget}
             additionalAmount={debouncedAmount > 0 ? convertToEUR(debouncedAmount, selectedCurrency || "EUR") : 0}

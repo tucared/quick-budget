@@ -76,6 +76,33 @@ export async function getBudgetSummary(
 }
 
 /**
+ * Server-side function to fetch allowance summary for a given month
+ * (categories with exclude_from_budget_total = true)
+ */
+export async function getAllowanceSummary(
+  householdId: string,
+  budgetMonth?: string
+): Promise<BudgetSummary[]> {
+  const supabase = await createServerSupabaseClient()
+  const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
+
+  const { data, error } = await supabase
+    .from("budget_summary")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("budget_month", month)
+    .eq("exclude_from_budget_total", true)
+    .order("category_name", { ascending: true })
+
+  if (error) {
+    console.error("Failed to fetch allowance summary:", error)
+    return []
+  }
+
+  return data || []
+}
+
+/**
  * Server-side function to fetch raw budget allocations for a given month
  */
 export async function getBudgetAllocations(
