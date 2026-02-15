@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, parseISO, startOfMonth } from "date-fns"
 import type {
+  BudgetAllocation,
   BudgetSummary,
   Category,
   Account,
@@ -49,24 +50,78 @@ export async function getServerUser(): Promise<UserData | null> {
 }
 
 /**
- * Server-side function to fetch budget summary for current month
+ * Server-side function to fetch budget summary for a given month
  */
 export async function getBudgetSummary(
-  householdId: string
+  householdId: string,
+  budgetMonth?: string
 ): Promise<BudgetSummary[]> {
   const supabase = await createServerSupabaseClient()
-  const budgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+  const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
   const { data, error } = await supabase
     .from("budget_summary")
     .select("*")
     .eq("household_id", householdId)
-    .eq("budget_month", budgetMonth)
+    .eq("budget_month", month)
     .eq("exclude_from_budget_total", false)
     .order("category_name", { ascending: true })
 
   if (error) {
     console.error("Failed to fetch budget summary:", error)
+    return []
+  }
+
+  return data || []
+}
+
+/**
+ * Server-side function to fetch raw budget allocations for a given month
+ */
+export async function getBudgetAllocations(
+  householdId: string,
+  budgetMonth: string
+): Promise<BudgetAllocation[]> {
+  const supabase = await createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from("budget_allocations")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("budget_month", budgetMonth)
+
+  if (error) {
+    console.error("Failed to fetch budget allocations:", error)
+    return []
+  }
+
+  return data || []
+}
+
+/**
+ * Server-side function to fetch budget summary history for last N months
+ * Returns all budget_summary rows (including allowances) for historical comparison
+ */
+export async function getBudgetHistory(
+  householdId: string,
+  months: number = 3
+): Promise<BudgetSummary[]> {
+  const supabase = await createServerSupabaseClient()
+
+  // Calculate the start month (N months ago)
+  const now = new Date()
+  const startDate = new Date(now.getFullYear(), now.getMonth() - months, 1)
+  const startMonth = format(startDate, 'yyyy-MM-dd')
+
+  const { data, error } = await supabase
+    .from("budget_summary")
+    .select("*")
+    .eq("household_id", householdId)
+    .gte("budget_month", startMonth)
+    .order("budget_month", { ascending: false })
+
+  if (error) {
+    console.error("Failed to fetch budget history:", error)
     return []
   }
 

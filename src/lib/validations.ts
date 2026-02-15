@@ -32,3 +32,17 @@ export const expenseSchema = z.object({
 })
 
 export type ExpenseFormValues = z.infer<typeof expenseSchema>
+
+// Budget allocation input validation (single category amount)
+export const budgetAllocationInputSchema = z.object({
+  category_id: z
+    .string()
+    .uuid("Invalid category"),
+
+  amount: z
+    .number()
+    .min(0, "Amount cannot be negative")
+    .max(9999999999.99, "Amount is too large"),
+})
+
+export type BudgetAllocationInput = z.infer<typeof budgetAllocationInputSchema>
