@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { getErrorMessage } from "@/lib/error-handler"
@@ -21,7 +21,7 @@ export function ExpenseListClient({
   initialExpenses,
   initialCategories,
   initialAccounts,
-  householdId,
+  householdId: _householdId,
 }: ExpenseListClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
   const [categories, setCategories] = useState<Map<string, Category>>(() => {

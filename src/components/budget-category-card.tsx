@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
-import { getBudgetStatusColor, getBudgetProgressBarColor, getBudgetStatusIcon, getBudgetStatusLabel } from "@/lib/budget-utils"
+import { getBudgetStatusColor, getBudgetProgressBarColor, getBudgetStatusIcon } from "@/lib/budget-utils"
 
 interface BudgetCategoryCardProps {
   budget: BudgetSummary

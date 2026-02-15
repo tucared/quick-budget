@@ -8,8 +8,8 @@ import { useUser } from "./use-user"
 // Expense change event types
 export type ExpenseChangeEvent = {
   type: "INSERT" | "UPDATE" | "DELETE"
-  new?: any
-  old?: any
+  new?: unknown
+  old?: unknown
 }
 
 // Callback type for expense changes

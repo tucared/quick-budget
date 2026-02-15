@@ -12,7 +12,7 @@
 - DO NOT WRITE ANY new migrations, just edit @supabase/migrations/20260116_initial_schema.sql and run `supabase db reset`
 - When editing the seeds, dont forget to update @supabase/seeds/prod/.template files as well
 - After modifying the database schema in migrations, regenerate TypeScript types with `npm run types:generate`
-- ESLint is configured via `.eslintrc.json` (extends `next/core-web-vitals`). Run `npm run lint` to check for issues
+- ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 
 ## Exchange Rate System
 

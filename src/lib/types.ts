@@ -36,14 +36,6 @@ export interface ExpenseWithDetails extends Expense {
 }
 
 // Local storage keys for remembering defaults, namespaced by household
-const STORAGE_KEY_NAMES = [
-  "last_category",
-  "last_account",
-  "last_currency",
-  "category_usage",
-  "account_usage",
-] as const
-
 export function getStorageKeys(householdId: string) {
   const prefix = `qb:${householdId}`
   return {
