@@ -91,17 +91,19 @@ export function ExpenseListClient({
         setExpenses((prev) => [event.new as ExpenseWithDetails, ...prev.slice(0, 19)])
       } else if (event.type === "UPDATE") {
         // Update existing expense
+        const updatedExpense = event.new as ExpenseWithDetails
         setExpenses((prev) =>
           prev.map((exp) =>
-            exp.id === event.new.id ? (event.new as ExpenseWithDetails) : exp
+            exp.id === updatedExpense.id ? updatedExpense : exp
           )
         )
       } else if (event.type === "DELETE") {
         // Remove deleted expense
-        setExpenses((prev) => prev.filter((exp) => exp.id !== event.old.id))
+        const deletedExpense = event.old as ExpenseWithDetails
+        setExpenses((prev) => prev.filter((exp) => exp.id !== deletedExpense.id))
         setDeletingIds((prev) => {
           const next = new Set(prev)
-          next.delete(event.old.id)
+          next.delete(deletedExpense.id)
           return next
         })
       }
