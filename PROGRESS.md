@@ -33,7 +33,7 @@ When I log an expense that makes a category overspent, I want to be notified imm
 ### [x] JTBD #5: Rebalance categories mid-month
 When we want to spend in a category that's exhausted or about to, we want to quickly move money from categories we're underspending, so we can enjoy what we want without guilt or breaking our plan
 
-### [ ] JTBD #6: Understand why categories run out
+### [x] JTBD #6: Understand why categories run out
 When I see a category running out faster than expected, I want to review the individual expenses in it, so I can decide whether to rebalance now or adjust next month's budget based on what I learn
 
 ---
