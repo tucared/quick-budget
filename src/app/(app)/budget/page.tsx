@@ -3,6 +3,7 @@ import { format, startOfMonth, parseISO } from "date-fns"
 import {
   getServerUser,
   getBudgetSummary,
+  getAllowanceSummary,
   getMonthlyExpenses,
   getCategories,
   getAccounts,
@@ -31,8 +32,9 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   }
 
   // Fetch all data in parallel
-  const [budgets, expenses, categories, accounts] = await Promise.all([
+  const [budgets, allowances, expenses, categories, accounts] = await Promise.all([
     getBudgetSummary(user.householdId, budgetMonth),
+    getAllowanceSummary(user.householdId, budgetMonth),
     getMonthlyExpenses(user.householdId, budgetMonth),
     getCategories(user.householdId),
     getAccounts(user.householdId),
@@ -42,6 +44,7 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
     <main className="container mx-auto px-4 py-6 max-w-6xl">
       <BudgetPageContent
         initialBudgets={budgets}
+        initialAllowances={allowances}
         initialExpenses={expenses}
         categories={categories}
         accounts={accounts}

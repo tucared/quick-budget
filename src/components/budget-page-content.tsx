@@ -18,6 +18,7 @@ import { getErrorMessage } from "@/lib/error-handler"
 
 interface BudgetPageContentProps {
   initialBudgets: BudgetSummary[]
+  initialAllowances: BudgetSummary[]
   initialExpenses: Expense[]
   categories: Category[]
   accounts: Account[]
@@ -27,6 +28,7 @@ interface BudgetPageContentProps {
 
 export function BudgetPageContent({
   initialBudgets,
+  initialAllowances,
   initialExpenses,
   categories,
   accounts,
@@ -34,6 +36,7 @@ export function BudgetPageContent({
   budgetMonth,
 }: BudgetPageContentProps) {
   const [budgets, setBudgets] = useState<BudgetSummary[]>(initialBudgets)
+  const [allowances, setAllowances] = useState<BudgetSummary[]>(initialAllowances)
   const [error, setError] = useState("")
   const [editOpen, setEditOpen] = useState(false)
   const [rebalanceOpen, setRebalanceOpen] = useState(false)
@@ -43,10 +46,14 @@ export function BudgetPageContent({
   const isCurrentMonth =
     format(startOfMonth(new Date()), "yyyy-MM-dd") === budgetMonth
 
-  // Update budgets when initial data changes (e.g. month navigation via server)
+  // Update budgets and allowances when initial data changes (e.g. month navigation via server)
   useEffect(() => {
     setBudgets(initialBudgets)
   }, [initialBudgets])
+
+  useEffect(() => {
+    setAllowances(initialAllowances)
+  }, [initialAllowances])
 
   // Reload budgets when expenses change (real-time updates)
   useExpenseSubscription(
@@ -65,6 +72,21 @@ export function BudgetPageContent({
             setError(getErrorMessage(reloadError))
           } else if (data) {
             setBudgets(data)
+          }
+        })
+
+      supabase
+        .from("budget_summary")
+        .select("*")
+        .eq("household_id", householdId)
+        .eq("budget_month", budgetMonth)
+        .eq("exclude_from_budget_total", true)
+        .order("category_name", { ascending: true })
+        .then(({ data, error: reloadError }) => {
+          if (reloadError) {
+            setError(getErrorMessage(reloadError))
+          } else if (data) {
+            setAllowances(data)
           }
         })
     },
@@ -145,6 +167,22 @@ export function BudgetPageContent({
               ))}
             </div>
           </div>
+
+          {/* Allowances Grid */}
+          {allowances.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Allowances</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {allowances.map((allowance) => (
+                  <BudgetCategoryCard
+                    key={allowance.id}
+                    budget={allowance}
+                    onClick={handleCategoryClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
