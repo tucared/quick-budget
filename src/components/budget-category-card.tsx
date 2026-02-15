@@ -5,16 +5,34 @@ import { getBudgetStatusColor, getBudgetProgressBarColor, getBudgetStatusIcon } 
 
 interface BudgetCategoryCardProps {
   budget: BudgetSummary
+  onClick?: (budget: BudgetSummary) => void
 }
 
-export function BudgetCategoryCard({ budget }: BudgetCategoryCardProps) {
+export function BudgetCategoryCard({ budget, onClick }: BudgetCategoryCardProps) {
   const percentSpent = Number(budget.percent_spent)
   const allocated = Number(budget.allocated_amount)
   const spent = Number(budget.spent_amount)
   const remaining = Number(budget.remaining_amount)
 
+  const handleClick = () => {
+    onClick?.(budget)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (onClick && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault()
+      onClick(budget)
+    }
+  }
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card
+      className={`hover:shadow-md transition-shadow ${onClick ? "cursor-pointer" : ""}`}
+      onClick={handleClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={handleKeyDown}
+    >
       <CardContent className="p-4">
         {/* Category header with icon and name */}
         <div className="flex items-center gap-2 mb-3">
