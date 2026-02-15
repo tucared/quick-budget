@@ -215,12 +215,6 @@ export function BudgetBurndownChartClient({
     return null
   }
 
-  const totalAllocated =
-    selectedCategoryId === "all"
-      ? budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
-      : budgets.find((b) => b.category_id === selectedCategoryId)
-          ?.allocated_amount ?? 0
-
   // Determine line color based on whether we're over budget
   // In a burndown chart, over budget means remaining budget went negative
   const latestActual = chartData.data

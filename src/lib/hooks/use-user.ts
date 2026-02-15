@@ -65,7 +65,7 @@ export function useUser() {
           householdId: userData.household_id,
         })
         setLoading(false)
-      } catch (err) {
+      } catch (_err) {
         setError("An unexpected error occurred")
         setLoading(false)
       }

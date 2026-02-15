@@ -207,7 +207,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           if (lastCurrency) {
             setValue("currency", lastCurrency)
           }
-        } catch (err) {
+        } catch (_err) {
           // localStorage might be disabled (incognito mode, etc.)
           // Fall back to defaults if available
           if (accountsData && accountsData.length > 0) {
@@ -334,7 +334,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           recordUsage(storageKeys.CATEGORY_USAGE, data.category_id)
           recordUsage(storageKeys.ACCOUNT_USAGE, data.account_id)
         }
-      } catch (err) {
+      } catch (_err) {
         // localStorage might be disabled, silently fail
         // This is not critical for functionality
       }

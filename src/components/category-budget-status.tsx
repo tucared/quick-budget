@@ -1,6 +1,6 @@
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
-import { getBudgetStatusTheme, getBudgetStatusIcon, getBudgetStatusLabel } from "@/lib/budget-utils"
+import { getBudgetStatusTheme, getBudgetStatusIcon } from "@/lib/budget-utils"
 
 interface CategoryBudgetStatusProps {
   budget: BudgetSummary | null

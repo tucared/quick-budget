@@ -96,6 +96,14 @@ This project uses Tailwind CSS v4 with CSS-first configuration:
 - No JavaScript config file needed (`tailwind.config.ts` has been removed)
 - Uses `tw-animate-css` for animations (replaces `tailwindcss-animate`)
 
+### ESLint Configuration
+
+This project uses ESLint v9 with the flat config format:
+- Configuration is in `eslint.config.js` (Next.js 16+ removed the `next lint` command)
+- Run `npm run lint` to check for linting issues
+- The configuration extends Next.js core-web-vitals rules with TypeScript support
+- **Note**: Do not upgrade to ESLint v10 until Next.js plugins support it
+
 ## Database Migrations
 
 ```bash
