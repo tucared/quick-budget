@@ -100,21 +100,52 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Not in cache, fetch from API
-    const rate = await fetchExchangeRate(currency, date)
+    // Not in cache — try Frankfurter
+    let rate: number
+    let fromApi = false
 
-    // Store in database for future use (using working day date)
-    const { error: insertError } = await supabase
-      .from('exchange_rates')
-      .insert({
+    try {
+      rate = await fetchExchangeRate(currency, date)
+      fromApi = true
+    } catch (apiError) {
+      console.error(`Frankfurter API failed for ${currency} on ${date}:`, apiError)
+
+      // Use hardcoded fallback so the expense can still be saved.
+      // Do NOT cache this rate — next request will retry Frankfurter.
+      const fallbackRates: Record<string, number> = {
+        BRL: 0.164,  // 1 BRL ≈ 0.164 EUR  (approx Feb 2026)
+        USD: 0.92,
+        GBP: 1.17,
+        CHF: 1.05,
+        JPY: 0.0062,
+        CAD: 0.65,
+      }
+      rate = fallbackRates[currency] ?? 1.0
+      console.warn(`Using fallback rate for ${currency}: ${rate}`)
+
+      return NextResponse.json({
         currency,
-        rate_date: date,
-        rate_to_eur: rate
+        date,
+        rate,
+        source: 'fallback',
+        ...(date !== requestedDate && { adjustedFrom: requestedDate })
       })
+    }
 
-    if (insertError) {
-      // Log but don't fail - we still have the rate
-      console.error('Failed to cache exchange rate:', insertError)
+    // Only cache confirmed rates from Frankfurter
+    if (fromApi) {
+      const { error: insertError } = await supabase
+        .from('exchange_rates')
+        .insert({
+          currency,
+          rate_date: date,
+          rate_to_eur: rate
+        })
+
+      if (insertError) {
+        // Log but don't fail — we still have the rate
+        console.error('Failed to cache exchange rate:', insertError)
+      }
     }
 
     return NextResponse.json({
