@@ -163,10 +163,6 @@ function validateExpense(row, rateMap = null) {
   }
 
   // Check exclusion criteria
-  if (row.Credit === config.excludeTransactions.credit) {
-    return { valid: false, skip: true, reason: 'Credit transaction excluded' };
-  }
-
   if (config.excludeCategories.includes(row.Category)) {
     return { valid: false, skip: true, reason: `Category "${row.Category}" excluded` };
   }
@@ -184,6 +180,12 @@ function validateExpense(row, rateMap = null) {
     currency = 'EUR';
   } else {
     errors.push('Missing amount');
+  }
+
+  // Credit transactions (refunds, reimbursements) are stored as negative amounts
+  const isCredit = row.Credit === true || row.Credit === 'true' || row.Credit === 'Yes';
+  if (isCredit && amount != null) {
+    amount = -amount;
   }
 
   const expenseDate = parseDate(row.Date);

@@ -119,10 +119,13 @@ function generateExpensesSql(data, validCategories) {
  * Generates SQL INSERT statements for budget allocations
  */
 function generateBudgetSql(data, validCategories) {
-  // Filter out allocations for categories not in seed and zero/negative allocations
+  // Filter out allocations for categories not in seed and zero allocations.
+  // Negative allocations are kept (e.g. Helper category used as a balancing entry).
+  // Savings pot categories (Safety Net, Holidays Pot, Brazil Pot, Home Buy, Retirement)
+  // are not in validCategories and will be dropped — intentional, this app tracks spending only.
   const dropped = {};
   const filteredData = data.filter(row => {
-    if (parseFloat(row.allocated_amount) <= 0) return false;
+    if (parseFloat(row.allocated_amount) === 0) return false;
     if (validCategories.has(row.category)) return true;
     dropped[row.category] = (dropped[row.category] || 0) + 1;
     return false;

@@ -145,6 +145,12 @@ BEGIN
     (shared_household_id, 'User One Allowance', '👤', TRUE, '#6366f1', TRUE),
     (shared_household_id, 'User Two Allowance', '👤', TRUE, '#f97316', TRUE);
 
+  -- Legacy bookkeeping category (inactive: not shown in UI, only exists for historical import)
+  -- In the old app, Helper had negative budget allocations to reconcile the monthly total.
+  -- In this app, we edit/delete expenses directly and set category budgets without a balancing entry.
+  INSERT INTO public.categories (household_id, name, icon, is_active) VALUES
+    (shared_household_id, 'Helper', '⚖️', FALSE);
+
   RAISE NOTICE '  ✓ Created categories';
 
   -- ============================================================================

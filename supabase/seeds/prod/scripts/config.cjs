@@ -26,12 +26,14 @@ module.exports = {
   },
 
   // Categories to exclude from import
-  excludeCategories: ['Helper'],
+  // Note: savings pot categories (Safety Net, Holidays Pot, Brazil Pot, Home Buy, Retirement)
+  // are intentionally excluded — they are not tracked as spending in this app.
+  excludeCategories: [],
 
   // Transaction filters
-  excludeTransactions: {
-    credit: 'Yes'  // Exclude credit transactions (only import expenses)
-  },
+  // Credits (refunds, reimbursements) are imported as negative-amount expenses.
+  // In the new app, use edit/delete instead of credit entries.
+  excludeTransactions: {},
 
   // Default values
   defaults: {
