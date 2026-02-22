@@ -67,12 +67,18 @@ src/
 │   ├── expense-form.tsx   # Expense entry form
 │   └── expense-list.tsx   # Recent expenses list
 ├── lib/
-│   ├── supabase.ts        # Supabase client
-│   ├── types.ts           # Application types
+│   ├── supabase.ts        # Supabase client (browser + server variants)
+│   ├── types.ts           # Application types + localStorage helpers
 │   ├── database.types.ts  # Generated Supabase database types
 │   ├── validations.ts     # Zod schemas
-│   └── utils.ts           # Utilities
-└── middleware.ts          # Auth middleware
+│   ├── currency.ts        # Currency formatting + fetchExchangeRateFromAPI()
+│   ├── exchange-rate-api.ts # Frankfurter API client (server-side)
+│   ├── utils.ts           # Utilities
+│   ├── contexts/
+│   │   └── user-context.tsx # UserProvider + useUser() hook (client auth)
+│   ├── hooks/             # Custom React hooks (e.g. useExpenseSubscription)
+│   └── server/
+│       └── data.ts        # Server-side data fetching utilities
 
 supabase/
 ├── migrations/            # Database migrations
@@ -102,7 +108,6 @@ This project uses ESLint v9 with the flat config format:
 - Configuration is in `eslint.config.js` (Next.js 16+ removed the `next lint` command)
 - Run `npm run lint` to check for linting issues
 - The configuration extends Next.js core-web-vitals rules with TypeScript support
-- **Note**: Do not upgrade to ESLint v10 until Next.js plugins support it
 
 ## Database Migrations
 
@@ -144,16 +149,22 @@ Application-specific types in `src/lib/types.ts` can extend or compose these gen
 
 ## Database Seeding
 
+Seeds live in `supabase/seeds/prod/` and are executed automatically by `supabase db reset`. Three files run in order:
+
+1. `01_seed_all.sql` — Users, accounts, categories (base data, hand-authored)
+2. `02_import_normalized.sql` — Historical expenses + budget allocations (**auto-generated** from CSVs)
+3. `03_import_exchange_rates.sql` — Historical exchange rates (**auto-generated** from CSV)
+
 ```bash
-# Full workflow: Transform CSVs and reset database
+# Full workflow: Transform CSVs → SQL, then reset DB
 npm run seed:full
 
 # Or run steps individually:
-npm run seed:transform  # Transform raw CSVs to SQL
+npm run seed:transform  # Regenerate 02_import_normalized.sql from raw CSVs
 npm run seed:reset      # Reset database with migrations and seeds
 ```
 
-Seeds are automatically run when you execute `supabase db reset`.
+> **Important:** After modifying categories in `01_seed_all.sql`, always re-run `npm run seed:transform` because the generated file references categories by name. If a category is renamed or removed, the generated SQL will fail with a NULL constraint violation.
 
 ## Other Documentation
 

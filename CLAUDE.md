@@ -18,8 +18,10 @@
 
 The app uses an API-based exchange rate system with on-demand caching:
 
-- **API**: Uses ExchangeRate-API (requires `EXCHANGE_RATE_API_KEY` in `.env.local`)
+- **API**: Uses [Frankfurter](https://www.frankfurter.dev) (free, no API key, ECB data) — **no env var needed**
 - **Table**: `exchange_rates` is a cache populated automatically (starts empty)
 - **API Route**: `/api/exchange-rates?currency=BRL&date=2024-01-15` fetches rates with caching
 - **Client Function**: `fetchExchangeRateFromAPI(currency, date)` in `@src/lib/currency.ts`
 - **Expense Form**: Automatically fetches correct rate when logging expenses
+- **Weekend handling**: Dates falling on Sat/Sun are adjusted to the preceding Friday (ECB doesn't publish rates on weekends)
+- **Fallback**: If Frankfurter is unreachable, hardcoded approximate rates are used; these are **not cached** so the next request retries the API
