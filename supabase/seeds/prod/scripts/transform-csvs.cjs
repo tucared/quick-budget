@@ -14,6 +14,21 @@ const path = require('path');
 const { parse } = require('csv-parse/sync');
 const { validateExpense, validateBudgetAllocation } = require('./validators.cjs');
 
+/**
+ * Parses valid category names from 01_seed_all.sql (single source of truth)
+ */
+function parseCategoriesFromSeed(seedFilePath) {
+  const content = fs.readFileSync(seedFilePath, 'utf-8');
+  const validCategories = new Set();
+  // Match: (shared_household_id, 'CategoryName', ...)
+  const pattern = /\(shared_household_id,\s*'([^']+)'/g;
+  let match;
+  while ((match = pattern.exec(content)) !== null) {
+    validCategories.add(match[1]);
+  }
+  return validCategories;
+}
+
 // Load config.local.cjs if it exists, otherwise use config.cjs template
 const SCRIPT_DIR_FOR_CONFIG = __dirname;
 let config;
@@ -61,7 +76,21 @@ function escapeSql(value) {
 /**
  * Generates SQL INSERT statements for expenses
  */
-function generateExpensesSql(data) {
+function generateExpensesSql(data, validCategories) {
+  const dropped = {};
+  const filteredData = data.filter(row => {
+    if (validCategories.has(row.category)) return true;
+    dropped[row.category] = (dropped[row.category] || 0) + 1;
+    return false;
+  });
+
+  const droppedEntries = Object.entries(dropped);
+  if (droppedEntries.length > 0) {
+    const total = droppedEntries.reduce((sum, [, n]) => sum + n, 0);
+    console.log(`\n⚠️  Dropped ${total} expenses with unknown categories:`);
+    droppedEntries.forEach(([cat, count]) => console.log(`    • "${cat}": ${count} rows`));
+  }
+
   const lines = [];
   lines.push('-- Expense data from transformed CSV');
   lines.push('INSERT INTO public.expenses (');
@@ -70,8 +99,8 @@ function generateExpensesSql(data) {
   lines.push('  expense_date, description');
   lines.push(') VALUES');
 
-  const values = data.map((row, index) => {
-    const isLast = index === data.length - 1;
+  const values = filteredData.map((row, index) => {
+    const isLast = index === filteredData.length - 1;
     return `  (
     user1_id, shared_household_id,
     (SELECT id FROM public.categories WHERE name = ${escapeSql(row.category)} AND household_id = shared_household_id),
@@ -89,15 +118,22 @@ function generateExpensesSql(data) {
 /**
  * Generates SQL INSERT statements for budget allocations
  */
-// Categories removed from the data model (no longer seeded)
-const REMOVED_CATEGORIES = ['Safety Net', 'Holidays Pot', 'Brazil Pot', 'Home Buy', 'Retirement'];
+function generateBudgetSql(data, validCategories) {
+  // Filter out allocations for categories not in seed and zero/negative allocations
+  const dropped = {};
+  const filteredData = data.filter(row => {
+    if (parseFloat(row.allocated_amount) <= 0) return false;
+    if (validCategories.has(row.category)) return true;
+    dropped[row.category] = (dropped[row.category] || 0) + 1;
+    return false;
+  });
 
-function generateBudgetSql(data) {
-  // Filter out allocations for categories that no longer exist and zero/negative allocations
-  const filteredData = data.filter(row =>
-    !REMOVED_CATEGORIES.includes(row.category) &&
-    parseFloat(row.allocated_amount) > 0
-  );
+  const droppedEntries = Object.entries(dropped);
+  if (droppedEntries.length > 0) {
+    const total = droppedEntries.reduce((sum, [, n]) => sum + n, 0);
+    console.log(`\n⚠️  Dropped ${total} budget allocations with unknown categories:`);
+    droppedEntries.forEach(([cat, count]) => console.log(`    • "${cat}": ${count} rows`));
+  }
 
   const lines = [];
   lines.push('-- Budget allocation data from transformed CSV');
@@ -250,6 +286,11 @@ function main() {
   const outputFile = path.join(SEED_DIR, '02_import_normalized.sql');
 
   try {
+    // Parse valid categories from seed (single source of truth)
+    const seedFile = path.join(SEED_DIR, '01_seed_all.sql');
+    const VALID_CATEGORIES = parseCategoriesFromSeed(seedFile);
+    console.log(`\n📂 Parsed ${VALID_CATEGORIES.size} valid categories from 01_seed_all.sql`);
+
     const expenseResult = transformExpenses();
     const budgetResult = transformBudgetAllocations();
 
@@ -283,7 +324,7 @@ function main() {
     sqlLines.push('  -- ============================================================================');
     sqlLines.push('  RAISE NOTICE \'  Importing budget allocations...\';');
     sqlLines.push('');
-    sqlLines.push(generateBudgetSql(budgetResult.data));
+    sqlLines.push(generateBudgetSql(budgetResult.data, VALID_CATEGORIES));
     sqlLines.push('');
     sqlLines.push('  GET DIAGNOSTICS imported_count = ROW_COUNT;');
     sqlLines.push('  RAISE NOTICE \'  ✓ Imported % budget allocations\', imported_count;');
@@ -293,7 +334,7 @@ function main() {
     sqlLines.push('  -- ============================================================================');
     sqlLines.push('  RAISE NOTICE \'  Importing expenses...\';');
     sqlLines.push('');
-    sqlLines.push(generateExpensesSql(expenseResult.data));
+    sqlLines.push(generateExpensesSql(expenseResult.data, VALID_CATEGORIES));
     sqlLines.push('');
     sqlLines.push('  GET DIAGNOSTICS imported_count = ROW_COUNT;');
     sqlLines.push('  RAISE NOTICE \'  ✓ Imported % expenses\', imported_count;');
