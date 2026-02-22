@@ -123,12 +123,18 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const getAccountOptions = (): GroupedOption[] => {
     const usageMap = storageKeys ? getUsageMap(storageKeys.ACCOUNT_USAGE) : {}
 
-    return accounts.map((account) => ({
-      value: account.id,
-      label: account.name,
-      group: account.owner_name || "Unknown",
-      frequency: usageMap[account.id] || 0,
-    }))
+    return [...accounts]
+      .sort((a, b) => {
+        const aIsMe = a.owner_user_id === user?.id ? 0 : 1
+        const bIsMe = b.owner_user_id === user?.id ? 0 : 1
+        return aIsMe - bIsMe
+      })
+      .map((account) => ({
+        value: account.id,
+        label: account.name,
+        group: account.owner_name || "Unknown",
+        frequency: usageMap[account.id] || 0,
+      }))
   }
 
   // Load categories and accounts on mount
