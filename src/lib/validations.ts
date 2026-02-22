@@ -11,9 +11,7 @@ export const expenseSchema = z.object({
     .string({ message: "Category is required" })
     .uuid("Invalid category"),
 
-  account_id: z
-    .string({ message: "Account is required" })
-    .uuid("Invalid account"),
+  is_cash: z.boolean(),
 
   expense_date: z
     .string({ message: "Date is required" })

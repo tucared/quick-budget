@@ -4,7 +4,6 @@ import type {
   BudgetAllocation,
   BudgetSummary,
   Category,
-  Account,
   Expense,
   ExpenseWithDetails,
 } from "@/lib/types"
@@ -233,21 +232,3 @@ export async function getCategories(householdId: string): Promise<Category[]> {
   return data || []
 }
 
-/**
- * Server-side function to fetch accounts for a household
- */
-export async function getAccounts(householdId: string): Promise<Account[]> {
-  const supabase = await createServerSupabaseClient()
-
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .eq("household_id", householdId)
-
-  if (error) {
-    console.error("Failed to fetch accounts:", error)
-    return []
-  }
-
-  return data || []
-}

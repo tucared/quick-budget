@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import type { BudgetSummary, Expense, Category, Account } from "@/lib/types"
+import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,6 @@ interface CategoryExpenseDialogProps {
   budgetMonth: string
   allExpenses: Expense[]
   categories: Category[]
-  accounts: Account[]
 }
 
 export function CategoryExpenseDialog({
@@ -35,7 +34,6 @@ export function CategoryExpenseDialog({
   budgetMonth,
   allExpenses,
   categories,
-  accounts,
 }: CategoryExpenseDialogProps) {
   const [realtimeExpenses, setRealtimeExpenses] = useState<Expense[]>([])
   const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
@@ -48,12 +46,6 @@ export function CategoryExpenseDialog({
     categories.forEach((cat) => map.set(cat.id, cat))
     return map
   }, [categories])
-
-  const accountMap = useMemo(() => {
-    const map = new Map<string, Account>()
-    accounts.forEach((acc) => map.set(acc.id, acc))
-    return map
-  }, [accounts])
 
   // Filter expenses to this category and month (derived state using useMemo)
   const expenses = useMemo(() => {
@@ -200,9 +192,6 @@ export function CategoryExpenseDialog({
                 const category = expense.category_id
                   ? categoryMap.get(expense.category_id)
                   : null
-                const account = expense.account_id
-                  ? accountMap.get(expense.account_id)
-                  : null
 
                 const isShowingDelete = showingDeleteId === expense.id
                 const isDeleting = deletingIds.has(expense.id)
@@ -243,10 +232,10 @@ export function CategoryExpenseDialog({
                                 <span>
                                   {format(new Date(expense.expense_date), "MMM d, yyyy")}
                                 </span>
-                                {account && (
+                                {expense.is_cash && (
                                   <>
                                     <span>•</span>
-                                    <span>{account.name}</span>
+                                    <span>Cash</span>
                                   </>
                                 )}
                               </div>

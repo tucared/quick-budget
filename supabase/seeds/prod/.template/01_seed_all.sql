@@ -12,7 +12,6 @@ DECLARE
   household1_id UUID;
   household2_id UUID;
   shared_household_id UUID;
-  default_account_id UUID;
   imported_count INTEGER;
 BEGIN
   RAISE NOTICE '========================================';
@@ -102,7 +101,6 @@ BEGIN
 
   -- Consolidate users into shared household
   UPDATE public.users SET household_id = shared_household_id WHERE id IN (user1_id, user2_id);
-  UPDATE public.accounts SET household_id = shared_household_id WHERE owner_user_id IN (user1_id, user2_id);
 
   -- Delete auto-created households
   DELETE FROM public.households WHERE id IN (household1_id, household2_id);
@@ -110,26 +108,9 @@ BEGIN
   RAISE NOTICE '  ✓ Created 2 users in shared household';
 
   -- ============================================================================
-  -- STEP 2: Create Accounts
+  -- STEP 2: Create Categories
   -- ============================================================================
-  RAISE NOTICE '[2/5] Creating accounts...';
-
-  -- Delete auto-created default accounts from trigger (2 accounts, 1 per user)
-  DELETE FROM public.accounts WHERE household_id = shared_household_id;
-
-  -- Create accounts (customize as needed)
-  INSERT INTO public.accounts (household_id, owner_user_id, name, account_type, currency, is_default, is_active) VALUES
-    (shared_household_id, user1_id, 'Checking Account', 'bank_account', 'EUR', TRUE, TRUE),
-    (shared_household_id, user1_id, 'Savings Account', 'bank_account', 'EUR', FALSE, TRUE),
-    (shared_household_id, user1_id, 'Cash', 'cash', 'EUR', FALSE, TRUE),
-    (shared_household_id, user2_id, 'Credit Card', 'credit_card', 'EUR', FALSE, TRUE);
-
-  RAISE NOTICE '  ✓ Created accounts';
-
-  -- ============================================================================
-  -- STEP 3: Create Categories
-  -- ============================================================================
-  RAISE NOTICE '[3/5] Creating categories...';
+  RAISE NOTICE '[2/4] Creating categories...';
 
   -- Spending categories (customize as needed)
   INSERT INTO public.categories (household_id, name, icon, is_active) VALUES

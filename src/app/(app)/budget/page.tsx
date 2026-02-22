@@ -6,7 +6,6 @@ import {
   getAllowanceSummary,
   getMonthlyExpenses,
   getCategories,
-  getAccounts,
 } from "@/lib/server/data"
 import { BudgetPageContent } from "@/components/budget-page-content"
 
@@ -32,12 +31,11 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   }
 
   // Fetch all data in parallel
-  const [budgets, allowances, expenses, categories, accounts] = await Promise.all([
+  const [budgets, allowances, expenses, categories] = await Promise.all([
     getBudgetSummary(user.householdId, budgetMonth),
     getAllowanceSummary(user.householdId, budgetMonth),
     getMonthlyExpenses(user.householdId, budgetMonth),
     getCategories(user.householdId),
-    getAccounts(user.householdId),
   ])
 
   return (
@@ -47,7 +45,6 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
         initialAllowances={allowances}
         initialExpenses={expenses}
         categories={categories}
-        accounts={accounts}
         householdId={user.householdId}
         budgetMonth={budgetMonth}
       />

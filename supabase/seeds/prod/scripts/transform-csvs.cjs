@@ -94,17 +94,18 @@ function generateExpensesSql(data, validCategories) {
   const lines = [];
   lines.push('-- Expense data from transformed CSV');
   lines.push('INSERT INTO public.expenses (');
-  lines.push('  logged_by_user_id, household_id, category_id, account_id,');
+  lines.push('  logged_by_user_id, household_id, category_id, is_cash,');
   lines.push('  amount, currency, converted_amount, converted_currency, exchange_rate,');
   lines.push('  expense_date, description');
   lines.push(') VALUES');
 
   const values = filteredData.map((row, index) => {
     const isLast = index === filteredData.length - 1;
+    const isCash = row.account && row.account.toLowerCase() === 'cash' ? 'TRUE' : 'FALSE';
     return `  (
     user1_id, shared_household_id,
     (SELECT id FROM public.categories WHERE name = ${escapeSql(row.category)} AND household_id = shared_household_id),
-    (SELECT id FROM public.accounts WHERE name = ${escapeSql(row.account)} AND household_id = shared_household_id),
+    ${isCash},
     ${escapeSql(row.amount)}, ${escapeSql(row.currency)},
     ${escapeSql(row.converted_amount)}, ${escapeSql(row.converted_currency)}, ${escapeSql(row.exchange_rate)},
     ${escapeSql(row.expense_date)}, ${escapeSql(row.description)}
