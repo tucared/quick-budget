@@ -505,7 +505,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           id="description"
           placeholder="Optional notes about this expense"
           rows={1}
-          className="min-h-0"
+          className="min-h-0 resize-none overflow-hidden"
+          onInput={(e) => {
+            const el = e.currentTarget
+            el.style.height = "auto"
+            el.style.height = `${el.scrollHeight}px`
+          }}
           {...register("description")}
         />
         {errors.description && (
