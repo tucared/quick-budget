@@ -383,3 +383,7 @@ ALTER VIEW budget_summary SET (security_invoker = true);
 -- Enable Supabase Realtime for tables that need live updates
 ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
 ALTER PUBLICATION supabase_realtime ADD TABLE budget_allocations;
+
+-- Set REPLICA IDENTITY FULL so DELETE events include all columns (needed for household_id filter)
+ALTER TABLE expenses REPLICA IDENTITY FULL;
+ALTER TABLE budget_allocations REPLICA IDENTITY FULL;
