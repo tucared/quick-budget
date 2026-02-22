@@ -110,11 +110,25 @@ function calculateConversion(amount, currency, expenseDate = null, rateMap = nul
   let eurToCurrencyRate;
   let rateSource = 'config';
 
-  if (currency === 'BRL' && rateMap && expenseDate && rateMap.has(expenseDate)) {
-    // Per-date rate from historical CSV: rateMap value = EUR/BRL price (e.g. 6.099)
-    eurToCurrencyRate = rateMap.get(expenseDate);
-    rateSource = 'csv';
-  } else {
+  if (currency === 'BRL' && rateMap && expenseDate) {
+    // Look up exact date first, then walk back up to 3 days for weekends/holidays
+    let lookupDate = expenseDate;
+    let found = false;
+    for (let i = 0; i <= 3; i++) {
+      if (rateMap.has(lookupDate)) {
+        eurToCurrencyRate = rateMap.get(lookupDate);
+        rateSource = i === 0 ? 'csv' : 'csv-prev-day';
+        found = true;
+        break;
+      }
+      // Step back one day
+      const d = new Date(lookupDate + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() - 1);
+      lookupDate = d.toISOString().split('T')[0];
+    }
+  }
+
+  if (!eurToCurrencyRate) {
     // Fallback: config stores rate_to_eur (e.g. BRL: 6.2267 means 1 EUR = 6.2267 BRL)
     eurToCurrencyRate = config.exchangeRates[currency] || 1.0;
   }

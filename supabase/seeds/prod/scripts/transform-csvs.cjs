@@ -209,6 +209,7 @@ function transformExpenses() {
     errors: 0,
     errorDetails: [],
     brlFromCsv: 0,
+    brlFromCsvPrevDay: 0,
     brlFromConfig: 0
   };
 
@@ -220,6 +221,7 @@ function transformExpenses() {
       stats.valid++;
       if (result.data.currency === 'BRL') {
         if (result.rateSource === 'csv') stats.brlFromCsv++;
+        else if (result.rateSource === 'csv-prev-day') stats.brlFromCsvPrevDay++;
         else stats.brlFromConfig++;
       }
     } else if (result.skip) {
@@ -238,8 +240,8 @@ function transformExpenses() {
   console.log(`    • Valid: ${stats.valid}`);
   console.log(`    • Skipped: ${stats.skipped}`);
   console.log(`    • Errors: ${stats.errors}`);
-  if (stats.brlFromCsv + stats.brlFromConfig > 0) {
-    console.log(`    • BRL rates from CSV: ${stats.brlFromCsv}, from config fallback: ${stats.brlFromConfig}`);
+  if (stats.brlFromCsv + stats.brlFromCsvPrevDay + stats.brlFromConfig > 0) {
+    console.log(`    • BRL rates from CSV: ${stats.brlFromCsv}, from CSV prev-day (weekends): ${stats.brlFromCsvPrevDay}, from config fallback: ${stats.brlFromConfig}`);
   }
 
   if (stats.errors > 0) {
