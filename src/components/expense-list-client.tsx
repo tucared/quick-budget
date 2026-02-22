@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { format } from "date-fns"
+import { format, isToday, isYesterday, parseISO } from "date-fns"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
@@ -129,103 +129,120 @@ export function ExpenseListClient({
     setVisibleCount((prev) => prev + 10)
   }
 
+  // Group expenses by date
+  const groupedExpenses: { label: string; expenses: typeof visibleExpenses }[] = []
+  const seenDates = new Map<string, number>()
+
+  for (const expense of visibleExpenses) {
+    const dateKey = expense.expense_date // "yyyy-MM-dd"
+    if (!seenDates.has(dateKey)) {
+      const parsed = parseISO(dateKey)
+      let label: string
+      if (isToday(parsed)) label = "Today"
+      else if (isYesterday(parsed)) label = "Yesterday"
+      else label = format(parsed, "EEE, MMM d")
+      seenDates.set(dateKey, groupedExpenses.length)
+      groupedExpenses.push({ label, expenses: [] })
+    }
+    groupedExpenses[seenDates.get(dateKey)!].expenses.push(expense)
+  }
+
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-3">Recent Expenses</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Recent Expenses</h2>
       {deleteError && (
         <div className="mb-3 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {deleteError}
         </div>
       )}
-      {visibleExpenses.map((expense) => {
-        const category = expense.category_id
-          ? categories.get(expense.category_id)
-          : null
-        const account = expense.account_id
-          ? accounts.get(expense.account_id)
-          : null
+      {groupedExpenses.map(({ label, expenses: group }) => (
+        <div key={label} className="mb-5">
+          <div className="text-xs font-medium text-muted-foreground mb-2 px-1">{label}</div>
+          <div className="space-y-2">
+            {group.map((expense) => {
+              const category = expense.category_id
+                ? categories.get(expense.category_id)
+                : null
+              const account = expense.account_id
+                ? accounts.get(expense.account_id)
+                : null
 
-        const isShowingDelete = showingDeleteId === expense.id
-        const isDeleting = deletingIds.has(expense.id)
+              const isShowingDelete = showingDeleteId === expense.id
+              const isDeleting = deletingIds.has(expense.id)
 
-        return (
-          <div
-            key={expense.id}
-            className={`overflow-hidden transition-all duration-300 ${
-              isDeleting ? 'max-h-0 opacity-0 mb-0' : 'max-h-96 opacity-100 mb-3'
-            }`}
-          >
-            <div
-              className={`transition-all duration-300 ${
-                isDeleting ? 'scale-95 -translate-x-4' : 'scale-100 translate-x-0'
-              }`}
-            >
-            <Card
-              className="group cursor-pointer md:cursor-default"
-              onClick={() => handleCardClick(expense.id)}
-            >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    {category?.icon && (
-                      <span className="text-xl">{category.icon}</span>
-                    )}
-                    <span className="font-medium">{category?.name || "Uncategorized"}</span>
-                  </div>
-                  {expense.description && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {expense.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <span>
-                      {format(new Date(expense.expense_date), "MMM d, yyyy")}
-                    </span>
-                    {account && (
-                      <>
-                        <span>•</span>
-                        <span>{account.name}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="relative flex items-start">
-                  {/* Amount */}
-                  <div className={`text-right transition-all ${isShowingDelete ? 'mr-10' : 'md:group-hover:mr-10'}`}>
-                    <div className="font-semibold text-lg">
-                      {formatCurrency(expense.converted_amount)}
-                    </div>
-                    {expense.currency !== "EUR" && (
-                      <div className="text-xs text-muted-foreground">
-                        {formatCurrency(expense.amount, 2, expense.currency)}
-                      </div>
-                    )}
-                  </div>
-                  {/* Delete button - shows on click (mobile) or hover (desktop) */}
-                  <button
-                    onClick={(e) => handleDelete(expense.id, e)}
-                    className={`absolute right-0 top-0 transition-opacity p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive ${
-                      isShowingDelete
-                        ? 'opacity-100 pointer-events-auto'
-                        : 'opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto'
+              return (
+                <div
+                  key={expense.id}
+                  className={`overflow-hidden transition-all duration-300 ${
+                    isDeleting ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'
+                  }`}
+                >
+                  <div
+                    className={`transition-all duration-300 ${
+                      isDeleting ? 'scale-95 -translate-x-4' : 'scale-100 translate-x-0'
                     }`}
-                    aria-label="Delete expense"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                    <Card
+                      className="group cursor-pointer md:cursor-default"
+                      onClick={() => handleCardClick(expense.id)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              {category?.icon && (
+                                <span className="text-xl">{category.icon}</span>
+                              )}
+                              <span className="font-medium">{category?.name || "Uncategorized"}</span>
+                            </div>
+                            {expense.description && (
+                              <p className="text-sm text-muted-foreground truncate">
+                                {expense.description}
+                              </p>
+                            )}
+                            {account && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{account.name}</p>
+                            )}
+                          </div>
+                          <div className="relative flex items-start">
+                            {/* Amount */}
+                            <div className={`text-right transition-all ${isShowingDelete ? 'mr-10' : 'md:group-hover:mr-10'}`}>
+                              <div className="font-semibold text-lg">
+                                {formatCurrency(expense.converted_amount)}
+                              </div>
+                              {expense.currency !== "EUR" && (
+                                <div className="text-xs text-muted-foreground">
+                                  {formatCurrency(expense.amount, 2, expense.currency)}
+                                </div>
+                              )}
+                            </div>
+                            {/* Delete button */}
+                            <button
+                              onClick={(e) => handleDelete(expense.id, e)}
+                              className={`absolute right-0 top-0 transition-opacity p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive ${
+                                isShowingDelete
+                                  ? 'opacity-100 pointer-events-auto'
+                                  : 'opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto'
+                              }`}
+                              aria-label="Delete expense"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-            </div>
+              )
+            })}
           </div>
-        )
-      })}
+        </div>
+      ))}
 
       {/* Show More Button */}
       {hasMore && (
-        <div className="mt-4 text-center">
+        <div className="mt-2 text-center">
           <button
             onClick={handleShowMore}
             className="px-6 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-accent transition-colors"

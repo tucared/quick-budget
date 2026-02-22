@@ -25,12 +25,13 @@ export default async function ExpensesPage() {
   return (
     <main className="container mx-auto px-4 py-6 max-w-2xl">
       {/* Expense Form */}
-      <div className="mb-8 bg-background">
-        <div className="bg-card border rounded-lg p-6 shadow-xs">
-          <h2 className="text-xl font-semibold mb-4">Add Expense</h2>
-          <ExpenseFormWrapper />
-        </div>
+      <div className="bg-card border rounded-lg p-6 shadow-xs mb-6">
+        <h2 className="text-xl font-semibold mb-4">Add Expense</h2>
+        <ExpenseFormWrapper />
       </div>
+
+      {/* Divider */}
+      <hr className="border-border mb-6" />
 
       {/* Recent Expenses List */}
       <ExpenseListClient
