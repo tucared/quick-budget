@@ -13,7 +13,7 @@ interface FrankfurterResponse {
  * @param dateStr - Date in YYYY-MM-DD format
  * @returns Adjusted date as YYYY-MM-DD
  */
-function adjustToWorkingDay(dateStr: string): string {
+export function adjustToWorkingDay(dateStr: string): string {
   const date = new Date(dateStr + 'T00:00:00')
   const dayOfWeek = date.getUTCDay() // 0 = Sunday, 6 = Saturday
 

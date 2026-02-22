@@ -50,10 +50,12 @@ All categories receive monthly budget allocations via `budget_allocations` table
 Expenses store both original currency/amount and converted amount with exchange rate preserved directly on each expense record for historical accuracy.
 
 The `exchange_rates` table is an **on-demand cache** for exchange rates. This table is **not household-scoped** (exchange rates are universal). The system:
-- Starts with an empty `exchange_rates` table
-- Fetches rates on-demand from ExchangeRate-API when logging new expenses
-- Caches rates in the database to minimize API calls (only fetches each (currency, date) combination once)
-- Falls back to hardcoded rates if API is unavailable
-- Historical imported expenses have rates baked into the expense record (not in exchange_rates table)
+- Starts with an empty `exchange_rates` table (historical imported expenses have rates baked directly into the expense record)
+- Fetches rates on-demand from [Frankfurter](https://www.frankfurter.dev) (free, no API key, ECB data) via `/api/exchange-rates`
+- Caches confirmed API rates in the database to avoid redundant fetches (unique per currency + date)
+- Falls back to hardcoded approximate rates if Frankfurter is unreachable — **fallback rates are not cached**, so the next request retries the live API
+- Weekend dates (Sat/Sun) are automatically adjusted to the preceding Friday, because ECB doesn't publish rates on weekends. The `adjustedFrom` field in the API response signals when this happened.
+
+The `/api/exchange-rates` response includes a `source` field: `'cache'` | `'api'` | `'fallback'` | `'fixed'` (EUR→EUR).
 
 This approach minimizes API usage while supporting accurate multi-currency expense logging.

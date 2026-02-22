@@ -1,26 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { fetchExchangeRate } from '@/lib/exchange-rate-api'
-
-/**
- * Adjust date to previous working day if it falls on a weekend
- * Forex markets are closed on weekends, so we use Friday's rate for Sat/Sun
- */
-function adjustToWorkingDay(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  const dayOfWeek = date.getUTCDay() // 0 = Sunday, 6 = Saturday
-
-  // If Saturday (6), go back 1 day to Friday
-  if (dayOfWeek === 6) {
-    date.setUTCDate(date.getUTCDate() - 1)
-  }
-  // If Sunday (0), go back 2 days to Friday
-  else if (dayOfWeek === 0) {
-    date.setUTCDate(date.getUTCDate() - 2)
-  }
-
-  return date.toISOString().split('T')[0]
-}
+import { fetchExchangeRate, adjustToWorkingDay } from '@/lib/exchange-rate-api'
 
 /**
  * GET /api/exchange-rates?currency=BRL&date=2024-01-15
