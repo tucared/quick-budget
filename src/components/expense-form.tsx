@@ -468,9 +468,20 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         )}
       </div>
 
-      {/* Date */}
+      {/* Date + Cash checkbox */}
       <div className="space-y-2">
-        <Label htmlFor="expense_date">Date *</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="expense_date">Date *</Label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isCash}
+              onChange={(e) => setValue("is_cash", e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            Cash
+          </label>
+        </div>
         <DatePicker
           date={dateAsObject}
           onDateChange={(date) => {
@@ -493,7 +504,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         <Textarea
           id="description"
           placeholder="Optional notes about this expense"
-          rows={2}
+          rows={1}
           {...register("description")}
         />
         {errors.description && (
@@ -502,17 +513,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           </p>
         )}
       </div>
-
-      {/* Cash checkbox */}
-      <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none w-fit">
-        <input
-          type="checkbox"
-          checked={isCash}
-          onChange={(e) => setValue("is_cash", e.target.checked)}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-        Cash payment
-      </label>
 
       {/* Submit Button - Large touch target for mobile */}
       <Button
