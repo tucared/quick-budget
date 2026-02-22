@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
@@ -16,7 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { CentsInput } from "@/components/ui/cents-input"
 
 interface RebalanceDialogProps {
   open: boolean
@@ -39,17 +38,16 @@ export function RebalanceDialog({
   budgetMonth,
   initialDestId,
 }: RebalanceDialogProps) {
-  const router = useRouter()
   const [step, setStep] = useState<Step>("source")
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [destId, setDestId] = useState<string | null>(null)
-  const [amount, setAmount] = useState("")
+  const [amountCents, setAmountCents] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
   const sourceBudget = budgets.find((b) => b.category_id === sourceId)
   const destBudget = budgets.find((b) => b.category_id === destId)
-  const transferAmount = Number(amount) || 0
+  const transferAmount = amountCents / 100
 
   // When opened with a pre-selected destination, initialize state
   const effectiveDestId = initialDestId ?? null
@@ -64,7 +62,7 @@ export function RebalanceDialog({
     setStep("source")
     setSourceId(null)
     setDestId(null)
-    setAmount("")
+    setAmountCents(0)
     setError("")
     setSaving(false)
   }
@@ -85,7 +83,7 @@ export function RebalanceDialog({
   function confirmAmount() {
     if (!sourceBudget) return
     const maxAmount = Number(sourceBudget.remaining_amount)
-    if (transferAmount <= 0) {
+    if (amountCents <= 0) {
       setError("Amount must be greater than 0")
       return
     }
@@ -149,7 +147,6 @@ export function RebalanceDialog({
 
     handleOpenChange(false)
     onSuccess?.()
-    router.refresh()
   }
 
   return (
@@ -221,19 +218,10 @@ export function RebalanceDialog({
             <div className="text-sm text-muted-foreground">
               Available from {sourceBudget.category_name}: {formatCurrency(Number(sourceBudget.remaining_amount))}
             </div>
-            <Input
-              type="text"
-              inputMode="decimal"
-              placeholder="Amount to move"
-              value={amount}
-              onChange={(e) => {
-                if (e.target.value === "" || /^\d*\.?\d{0,2}$/.test(e.target.value)) {
-                  setAmount(e.target.value)
-                  setError("")
-                }
-              }}
+            <CentsInput
+              value={amountCents}
+              onChange={(cents) => { setAmountCents(cents); setError("") }}
               autoFocus
-              className="text-right"
             />
             {!effectiveDestId && (
               <>
@@ -260,7 +248,7 @@ export function RebalanceDialog({
               </>
             )}
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setStep("source"); setSourceId(null); setDestId(null); setAmount(""); setError("") }}>
+              <Button variant="outline" onClick={() => { setStep("source"); setSourceId(null); setDestId(null); setAmountCents(0); setError("") }}>
                 Back
               </Button>
               <Button onClick={() => {

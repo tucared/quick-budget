@@ -2,13 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
-import { Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase"
 import type { ExpenseWithDetails, Category } from "@/lib/types"
-import { Card, CardContent } from "@/components/ui/card"
-import { formatCurrency } from "@/lib/currency"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
-import { getErrorMessage } from "@/lib/error-handler"
+import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
+import { ExpenseCard } from "@/components/expense-card"
 
 interface ExpenseListClientProps {
   initialExpenses: ExpenseWithDetails[]
@@ -27,10 +24,16 @@ export function ExpenseListClient({
     initialCategories.forEach((cat) => map.set(cat.id, cat))
     return map
   })
-  const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
-  const [deleteError, setDeleteError] = useState("")
   const [visibleCount, setVisibleCount] = useState(10)
+
+  const {
+    showingDeleteId,
+    deletingIds,
+    deleteError,
+    handleCardClick,
+    handleDelete,
+    clearDeletingId,
+  } = useExpenseDelete()
 
   // Update state when initial data changes
   useEffect(() => {
@@ -43,56 +46,20 @@ export function ExpenseListClient({
     setCategories(map)
   }, [initialCategories])
 
-  const handleCardClick = (expenseId: string) => {
-    // Toggle delete button visibility on mobile
-    setShowingDeleteId(showingDeleteId === expenseId ? null : expenseId)
-  }
-
-  const handleDelete = async (expenseId: string, e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent card click from firing
-    setDeletingIds((prev) => new Set(prev).add(expenseId))
-    setShowingDeleteId(null)
-    setDeleteError("")
-
-    const supabase = createClient()
-    const { error } = await supabase
-      .from("expenses")
-      .delete()
-      .eq("id", expenseId)
-
-    if (error) {
-      setDeleteError(getErrorMessage(error))
-      setDeletingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(expenseId)
-        return next
-      })
-    }
-  }
-
   // Subscribe to real-time expense changes
   useExpenseSubscription(
     (event) => {
       if (event.type === "INSERT") {
-        // Add new expense to the top of the list
         setExpenses((prev) => [event.new as ExpenseWithDetails, ...prev.slice(0, 19)])
       } else if (event.type === "UPDATE") {
-        // Update existing expense
         const updatedExpense = event.new as ExpenseWithDetails
         setExpenses((prev) =>
-          prev.map((exp) =>
-            exp.id === updatedExpense.id ? updatedExpense : exp
-          )
+          prev.map((exp) => (exp.id === updatedExpense.id ? updatedExpense : exp))
         )
       } else if (event.type === "DELETE") {
-        // Remove deleted expense
         const deletedExpense = event.old as ExpenseWithDetails
         setExpenses((prev) => prev.filter((exp) => exp.id !== deletedExpense.id))
-        setDeletingIds((prev) => {
-          const next = new Set(prev)
-          next.delete(deletedExpense.id)
-          return next
-        })
+        clearDeletingId(deletedExpense.id)
       }
     },
     true
@@ -102,9 +69,7 @@ export function ExpenseListClient({
     return (
       <div className="text-center py-8 text-muted-foreground">
         <p className="text-lg font-medium mb-2">No expenses yet</p>
-        <p className="text-sm">
-          Add your first expense using the form above
-        </p>
+        <p className="text-sm">Add your first expense using the form above</p>
       </div>
     )
   }
@@ -112,16 +77,12 @@ export function ExpenseListClient({
   const visibleExpenses = expenses.slice(0, visibleCount)
   const hasMore = expenses.length > visibleCount
 
-  const handleShowMore = () => {
-    setVisibleCount((prev) => prev + 10)
-  }
-
   // Group expenses by date
   const groupedExpenses: { label: string; expenses: typeof visibleExpenses }[] = []
   const seenDates = new Map<string, number>()
 
   for (const expense of visibleExpenses) {
-    const dateKey = expense.expense_date // "yyyy-MM-dd"
+    const dateKey = expense.expense_date
     if (!seenDates.has(dateKey)) {
       const parsed = parseISO(dateKey)
       let label: string
@@ -136,7 +97,9 @@ export function ExpenseListClient({
 
   return (
     <div>
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Recent Expenses</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        Recent Expenses
+      </h2>
       {deleteError && (
         <div className="mb-3 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {deleteError}
@@ -144,91 +107,29 @@ export function ExpenseListClient({
       )}
       {groupedExpenses.map(({ label, expenses: group }) => (
         <div key={label} className="mb-5">
-          <div className="text-xs font-medium text-muted-foreground mb-2 px-1">{label}</div>
+          <div className="text-xs font-medium text-muted-foreground mb-2 px-1">
+            {label}
+          </div>
           <div className="space-y-2">
-            {group.map((expense) => {
-              const category = expense.category_id
-                ? categories.get(expense.category_id)
-                : null
-
-              const isShowingDelete = showingDeleteId === expense.id
-              const isDeleting = deletingIds.has(expense.id)
-
-              return (
-                <div
-                  key={expense.id}
-                  className={`overflow-hidden transition-all duration-300 ${
-                    isDeleting ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'
-                  }`}
-                >
-                  <div
-                    className={`transition-all duration-300 ${
-                      isDeleting ? 'scale-95 -translate-x-4' : 'scale-100 translate-x-0'
-                    }`}
-                  >
-                    <Card
-                      className="group cursor-pointer md:cursor-default"
-                      onClick={() => handleCardClick(expense.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              {category?.icon && (
-                                <span className="text-xl">{category.icon}</span>
-                              )}
-                              <span className="font-medium">{category?.name || "Uncategorized"}</span>
-                            </div>
-                            {expense.description && (
-                              <p className="text-sm text-muted-foreground truncate">
-                                {expense.description}
-                              </p>
-                            )}
-                            {expense.is_cash && (
-                              <p className="text-xs text-muted-foreground mt-0.5">Cash</p>
-                            )}
-                          </div>
-                          <div className="relative flex items-start">
-                            {/* Amount */}
-                            <div className={`text-right transition-all ${isShowingDelete ? 'mr-10' : 'md:group-hover:mr-10'}`}>
-                              <div className="font-semibold text-lg">
-                                {formatCurrency(expense.converted_amount)}
-                              </div>
-                              {expense.currency !== "EUR" && (
-                                <div className="text-xs text-muted-foreground">
-                                  {formatCurrency(expense.amount, 2, expense.currency)}
-                                </div>
-                              )}
-                            </div>
-                            {/* Delete button */}
-                            <button
-                              onClick={(e) => handleDelete(expense.id, e)}
-                              className={`absolute right-0 top-0 transition-opacity p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive ${
-                                isShowingDelete
-                                  ? 'opacity-100 pointer-events-auto'
-                                  : 'opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto'
-                              }`}
-                              aria-label="Delete expense"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              )
-            })}
+            {group.map((expense) => (
+              <ExpenseCard
+                key={expense.id}
+                expense={expense}
+                category={expense.category_id ? categories.get(expense.category_id) : null}
+                isShowingDelete={showingDeleteId === expense.id}
+                isDeleting={deletingIds.has(expense.id)}
+                onCardClick={handleCardClick}
+                onDelete={handleDelete}
+              />
+            ))}
           </div>
         </div>
       ))}
 
-      {/* Show More Button */}
       {hasMore && (
         <div className="mt-2 text-center">
           <button
-            onClick={handleShowMore}
+            onClick={() => setVisibleCount((prev) => prev + 10)}
             className="px-6 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-accent transition-colors"
           >
             Show More
