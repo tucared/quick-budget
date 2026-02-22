@@ -15,6 +15,7 @@ import { RebalanceDialog } from "@/components/rebalance-dialog"
 import { CategoryExpenseDialog } from "@/components/category-expense-dialog"
 import { Button } from "@/components/ui/button"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
+import { useBudgetAllocationSubscription } from "@/lib/hooks/use-budget-allocation-subscription"
 import { getErrorMessage } from "@/lib/error-handler"
 
 interface BudgetPageContentProps {
@@ -81,8 +82,9 @@ export function BudgetPageContent({
       })
   }
 
-  // Reload budgets when expenses change (real-time updates)
+  // Reload budgets when expenses or budget allocations change (real-time)
   useExpenseSubscription(reloadBudgets, true)
+  useBudgetAllocationSubscription(reloadBudgets, true)
 
   const handleCategoryClick = (budget: BudgetSummary) => {
     setSelectedBudget(budget)
@@ -181,6 +183,7 @@ export function BudgetPageContent({
       <BudgetEditDialog
         open={editOpen}
         onOpenChange={setEditOpen}
+        onSuccess={reloadBudgets}
         categories={categories}
         householdId={householdId}
         budgetMonth={budgetMonth}

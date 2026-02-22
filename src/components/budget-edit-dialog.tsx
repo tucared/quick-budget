@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { format, subMonths, parseISO } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
@@ -17,11 +16,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { CentsInput } from "@/components/ui/cents-input"
 
 interface BudgetEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
   categories: Category[]
   householdId: string
   budgetMonth: string // yyyy-MM-dd
@@ -29,18 +29,18 @@ interface BudgetEditDialogProps {
 
 interface CategoryAmountEntry {
   categoryId: string
-  amount: string // string for input control
+  cents: number // 0 = no allocation
   existingAllocationId?: string
 }
 
 export function BudgetEditDialog({
   open,
   onOpenChange,
+  onSuccess,
   categories,
   householdId,
   budgetMonth,
 }: BudgetEditDialogProps) {
-  const router = useRouter()
   const [entries, setEntries] = useState<CategoryAmountEntry[]>([])
   const [history, setHistory] = useState<BudgetSummary[]>([])
   const [saving, setSaving] = useState(false)
@@ -51,7 +51,6 @@ export function BudgetEditDialog({
   const regularCategories = activeCategories.filter((c) => !c.exclude_from_budget_total)
   const allowanceCategories = activeCategories.filter((c) => c.exclude_from_budget_total)
 
-  // Load current allocations and history when dialog opens
   const loadData = useCallback(async () => {
     if (!open) return
     setLoading(true)
@@ -59,7 +58,6 @@ export function BudgetEditDialog({
 
     const supabase = createClient()
 
-    // Fetch current allocations and 3-month history in parallel
     const prevMonths = [1, 2, 3].map((n) =>
       format(subMonths(parseISO(budgetMonth), n), "yyyy-MM-dd")
     )
@@ -90,12 +88,11 @@ export function BudgetEditDialog({
     const allocations = (allocationsRes.data || []) as BudgetAllocation[]
     setHistory((historyRes.data || []) as BudgetSummary[])
 
-    // Build entries from active categories, pre-filling with existing allocations
     const newEntries = activeCategories.map((cat) => {
       const existing = allocations.find((a) => a.category_id === cat.id)
       return {
         categoryId: cat.id,
-        amount: existing ? String(Number(existing.allocated_amount)) : "",
+        cents: existing ? Math.round(Number(existing.allocated_amount) * 100) : 0,
         existingAllocationId: existing?.id,
       }
     })
@@ -107,11 +104,9 @@ export function BudgetEditDialog({
     loadData()
   }, [open, householdId, budgetMonth]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function updateAmount(categoryId: string, value: string) {
-    // Allow empty or valid numeric input
-    if (value !== "" && !/^\d*\.?\d{0,2}$/.test(value)) return
+  function updateCents(categoryId: string, cents: number) {
     setEntries((prev) =>
-      prev.map((e) => (e.categoryId === categoryId ? { ...e, amount: value } : e))
+      prev.map((e) => (e.categoryId === categoryId ? { ...e, cents } : e))
     )
   }
 
@@ -139,11 +134,9 @@ export function BudgetEditDialog({
 
     setEntries((prev) =>
       prev.map((entry) => {
-        const prevAlloc = prevAllocations.find(
-          (a) => a.category_id === entry.categoryId
-        )
+        const prevAlloc = prevAllocations.find((a) => a.category_id === entry.categoryId)
         return prevAlloc
-          ? { ...entry, amount: String(Number(prevAlloc.allocated_amount)) }
+          ? { ...entry, cents: Math.round(Number(prevAlloc.allocated_amount) * 100) }
           : entry
       })
     )
@@ -155,16 +148,10 @@ export function BudgetEditDialog({
 
     const supabase = createClient()
 
-    // Split entries into upserts (amount > 0) and deletes (amount cleared/0)
-    const toUpsert = entries.filter(
-      (e) => e.amount !== "" && Number(e.amount) > 0
-    )
-    const toDelete = entries.filter(
-      (e) => (e.amount === "" || Number(e.amount) === 0) && e.existingAllocationId
-    )
+    const toUpsert = entries.filter((e) => e.cents > 0)
+    const toDelete = entries.filter((e) => e.cents === 0 && e.existingAllocationId)
 
     try {
-      // Upsert allocations
       if (toUpsert.length > 0) {
         const { error: upsertError } = await supabase
           .from("budget_allocations")
@@ -173,7 +160,7 @@ export function BudgetEditDialog({
               household_id: householdId,
               category_id: e.categoryId,
               budget_month: budgetMonth,
-              allocated_amount: Number(e.amount),
+              allocated_amount: e.cents / 100,
               currency: "EUR",
             })),
             { onConflict: "household_id,category_id,budget_month" }
@@ -185,10 +172,8 @@ export function BudgetEditDialog({
         }
       }
 
-      // Delete cleared allocations
       if (toDelete.length > 0) {
-        const deleteIds = toDelete
-          .map((e) => e.existingAllocationId!)
+        const deleteIds = toDelete.map((e) => e.existingAllocationId!)
         const { error: deleteError } = await supabase
           .from("budget_allocations")
           .delete()
@@ -201,7 +186,7 @@ export function BudgetEditDialog({
       }
 
       onOpenChange(false)
-      router.refresh()
+      onSuccess?.()
     } catch {
       setError("An unexpected error occurred. Please try again.")
     } finally {
@@ -209,9 +194,10 @@ export function BudgetEditDialog({
     }
   }
 
-  const regularTotal = entries
-    .filter((e) => regularCategories.some((c) => c.id === e.categoryId))
-    .reduce((sum, e) => sum + (e.amount ? Number(e.amount) : 0), 0)
+  const regularTotal =
+    entries
+      .filter((e) => regularCategories.some((c) => c.id === e.categoryId))
+      .reduce((sum, e) => sum + e.cents, 0) / 100
 
   function renderCategoryRow(cat: Category) {
     const entry = entries.find((e) => e.categoryId === cat.id)
@@ -225,16 +211,11 @@ export function BudgetEditDialog({
         <div className="hidden sm:block">
           <BudgetHistoryMini categoryId={cat.id} history={history} />
         </div>
-        <div className="w-28 shrink-0">
-          <Input
-            type="text"
-            inputMode="decimal"
-            placeholder="0"
-            value={entry.amount}
-            onChange={(e) => updateAmount(cat.id, e.target.value)}
-            className="text-right h-8"
-          />
-        </div>
+        <CentsInput
+          value={entry.cents}
+          onChange={(cents) => updateCents(cat.id, cents)}
+          className="w-28 shrink-0 h-8"
+        />
       </div>
     )
   }
@@ -262,24 +243,17 @@ export function BudgetEditDialog({
         ) : (
           <>
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyFromPreviousMonth}
-              >
+              <Button variant="outline" size="sm" onClick={copyFromPreviousMonth}>
                 Copy from previous month
               </Button>
             </div>
 
-            {/* Regular categories */}
             {regularCategories.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-muted-foreground mb-2">
                   Categories
                 </h4>
-                <div className="divide-y">
-                  {regularCategories.map(renderCategoryRow)}
-                </div>
+                <div className="divide-y">{regularCategories.map(renderCategoryRow)}</div>
                 <div className="flex justify-between items-center pt-2 text-sm font-semibold">
                   <span>Subtotal</span>
                   <span>{formatCurrency(regularTotal, 0)}</span>
@@ -287,15 +261,12 @@ export function BudgetEditDialog({
               </div>
             )}
 
-            {/* Allowances */}
             {allowanceCategories.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-muted-foreground mb-2">
                   Allowances
                 </h4>
-                <div className="divide-y">
-                  {allowanceCategories.map(renderCategoryRow)}
-                </div>
+                <div className="divide-y">{allowanceCategories.map(renderCategoryRow)}</div>
               </div>
             )}
           </>
