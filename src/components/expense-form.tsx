@@ -505,6 +505,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           id="description"
           placeholder="Optional notes about this expense"
           rows={1}
+          className="min-h-0"
           {...register("description")}
         />
         {errors.description && (
