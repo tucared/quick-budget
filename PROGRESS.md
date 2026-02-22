@@ -20,7 +20,7 @@ When planning next month, we want to see how our spending targets compared to ac
 ### [x] JTBD #2: Check shared discretionary budget
 When we're deciding whether to go out, we want to see if we have budget left in shared discretionary spending, so we can enjoy it without worry
 
-### [ ] JTBD #3: Spend personal allowance guilt-free
+### [x] JTBD #3: Spend personal allowance guilt-free
 When I'm about to spend on something personal, I want to see my allowance balance, so I can spend guilt-free without affecting our shared goals
 
 ---
