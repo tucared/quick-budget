@@ -376,3 +376,10 @@ GROUP BY
 -- Views don't support RLS directly, but security_invoker ensures
 -- RLS policies from underlying tables (budget_allocations, categories, expenses) are applied
 ALTER VIEW budget_summary SET (security_invoker = true);
+
+-- ============================================================================
+-- REALTIME PUBLICATION
+-- ============================================================================
+-- Enable Supabase Realtime for tables that need live updates
+ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
+ALTER PUBLICATION supabase_realtime ADD TABLE budget_allocations;

@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { formatCurrency } from "@/lib/currency"
-import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
 
@@ -33,16 +32,24 @@ export function CategoryExpenseDialog({
   allExpenses,
   categories,
 }: CategoryExpenseDialogProps) {
-  const [realtimeExpenses, setRealtimeExpenses] = useState<Expense[]>([])
+  // Optimistic delete: track IDs removed in this session so they disappear immediately
+  // before the parent's reloadExpenses() finishes. Safe to keep across category/open changes
+  // since deleted IDs won't appear in allExpenses once the parent reloads.
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
 
   const {
     showingDeleteId,
     deletingIds,
     deleteError,
     handleCardClick,
-    handleDelete,
-    clearDeletingId,
+    handleDelete: handleDeleteBase,
   } = useExpenseDelete()
+
+  // Wrap delete to mark as deleted immediately (optimistic UI)
+  const handleDelete = (expenseId: string, e: React.MouseEvent) => {
+    setDeletedIds((prev) => new Set([...prev, expenseId]))
+    handleDeleteBase(expenseId, e)
+  }
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, Category>()
@@ -56,43 +63,16 @@ export function CategoryExpenseDialog({
     const monthStart = startOfMonth(parseISO(budgetMonth))
     const monthEnd = endOfMonth(parseISO(budgetMonth))
 
-    // Merge initial expenses with real-time updates
-    const allExpensesMap = new Map<string, Expense>()
-    allExpenses.forEach((expense) => allExpensesMap.set(expense.id, expense))
-    realtimeExpenses.forEach((expense) => allExpensesMap.set(expense.id, expense))
-
-    return Array.from(allExpensesMap.values()).filter((expense) => {
+    return allExpenses.filter((expense) => {
       const expenseDate = new Date(expense.expense_date)
       return (
+        !deletedIds.has(expense.id) &&
         expense.category_id === budget.category_id &&
         expenseDate >= monthStart &&
         expenseDate <= monthEnd
       )
     })
-  }, [budget, budgetMonth, allExpenses, realtimeExpenses])
-
-  useExpenseSubscription(
-    (event) => {
-      if (event.type === "INSERT") {
-        setRealtimeExpenses((prev) => [event.new as Expense, ...prev])
-      } else if (event.type === "UPDATE") {
-        const updatedExpense = event.new as Expense
-        setRealtimeExpenses((prev) => {
-          const exists = prev.some((exp) => exp.id === updatedExpense.id)
-          return exists
-            ? prev.map((exp) => (exp.id === updatedExpense.id ? updatedExpense : exp))
-            : [updatedExpense, ...prev]
-        })
-      } else if (event.type === "DELETE") {
-        const deletedExpense = event.old as Expense
-        setRealtimeExpenses((prev) =>
-          prev.filter((exp) => exp.id !== deletedExpense.id)
-        )
-        clearDeletingId(deletedExpense.id)
-      }
-    },
-    open
-  )
+  }, [budget, budgetMonth, allExpenses, deletedIds])
 
   if (!budget) return null
 

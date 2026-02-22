@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
-import { format, startOfMonth } from "date-fns"
+import { format, parseISO, startOfMonth } from "date-fns"
 import { Pencil, Plus } from "lucide-react"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
@@ -37,6 +37,7 @@ export function BudgetPageContent({
 }: BudgetPageContentProps) {
   const [budgets, setBudgets] = useState<BudgetSummary[]>(initialBudgets)
   const [allowances, setAllowances] = useState<BudgetSummary[]>(initialAllowances)
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [error, setError] = useState("")
   const [editOpen, setEditOpen] = useState(false)
   const [rebalanceOpen, setRebalanceOpen] = useState(false)
@@ -47,14 +48,10 @@ export function BudgetPageContent({
   const isCurrentMonth =
     format(startOfMonth(new Date()), "yyyy-MM-dd") === budgetMonth
 
-  // Update budgets and allowances when initial data changes (e.g. month navigation via server)
-  useEffect(() => {
-    setBudgets(initialBudgets)
-  }, [initialBudgets])
-
-  useEffect(() => {
-    setAllowances(initialAllowances)
-  }, [initialAllowances])
+  // Update state when initial data changes (e.g. month navigation via server)
+  useEffect(() => { setBudgets(initialBudgets) }, [initialBudgets])
+  useEffect(() => { setAllowances(initialAllowances) }, [initialAllowances])
+  useEffect(() => { setExpenses(initialExpenses) }, [initialExpenses])
 
   function reloadBudgets() {
     const supabase = createClient()
@@ -82,8 +79,25 @@ export function BudgetPageContent({
       })
   }
 
-  // Reload budgets when expenses or budget allocations change (real-time)
-  useExpenseSubscription(reloadBudgets, true)
+  function reloadExpenses() {
+    const supabase = createClient()
+    const currentDate = parseISO(budgetMonth)
+    const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+    supabase
+      .from("expenses")
+      .select("*")
+      .eq("household_id", householdId)
+      .gte("expense_date", budgetMonth)
+      .lt("expense_date", format(nextMonth, "yyyy-MM-dd"))
+      .order("expense_date", { ascending: true })
+      .then(({ data, error: reloadError }) => {
+        if (reloadError) setError(getErrorMessage(reloadError))
+        else if (data) setExpenses(data as Expense[])
+      })
+  }
+
+  // Reload budgets and expenses when expenses or budget allocations change (real-time)
+  useExpenseSubscription(() => { reloadBudgets(); reloadExpenses() }, true)
   useBudgetAllocationSubscription(reloadBudgets, true)
 
   const handleCategoryClick = (budget: BudgetSummary) => {
@@ -140,7 +154,7 @@ export function BudgetPageContent({
             budgets={budgets}
             householdId={householdId}
             currentMonth={budgetMonth}
-            initialExpenses={initialExpenses}
+            initialExpenses={expenses}
           />
 
           {/* Category Budgets */}
@@ -207,7 +221,7 @@ export function BudgetPageContent({
         budget={selectedBudget}
         householdId={householdId}
         budgetMonth={budgetMonth}
-        allExpenses={initialExpenses}
+        allExpenses={expenses}
         categories={categories}
       />
     </>
