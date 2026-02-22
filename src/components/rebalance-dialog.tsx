@@ -21,19 +21,23 @@ import { Input } from "@/components/ui/input"
 interface RebalanceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
   budgets: BudgetSummary[]
   householdId: string
   budgetMonth: string
+  initialDestId?: string | null
 }
 
-type Step = "source" | "amount" | "destination" | "confirm"
+type Step = "source" | "amount" | "confirm"
 
 export function RebalanceDialog({
   open,
   onOpenChange,
+  onSuccess,
   budgets,
   householdId,
   budgetMonth,
+  initialDestId,
 }: RebalanceDialogProps) {
   const router = useRouter()
   const [step, setStep] = useState<Step>("source")
@@ -47,9 +51,13 @@ export function RebalanceDialog({
   const destBudget = budgets.find((b) => b.category_id === destId)
   const transferAmount = Number(amount) || 0
 
-  // Categories with remaining > 0 as potential sources
+  // When opened with a pre-selected destination, initialize state
+  const effectiveDestId = initialDestId ?? null
+  const destBudgetForTitle = budgets.find((b) => b.category_id === effectiveDestId)
+
+  // Categories with remaining > 0 as potential sources (excluding dest if pre-selected)
   const sourceCandidates = budgets
-    .filter((b) => Number(b.remaining_amount) > 0)
+    .filter((b) => Number(b.remaining_amount) > 0 && b.category_id !== effectiveDestId)
     .sort((a, b) => Number(b.remaining_amount) - Number(a.remaining_amount))
 
   function reset() {
@@ -68,6 +76,9 @@ export function RebalanceDialog({
 
   function selectSource(categoryId: string) {
     setSourceId(categoryId)
+    if (effectiveDestId) {
+      setDestId(effectiveDestId)
+    }
     setStep("amount")
   }
 
@@ -83,13 +94,15 @@ export function RebalanceDialog({
       return
     }
     setError("")
-    setStep("destination")
+    if (effectiveDestId) {
+      setDestId(effectiveDestId)
+      setStep("confirm")
+    } else {
+      setStep("confirm")
+    }
   }
 
-  function selectDestination(categoryId: string) {
-    setDestId(categoryId)
-    setStep("confirm")
-  }
+  // When no initialDestId, we need a dest selection step — handled inline below
 
   async function handleConfirm() {
     if (!sourceId || !destId || !sourceBudget || !destBudget) return
@@ -135,6 +148,7 @@ export function RebalanceDialog({
     }
 
     handleOpenChange(false)
+    onSuccess?.()
     router.refresh()
   }
 
@@ -143,15 +157,30 @@ export function RebalanceDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Rebalance - {format(parseISO(budgetMonth), "MMMM yyyy")}
+            {effectiveDestId
+              ? `Add funds to ${destBudgetForTitle?.category_name ?? "category"}`
+              : `Rebalance - ${format(parseISO(budgetMonth), "MMMM yyyy")}`}
           </DialogTitle>
           <DialogDescription>
-            {step === "source" && "Select a category to take money from."}
+            {step === "source" && (effectiveDestId
+              ? "Pick a category with budget left to transfer from."
+              : "Select a category to take money from.")}
             {step === "amount" && `How much to move from ${sourceBudget?.category_name}?`}
-            {step === "destination" && "Select the category to receive funds."}
             {step === "confirm" && "Review the transfer."}
           </DialogDescription>
         </DialogHeader>
+
+        {effectiveDestId && destBudgetForTitle && (
+          <div className="flex items-center justify-between rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm">
+            <span className="flex items-center gap-1.5 text-red-700">
+              {destBudgetForTitle.category_icon && <span>{destBudgetForTitle.category_icon}</span>}
+              <span className="font-medium">{destBudgetForTitle.category_name}</span>
+            </span>
+            <span className="font-semibold text-red-700">
+              {formatCurrency(Number(destBudgetForTitle.remaining_amount))}
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
@@ -186,11 +215,11 @@ export function RebalanceDialog({
           </div>
         )}
 
-        {/* Step 2: Enter amount */}
+        {/* Step 2: Enter amount (+ pick destination if no initialDestId) */}
         {step === "amount" && sourceBudget && (
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Available: {formatCurrency(Number(sourceBudget.remaining_amount))}
+              Available from {sourceBudget.category_name}: {formatCurrency(Number(sourceBudget.remaining_amount))}
             </div>
             <Input
               type="text"
@@ -206,46 +235,45 @@ export function RebalanceDialog({
               autoFocus
               className="text-right"
             />
+            {!effectiveDestId && (
+              <>
+                <p className="text-sm font-medium">Move to:</p>
+                <div className="space-y-1 max-h-[30vh] overflow-y-auto">
+                  {budgets
+                    .filter((b) => b.category_id !== sourceId)
+                    .map((b) => (
+                      <button
+                        key={b.category_id}
+                        onClick={() => setDestId(b.category_id!)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-md text-left transition-colors ${destId === b.category_id ? "bg-accent ring-1 ring-ring" : "hover:bg-accent/50"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {b.category_icon && <span className="text-base">{b.category_icon}</span>}
+                          <span className="text-sm font-medium">{b.category_name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {formatCurrency(Number(b.remaining_amount), 0)} left
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </>
+            )}
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setStep("source"); setSourceId(null); setAmount(""); setError("") }}>
+              <Button variant="outline" onClick={() => { setStep("source"); setSourceId(null); setDestId(null); setAmount(""); setError("") }}>
                 Back
               </Button>
-              <Button onClick={confirmAmount}>
+              <Button onClick={() => {
+                if (!effectiveDestId && !destId) { setError("Select a destination category"); return }
+                confirmAmount()
+              }} disabled={!effectiveDestId && !destId}>
                 Next
               </Button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Pick destination */}
-        {step === "destination" && (
-          <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-            {budgets
-              .filter((b) => b.category_id !== sourceId)
-              .map((b) => (
-                <button
-                  key={b.category_id}
-                  onClick={() => selectDestination(b.category_id!)}
-                  className="w-full flex items-center justify-between p-3 rounded-md hover:bg-accent text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    {b.category_icon && <span className="text-lg">{b.category_icon}</span>}
-                    <span className="text-sm font-medium">{b.category_name}</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {formatCurrency(Number(b.remaining_amount), 0)} left
-                  </span>
-                </button>
-              ))}
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => { setStep("amount"); setDestId(null); setError("") }}>
-                Back
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Confirm */}
+        {/* Step 3: Confirm */}
         {step === "confirm" && sourceBudget && destBudget && (
           <div className="space-y-4">
             <div className="rounded-md border p-4 space-y-2 text-sm">
@@ -264,7 +292,7 @@ export function RebalanceDialog({
             </div>
 
             <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
-              <Button variant="outline" onClick={() => { setStep("destination"); setDestId(null); setError("") }}>
+              <Button variant="outline" onClick={() => { setStep("amount"); setError("") }}>
                 Back
               </Button>
               <Button onClick={handleConfirm} disabled={saving}>

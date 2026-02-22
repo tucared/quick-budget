@@ -209,10 +209,6 @@ export function BudgetEditDialog({
     }
   }
 
-  const total = entries.reduce(
-    (sum, e) => sum + (e.amount ? Number(e.amount) : 0),
-    0
-  )
   const regularTotal = entries
     .filter((e) => regularCategories.some((c) => c.id === e.categoryId))
     .reduce((sum, e) => sum + (e.amount ? Number(e.amount) : 0), 0)
@@ -305,10 +301,7 @@ export function BudgetEditDialog({
           </>
         )}
 
-        <DialogFooter className="flex-row justify-between sm:justify-between">
-          <div className="text-sm font-semibold">
-            Total: {formatCurrency(total, 0)}
-          </div>
+        <DialogFooter className="flex-row justify-end sm:justify-end">
           <div className="flex gap-2">
             <Button
               variant="outline"
