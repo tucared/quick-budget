@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import type { ExpenseWithDetails, Category, Account } from "@/lib/types"
+import type { ExpenseWithDetails, Category } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
@@ -13,25 +13,18 @@ import { getErrorMessage } from "@/lib/error-handler"
 interface ExpenseListClientProps {
   initialExpenses: ExpenseWithDetails[]
   initialCategories: Category[]
-  initialAccounts: Account[]
   householdId: string
 }
 
 export function ExpenseListClient({
   initialExpenses,
   initialCategories,
-  initialAccounts,
   householdId: _householdId,
 }: ExpenseListClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
   const [categories, setCategories] = useState<Map<string, Category>>(() => {
     const map = new Map<string, Category>()
     initialCategories.forEach((cat) => map.set(cat.id, cat))
-    return map
-  })
-  const [accounts, setAccounts] = useState<Map<string, Account>>(() => {
-    const map = new Map<string, Account>()
-    initialAccounts.forEach((acc) => map.set(acc.id, acc))
     return map
   })
   const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
@@ -49,12 +42,6 @@ export function ExpenseListClient({
     initialCategories.forEach((cat) => map.set(cat.id, cat))
     setCategories(map)
   }, [initialCategories])
-
-  useEffect(() => {
-    const map = new Map<string, Account>()
-    initialAccounts.forEach((acc) => map.set(acc.id, acc))
-    setAccounts(map)
-  }, [initialAccounts])
 
   const handleCardClick = (expenseId: string) => {
     // Toggle delete button visibility on mobile
@@ -163,9 +150,6 @@ export function ExpenseListClient({
               const category = expense.category_id
                 ? categories.get(expense.category_id)
                 : null
-              const account = expense.account_id
-                ? accounts.get(expense.account_id)
-                : null
 
               const isShowingDelete = showingDeleteId === expense.id
               const isDeleting = deletingIds.has(expense.id)
@@ -200,8 +184,8 @@ export function ExpenseListClient({
                                 {expense.description}
                               </p>
                             )}
-                            {account && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{account.name}</p>
+                            {expense.is_cash && (
+                              <p className="text-xs text-muted-foreground mt-0.5">Cash</p>
                             )}
                           </div>
                           <div className="relative flex items-start">

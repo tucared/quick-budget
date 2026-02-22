@@ -11,19 +11,15 @@ type Views = Database['public']['Views']
 export type User = Tables['users']['Row']
 export type Household = Tables['households']['Row']
 export type Category = Tables['categories']['Row']
-export type Account = Tables['accounts']['Row']
 export type Expense = Tables['expenses']['Row']
 export type BudgetAllocation = Tables['budget_allocations']['Row']
 export type BudgetSummary = Views['budget_summary']['Row']
-
-// Extract the account_type enum from the generated types
-export type AccountType = Account['account_type']
 
 // Form types for creating/updating expenses
 export interface ExpenseFormData {
   amount: number
   category_id: string
-  account_id: string
+  is_cash: boolean
   expense_date: string
   description?: string
   currency?: string
@@ -32,7 +28,6 @@ export interface ExpenseFormData {
 // Extended types with relations for displaying data
 export interface ExpenseWithDetails extends Expense {
   category?: Category
-  account?: Account
 }
 
 // Local storage keys for remembering defaults, namespaced by household
@@ -40,10 +35,8 @@ export function getStorageKeys(householdId: string) {
   const prefix = `qb:${householdId}`
   return {
     LAST_CATEGORY: `${prefix}:last_category`,
-    LAST_ACCOUNT: `${prefix}:last_account`,
     LAST_CURRENCY: `${prefix}:last_currency`,
     CATEGORY_USAGE: `${prefix}:category_usage`,
-    ACCOUNT_USAGE: `${prefix}:account_usage`,
   } as const
 }
 

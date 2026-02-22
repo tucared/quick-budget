@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { format, startOfMonth } from "date-fns"
 import { Pencil, ArrowRightLeft } from "lucide-react"
-import type { BudgetSummary, Expense, Category, Account } from "@/lib/types"
+import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import { BudgetCategoryCard } from "@/components/budget-category-card"
 import { BudgetBurndownChartClient } from "@/components/budget-burndown-chart-client"
@@ -21,7 +21,6 @@ interface BudgetPageContentProps {
   initialAllowances: BudgetSummary[]
   initialExpenses: Expense[]
   categories: Category[]
-  accounts: Account[]
   householdId: string
   budgetMonth: string
 }
@@ -31,7 +30,6 @@ export function BudgetPageContent({
   initialAllowances,
   initialExpenses,
   categories,
-  accounts,
   householdId,
   budgetMonth,
 }: BudgetPageContentProps) {
@@ -213,7 +211,6 @@ export function BudgetPageContent({
         budgetMonth={budgetMonth}
         allExpenses={initialExpenses}
         categories={categories}
-        accounts={accounts}
       />
     </>
   )

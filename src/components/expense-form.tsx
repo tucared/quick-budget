@@ -7,7 +7,7 @@ import { Check } from "lucide-react"
 import { format, startOfMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
-import { getStorageKeys, type Category, type Account, type BudgetSummary } from "@/lib/types"
+import { getStorageKeys, type Category, type BudgetSummary } from "@/lib/types"
 import { convertToEUR, fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
@@ -25,17 +25,6 @@ interface ExpenseFormProps {
   onSuccess?: () => void
 }
 
-interface AccountWithUser extends Account {
-  owner_name?: string
-}
-
-// Type for Supabase response with joined users data
-interface AccountWithUserData extends Account {
-  users: {
-    full_name: string | null
-  } | null
-}
-
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const { user } = useUser()
   const storageKeys = useMemo(
@@ -43,7 +32,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     [user?.householdId]
   )
   const [categories, setCategories] = useState<Category[]>([])
-  const [accounts, setAccounts] = useState<AccountWithUser[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [loadError, setLoadError] = useState("")
@@ -71,12 +59,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       amount: NaN,
       expense_date: format(new Date(), 'yyyy-MM-dd'),
       currency: "EUR",
+      is_cash: false,
     },
   })
 
   const selectedCategory = watch("category_id")
-  const selectedAccount = watch("account_id")
   const selectedCurrency = watch("currency")
+  const isCash = watch("is_cash")
   const expenseAmount = watch("amount")
   const expenseDate = watch("expense_date")
 
@@ -119,25 +108,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     }))
   }
 
-  // Transform accounts into grouped options with frequency
-  const getAccountOptions = (): GroupedOption[] => {
-    const usageMap = storageKeys ? getUsageMap(storageKeys.ACCOUNT_USAGE) : {}
-
-    return [...accounts]
-      .sort((a, b) => {
-        const aIsMe = a.owner_user_id === user?.id ? 0 : 1
-        const bIsMe = b.owner_user_id === user?.id ? 0 : 1
-        return aIsMe - bIsMe
-      })
-      .map((account) => ({
-        value: account.id,
-        label: account.name,
-        group: account.owner_name || "Unknown",
-        frequency: usageMap[account.id] || 0,
-      }))
-  }
-
-  // Load categories and accounts on mount
+  // Load categories on mount
   useEffect(() => {
     const loadData = async () => {
       if (!user?.householdId) {
@@ -167,47 +138,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           setCategories(categoriesData)
         }
 
-        // Load accounts with explicit household filter
-        const { data: accountsData, error: accountsError } = await supabase
-          .from("accounts")
-          .select("*, users!accounts_owner_user_id_fkey(full_name)")
-          .eq("household_id", householdId)
-          .eq("is_active", true)
-          .order("name")
-          .returns<AccountWithUserData[]>()
-
-        if (accountsError) {
-          setLoadError(getErrorMessage(accountsError))
-          setLoadingData(false)
-          return
-        }
-
-        if (accountsData) {
-          // Transform accounts data to include owner name
-          const accountsWithOwner: AccountWithUser[] = accountsData.map((account: AccountWithUserData) => ({
-            ...account,
-            owner_name: account.users?.full_name || "Unknown",
-          }))
-          setAccounts(accountsWithOwner)
-        }
-
         // Load smart defaults from localStorage (namespaced by household)
         try {
           const keys = getStorageKeys(householdId)
           const lastCategory = localStorage.getItem(keys.LAST_CATEGORY)
-          const lastAccount = localStorage.getItem(keys.LAST_ACCOUNT)
           const lastCurrency = localStorage.getItem(keys.LAST_CURRENCY)
 
           if (lastCategory) {
             setValue("category_id", lastCategory)
-          }
-
-          if (lastAccount) {
-            setValue("account_id", lastAccount)
-          } else if (accountsData && accountsData.length > 0) {
-            // Default to the first account or the default account
-            const defaultAccount = accountsData.find((a) => a.is_default)
-            setValue("account_id", defaultAccount?.id || accountsData[0].id)
           }
 
           if (lastCurrency) {
@@ -215,11 +153,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           }
         } catch (_err) {
           // localStorage might be disabled (incognito mode, etc.)
-          // Fall back to defaults if available
-          if (accountsData && accountsData.length > 0) {
-            const defaultAccount = accountsData.find((a) => a.is_default)
-            setValue("account_id", defaultAccount?.id || accountsData[0].id)
-          }
         }
 
         setLoadingData(false)
@@ -311,7 +244,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         logged_by_user_id: user.id,
         household_id: user.householdId,
         category_id: data.category_id,
-        account_id: data.account_id,
+        is_cash: data.is_cash ?? false,
         amount: data.amount,
         currency: currency,
         converted_amount: convertedAmount,
@@ -331,13 +264,11 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       try {
         if (storageKeys) {
           localStorage.setItem(storageKeys.LAST_CATEGORY, data.category_id)
-          localStorage.setItem(storageKeys.LAST_ACCOUNT, data.account_id)
           if (data.currency) {
             localStorage.setItem(storageKeys.LAST_CURRENCY, data.currency)
           }
           // Track usage frequency
           recordUsage(storageKeys.CATEGORY_USAGE, data.category_id)
-          recordUsage(storageKeys.ACCOUNT_USAGE, data.account_id)
         }
       } catch (_err) {
         // localStorage might be disabled, silently fail
@@ -352,11 +283,11 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       }
       successTimerRef.current = setTimeout(() => setShowSuccess(false), 1500)
 
-      // Reset form but keep category, account, and date
+      // Reset form but keep category, currency, and date
       reset({
         amount: NaN,
         category_id: data.category_id,
-        account_id: data.account_id,
+        is_cash: data.is_cash,
         expense_date: data.expense_date,
         description: "",
         currency: data.currency,
@@ -383,24 +314,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   if (loadingData) {
     return (
       <div className="space-y-4">
-        {/* Amount with Currency Toggle Skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-20" />
-          <div className="flex gap-2">
-            <Skeleton className="h-10 flex-1" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
+        {/* Amount Skeleton */}
+        <Skeleton className="h-14 w-full" />
 
         {/* Category Skeleton */}
         <div className="space-y-2">
           <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-
-        {/* Account Skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-20" />
           <Skeleton className="h-10 w-full" />
         </div>
 
@@ -415,6 +334,9 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-20 w-full" />
         </div>
+
+        {/* Bottom row Skeleton */}
+        <Skeleton className="h-8 w-48" />
 
         {/* Submit Button Skeleton */}
         <Skeleton className="h-12 w-full" />
@@ -438,52 +360,25 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         </div>
       )}
 
-      {/* Amount with Currency Toggle */}
-      <div className="space-y-2">
-        <Label htmlFor="amount">Amount *</Label>
-        <div className="flex gap-2">
-          <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            inputMode="decimal"
-            autoFocus
-            className="flex-1"
-            {...register("amount", { valueAsNumber: true })}
-            ref={(e) => {
-              register("amount", { valueAsNumber: true }).ref(e)
-              amountInputRef.current = e
-            }}
-          />
-          <div className="inline-flex rounded-md shadow-xs" role="group">
-            <button
-              type="button"
-              onClick={() => setValue("currency", "EUR")}
-              className={`px-4 py-2 text-sm font-medium border rounded-l-md transition-colors ${
-                selectedCurrency === "EUR"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              EUR
-            </button>
-            <button
-              type="button"
-              onClick={() => setValue("currency", "BRL")}
-              className={`px-4 py-2 text-sm font-medium border-l-0 border rounded-r-md transition-colors ${
-                selectedCurrency === "BRL"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              BRL
-            </button>
-          </div>
-        </div>
+      {/* Amount - hero input */}
+      <div>
+        <Input
+          id="amount"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          inputMode="decimal"
+          autoFocus
+          className="h-14 text-2xl font-semibold text-center"
+          {...register("amount", { valueAsNumber: true })}
+          ref={(e) => {
+            register("amount", { valueAsNumber: true }).ref(e)
+            amountInputRef.current = e
+          }}
+        />
         {errors.amount && (
-          <p className="text-sm text-destructive">{errors.amount.message}</p>
+          <p className="text-sm text-destructive mt-1">{errors.amount.message}</p>
         )}
       </div>
 
@@ -510,24 +405,6 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             additionalAmount={debouncedAmount > 0 ? convertToEUR(debouncedAmount, selectedCurrency || "EUR") : 0}
             loading={loadingBudget}
           />
-        )}
-      </div>
-
-      {/* Account */}
-      <div className="space-y-2">
-        <Label htmlFor="account">Account *</Label>
-        <GroupedCombobox
-          options={getAccountOptions()}
-          value={selectedAccount}
-          onValueChange={(value) => setValue("account_id", value)}
-          placeholder="Select an account"
-          searchPlaceholder="Search accounts..."
-          emptyMessage="No account found."
-        />
-        {errors.account_id && (
-          <p className="text-sm text-destructive">
-            {errors.account_id.message}
-          </p>
         )}
       </div>
 
@@ -564,6 +441,43 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             {errors.description.message}
           </p>
         )}
+      </div>
+
+      {/* Bottom row: currency toggle + cash checkbox */}
+      <div className="flex items-center gap-4">
+        <div className="inline-flex rounded-md shadow-xs" role="group">
+          <button
+            type="button"
+            onClick={() => setValue("currency", "EUR")}
+            className={`px-3 py-1.5 text-sm font-medium border rounded-l-md transition-colors ${
+              selectedCurrency === "EUR"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
+            }`}
+          >
+            EUR
+          </button>
+          <button
+            type="button"
+            onClick={() => setValue("currency", "BRL")}
+            className={`px-3 py-1.5 text-sm font-medium border-l-0 border rounded-r-md transition-colors ${
+              selectedCurrency === "BRL"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
+            }`}
+          >
+            BRL
+          </button>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isCash}
+            onChange={(e) => setValue("is_cash", e.target.checked)}
+            className="h-4 w-4 rounded border-input accent-primary"
+          />
+          Cash
+        </label>
       </div>
 
       {/* Submit Button - Large touch target for mobile */}

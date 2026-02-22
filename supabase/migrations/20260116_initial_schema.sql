@@ -53,10 +53,6 @@ BEGIN
     new_household_id
   );
 
-  -- Create default account for the user
-  INSERT INTO public.accounts (household_id, owner_user_id, name, account_type, is_default, currency)
-  VALUES (new_household_id, NEW.id, 'Primary Account', 'other', TRUE, 'EUR');
-
   RETURN NEW;
 END;
 $$;
@@ -163,54 +159,6 @@ CREATE INDEX idx_categories_household ON categories(household_id);
 CREATE INDEX idx_categories_household_active ON categories(household_id, is_active) WHERE is_active = TRUE;
 
 -- ============================================================================
--- ACCOUNTS TABLE
--- ============================================================================
--- Payment sources (credit cards, bank accounts, cash, etc.)
--- Accounts are household-scoped; all household members can access all accounts
-CREATE TABLE accounts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
-  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  account_type TEXT NOT NULL CHECK (account_type IN ('credit_card', 'debit_card', 'bank_account', 'cash', 'other')),
-  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
-  is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Enable RLS
-ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
-
--- Household members can access all household accounts
-CREATE POLICY "Household members can view accounts" ON accounts
-  FOR SELECT USING (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
-CREATE POLICY "Household members can insert accounts" ON accounts
-  FOR INSERT WITH CHECK (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
-CREATE POLICY "Household members can update accounts" ON accounts
-  FOR UPDATE USING (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
-CREATE POLICY "Household members can delete accounts" ON accounts
-  FOR DELETE USING (
-    household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
-  );
-
--- Create indexes
-CREATE INDEX idx_accounts_household ON accounts(household_id);
-CREATE INDEX idx_accounts_household_active ON accounts(household_id, is_active) WHERE is_active = TRUE;
-CREATE INDEX idx_accounts_owner ON accounts(owner_user_id);
-
-
--- ============================================================================
 -- EXPENSES TABLE
 -- ============================================================================
 -- Individual expense transactions
@@ -220,7 +168,7 @@ CREATE TABLE expenses (
   logged_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
-  account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
+  is_cash BOOLEAN NOT NULL DEFAULT FALSE,
 
   -- Amount in original currency (negative for credit/refund transactions)
   amount DECIMAL(12, 2) NOT NULL CHECK (amount <> 0),
@@ -270,7 +218,6 @@ CREATE INDEX idx_expenses_household ON expenses(household_id);
 CREATE INDEX idx_expenses_logged_by ON expenses(logged_by_user_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
 CREATE INDEX idx_expenses_category ON expenses(category_id);
-CREATE INDEX idx_expenses_account ON expenses(account_id);
 
 -- ============================================================================
 -- EXCHANGE_RATES TABLE
@@ -374,9 +321,6 @@ CREATE TRIGGER update_households_updated_at BEFORE UPDATE ON households
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON accounts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_exchange_rates_updated_at BEFORE UPDATE ON exchange_rates

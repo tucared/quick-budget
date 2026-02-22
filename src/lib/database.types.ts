@@ -34,60 +34,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      accounts: {
-        Row: {
-          account_type: string
-          created_at: string
-          currency: string
-          household_id: string
-          id: string
-          is_active: boolean
-          is_default: boolean
-          name: string
-          owner_user_id: string
-          updated_at: string
-        }
-        Insert: {
-          account_type: string
-          created_at?: string
-          currency?: string
-          household_id: string
-          id?: string
-          is_active?: boolean
-          is_default?: boolean
-          name: string
-          owner_user_id: string
-          updated_at?: string
-        }
-        Update: {
-          account_type?: string
-          created_at?: string
-          currency?: string
-          household_id?: string
-          id?: string
-          is_active?: boolean
-          is_default?: boolean
-          name?: string
-          owner_user_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "accounts_household_id_fkey"
-            columns: ["household_id"]
-            isOneToOne: false
-            referencedRelation: "households"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "accounts_owner_user_id_fkey"
-            columns: ["owner_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       budget_allocations: {
         Row: {
           allocated_amount: number
@@ -206,7 +152,6 @@ export type Database = {
       }
       expenses: {
         Row: {
-          account_id: string | null
           amount: number
           category_id: string | null
           converted_amount: number
@@ -218,12 +163,12 @@ export type Database = {
           expense_date: string
           household_id: string
           id: string
+          is_cash: boolean
           logged_by_user_id: string
           notes: string | null
           updated_at: string
         }
         Insert: {
-          account_id?: string | null
           amount: number
           category_id?: string | null
           converted_amount: number
@@ -235,12 +180,12 @@ export type Database = {
           expense_date?: string
           household_id: string
           id?: string
+          is_cash?: boolean
           logged_by_user_id: string
           notes?: string | null
           updated_at?: string
         }
         Update: {
-          account_id?: string | null
           amount?: number
           category_id?: string | null
           converted_amount?: number
@@ -252,18 +197,12 @@ export type Database = {
           expense_date?: string
           household_id?: string
           id?: string
+          is_cash?: boolean
           logged_by_user_id?: string
           notes?: string | null
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "expenses_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "expenses_category_id_fkey"
             columns: ["category_id"]
