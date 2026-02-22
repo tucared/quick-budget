@@ -68,7 +68,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   } = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      amount: 0,
+      amount: NaN,
       expense_date: format(new Date(), 'yyyy-MM-dd'),
       currency: "EUR",
     },
@@ -348,7 +348,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       // Reset form but keep category, account, and date
       reset({
-        amount: 0,
+        amount: NaN,
         category_id: data.category_id,
         account_id: data.account_id,
         expense_date: data.expense_date,
