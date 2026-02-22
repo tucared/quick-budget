@@ -20,6 +20,7 @@ import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combob
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface ExpenseFormProps {
   onSuccess?: () => void
@@ -39,6 +40,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [showSuccess, setShowSuccess] = useState(false)
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
+  const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
 
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
@@ -236,7 +238,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     }
 
     loadCategoryBudget()
-  }, [selectedCategory, user, categories])
+  }, [selectedCategory, user, categories, budgetRefreshTick])
+
+  // Refresh budget status when any expense changes externally (partner added/deleted/updated)
+  useExpenseSubscription(() => {
+    setBudgetRefreshTick((t) => t + 1)
+  })
 
   // Cleanup success state timer on unmount
   useEffect(() => {
@@ -302,6 +309,9 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         // localStorage might be disabled, silently fail
         // This is not critical for functionality
       }
+
+      // Refresh budget status for the same category
+      setBudgetRefreshTick((t) => t + 1)
 
       // Show success state in button
       setShowSuccess(true)

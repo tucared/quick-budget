@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
-import { createClient } from "@/lib/supabase"
+import { useState, useMemo } from "react"
 import { format, getDaysInMonth, parseISO } from "date-fns"
 import { formatCurrency } from "@/lib/currency"
 import {
@@ -24,8 +23,6 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BudgetSummary, Expense } from "@/lib/types"
-import { getErrorMessage } from "@/lib/error-handler"
-import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface BurndownDataPoint {
   date: string // "Jan 1", "Jan 2", etc.
@@ -48,48 +45,15 @@ interface BudgetBurndownChartClientProps {
 
 export function BudgetBurndownChartClient({
   budgets,
-  householdId,
+  householdId: _householdId,
   currentMonth,
   initialExpenses,
 }: BudgetBurndownChartClientProps) {
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all")
-  const [error, setError] = useState("")
+  const [error] = useState("")
 
-  // Update expenses when server data changes (month navigation)
-  useEffect(() => {
-    setExpenses(initialExpenses)
-  }, [initialExpenses])
-
-  // Reload expenses on real-time changes
-  const reloadExpenses = useCallback(() => {
-    const supabase = createClient()
-
-    const currentDate = parseISO(currentMonth)
-    const nextMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() + 1,
-      1
-    )
-    const nextMonthStr = format(nextMonth, "yyyy-MM-dd")
-
-    supabase
-      .from("expenses")
-      .select("expense_date, converted_amount, category_id")
-      .eq("household_id", householdId)
-      .gte("expense_date", currentMonth)
-      .lt("expense_date", nextMonthStr)
-      .order("expense_date", { ascending: true })
-      .then(({ data, error: loadError }) => {
-        if (loadError) {
-          setError(getErrorMessage(loadError))
-        } else if (data) {
-          setExpenses(data as Expense[])
-        }
-      })
-  }, [householdId, currentMonth])
-
-  useExpenseSubscription(reloadExpenses, true)
+  // expenses come from parent (kept live via parent's subscription)
+  const expenses = initialExpenses
 
   const chartData = useMemo(() => {
     if (budgets.length === 0) return { data: [], weekends: [] }
