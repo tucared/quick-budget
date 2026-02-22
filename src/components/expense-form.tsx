@@ -40,7 +40,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
 
-  // Ref for amount input to manage focus without DOM queries
+  // Cents-first input state (POS-style: digits fill from the right)
+  const [centsRaw, setCentsRaw] = useState(0)
+
+  // Ref for the invisible input that captures keyboard events
   const amountInputRef = useRef<HTMLInputElement | null>(null)
 
   // Ref to store success state timer for cleanup
@@ -74,6 +77,31 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
   // Convert string date to Date object for DatePicker
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
+
+  // Format cents as "1 234,56" style display
+  const formatCentsDisplay = (cents: number): string => {
+    if (cents === 0) return "0,00"
+    const intPart = Math.floor(cents / 100)
+    const decPart = cents % 100
+    const intFormatted = intPart.toLocaleString("fr-FR")
+    return `${intFormatted},${String(decPart).padStart(2, "0")}`
+  }
+
+  const handleAmountKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault()
+      const next = centsRaw * 10 + parseInt(e.key)
+      if (next <= 999999999) { // cap at ~10M
+        setCentsRaw(next)
+        setValue("amount", next / 100, { shouldValidate: true })
+      }
+    } else if (e.key === "Backspace") {
+      e.preventDefault()
+      const next = Math.floor(centsRaw / 10)
+      setCentsRaw(next)
+      setValue("amount", next > 0 ? next / 100 : NaN, { shouldValidate: false })
+    }
+  }
 
   // Helper functions for tracking usage recency (timestamp-based)
   const getUsageMap = (key: string): Record<string, number> => {
@@ -284,6 +312,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       successTimerRef.current = setTimeout(() => setShowSuccess(false), 1500)
 
       // Reset form but keep category, currency, and date
+      setCentsRaw(0)
       reset({
         amount: NaN,
         category_id: data.category_id,
@@ -314,7 +343,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   if (loadingData) {
     return (
       <div className="space-y-4">
-        {/* Amount Skeleton */}
+        {/* Amount + currency toggle Skeleton */}
         <Skeleton className="h-14 w-full" />
 
         {/* Category Skeleton */}
@@ -335,8 +364,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           <Skeleton className="h-20 w-full" />
         </div>
 
-        {/* Bottom row Skeleton */}
-        <Skeleton className="h-8 w-48" />
+        {/* Cash checkbox Skeleton */}
+        <Skeleton className="h-5 w-32" />
 
         {/* Submit Button Skeleton */}
         <Skeleton className="h-12 w-full" />
@@ -360,23 +389,54 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         </div>
       )}
 
-      {/* Amount - hero input */}
+      {/* Amount - hero cents-first input with inline currency toggle */}
       <div>
-        <Input
-          id="amount"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          inputMode="decimal"
-          autoFocus
-          className="h-14 text-2xl font-semibold text-center"
-          {...register("amount", { valueAsNumber: true })}
-          ref={(e) => {
-            register("amount", { valueAsNumber: true }).ref(e)
-            amountInputRef.current = e
-          }}
-        />
+        <div
+          className={`flex items-center h-14 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${errors.amount ? "border-destructive" : "border-input"}`}
+          onClick={() => amountInputRef.current?.focus()}
+        >
+          {/* Invisible input that captures keyboard events */}
+          <input
+            ref={amountInputRef}
+            type="text"
+            inputMode="none"
+            autoFocus
+            autoComplete="off"
+            readOnly
+            onKeyDown={handleAmountKeyDown}
+            className="sr-only"
+            aria-label="Amount"
+          />
+          {/* Display */}
+          <span className={`flex-1 text-2xl font-semibold text-center tabular-nums ${centsRaw === 0 ? "text-muted-foreground" : ""}`}>
+            {formatCentsDisplay(centsRaw)}
+          </span>
+          {/* Currency toggle inline */}
+          <div className="inline-flex rounded-md shrink-0" role="group">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setValue("currency", "EUR"); amountInputRef.current?.focus() }}
+              className={`px-2.5 py-1 text-xs font-semibold border rounded-l-md transition-colors ${
+                selectedCurrency === "EUR"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-input hover:bg-accent"
+              }`}
+            >
+              EUR
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setValue("currency", "BRL"); amountInputRef.current?.focus() }}
+              className={`px-2.5 py-1 text-xs font-semibold border-l-0 border rounded-r-md transition-colors ${
+                selectedCurrency === "BRL"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-input hover:bg-accent"
+              }`}
+            >
+              BRL
+            </button>
+          </div>
+        </div>
         {errors.amount && (
           <p className="text-sm text-destructive mt-1">{errors.amount.message}</p>
         )}
@@ -443,42 +503,16 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         )}
       </div>
 
-      {/* Bottom row: currency toggle + cash checkbox */}
-      <div className="flex items-center gap-4">
-        <div className="inline-flex rounded-md shadow-xs" role="group">
-          <button
-            type="button"
-            onClick={() => setValue("currency", "EUR")}
-            className={`px-3 py-1.5 text-sm font-medium border rounded-l-md transition-colors ${
-              selectedCurrency === "EUR"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            EUR
-          </button>
-          <button
-            type="button"
-            onClick={() => setValue("currency", "BRL")}
-            className={`px-3 py-1.5 text-sm font-medium border-l-0 border rounded-r-md transition-colors ${
-              selectedCurrency === "BRL"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            BRL
-          </button>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isCash}
-            onChange={(e) => setValue("is_cash", e.target.checked)}
-            className="h-4 w-4 rounded border-input accent-primary"
-          />
-          Cash
-        </label>
-      </div>
+      {/* Cash checkbox */}
+      <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none w-fit">
+        <input
+          type="checkbox"
+          checked={isCash}
+          onChange={(e) => setValue("is_cash", e.target.checked)}
+          className="h-4 w-4 rounded border-input accent-primary"
+        />
+        Cash payment
+      </label>
 
       {/* Submit Button - Large touch target for mobile */}
       <Button
