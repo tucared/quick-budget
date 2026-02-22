@@ -30,8 +30,8 @@ export function getBudgetProgressBarColor(percentSpent: number): string {
 }
 
 const statusLabels: Record<BudgetStatus, string> = {
-  over: "Over budget!",
-  critical: "Over budget!",
+  over: "Exhausted",
+  critical: "Nearly exhausted",
   warning: "Almost there",
   on_track: "On track",
 }
@@ -41,10 +41,10 @@ export function getBudgetStatusLabel(percentSpent: number): string {
 }
 
 const statusIcons: Record<BudgetStatus, string> = {
-  over: "✕",
-  critical: "⚠",
-  warning: "⚠",
-  on_track: "✓",
+  over: "●",
+  critical: "●",
+  warning: "●",
+  on_track: "●",
 }
 
 export function getBudgetStatusIcon(percentSpent: number): string {
