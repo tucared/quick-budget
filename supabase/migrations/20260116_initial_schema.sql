@@ -222,12 +222,12 @@ CREATE TABLE expenses (
   category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
   account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
 
-  -- Amount in original currency
-  amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
+  -- Amount in original currency (negative for credit/refund transactions)
+  amount DECIMAL(12, 2) NOT NULL CHECK (amount <> 0),
   currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
 
   -- Converted amount (for multi-currency support - MVP stores as 1:1)
-  converted_amount DECIMAL(12, 2) NOT NULL CHECK (converted_amount > 0),
+  converted_amount DECIMAL(12, 2) NOT NULL CHECK (converted_amount <> 0),
   converted_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(converted_currency) = 3),
   exchange_rate DECIMAL(12, 6) NOT NULL DEFAULT 1.0 CHECK (exchange_rate > 0),
 
@@ -311,7 +311,8 @@ CREATE TABLE budget_allocations (
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   budget_month DATE NOT NULL, -- First day of the month (e.g., 2026-01-01)
-  allocated_amount DECIMAL(12, 2) NOT NULL CHECK (allocated_amount > 0),
+  -- Negative allowed for historical balancing entries (e.g. "Helper" category from old app)
+  allocated_amount DECIMAL(12, 2) NOT NULL CHECK (allocated_amount <> 0),
   currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
