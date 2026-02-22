@@ -155,10 +155,49 @@ function generateBudgetSql(data, validCategories) {
 }
 
 /**
+ * Loads EUR/BRL historical rates from investing.com CSV.
+ * Returns a Map of YYYY-MM-DD → EUR/BRL price (e.g. "2026-02-20" → 6.099).
+ */
+function loadBrlRateMap() {
+  const rateFile = path.join(RAW_DIR, 'eur_brl_historical_rates.csv');
+  if (!fs.existsSync(rateFile)) {
+    console.log('  ℹ️  No eur_brl_historical_rates.csv found — using config fallback for all BRL expenses');
+    return new Map();
+  }
+
+  const content = fs.readFileSync(rateFile, 'utf-8');
+  const cleanContent = content.replace(/^\uFEFF/, '');
+  const rows = parse(cleanContent, { columns: true, skip_empty_lines: true, trim: true });
+
+  const rateMap = new Map();
+  for (const row of rows) {
+    const rawDate = row['Date'];
+    if (!rawDate) continue;
+    // investing.com format: MM/DD/YYYY (may be quoted)
+    const cleaned = rawDate.replace(/"/g, '').trim();
+    const parts = cleaned.split('/');
+    if (parts.length !== 3) continue;
+    const [month, day, year] = parts;
+    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    const price = parseFloat(row['Price']);
+    if (price && !isNaN(price) && price > 0) {
+      rateMap.set(isoDate, price);
+    }
+  }
+
+  return rateMap;
+}
+
+/**
  * Transforms expense CSV files
  */
 function transformExpenses() {
   console.log('\n📊 Transforming expenses...');
+
+  const rateMap = loadBrlRateMap();
+  if (rateMap.size > 0) {
+    console.log(`  📈 Loaded ${rateMap.size} per-date EUR/BRL rates from historical CSV`);
+  }
 
   const inputFile = path.join(RAW_DIR, 'expenses.csv');
   const rows = readCsv(inputFile);
@@ -168,15 +207,21 @@ function transformExpenses() {
     valid: 0,
     skipped: 0,
     errors: 0,
-    errorDetails: []
+    errorDetails: [],
+    brlFromCsv: 0,
+    brlFromConfig: 0
   };
 
   rows.forEach((row, index) => {
-    const result = validateExpense(row);
+    const result = validateExpense(row, rateMap);
 
     if (result.valid) {
       transformed.push(result.data);
       stats.valid++;
+      if (result.data.currency === 'BRL') {
+        if (result.rateSource === 'csv') stats.brlFromCsv++;
+        else stats.brlFromConfig++;
+      }
     } else if (result.skip) {
       stats.skipped++;
     } else {
@@ -193,6 +238,9 @@ function transformExpenses() {
   console.log(`    • Valid: ${stats.valid}`);
   console.log(`    • Skipped: ${stats.skipped}`);
   console.log(`    • Errors: ${stats.errors}`);
+  if (stats.brlFromCsv + stats.brlFromConfig > 0) {
+    console.log(`    • BRL rates from CSV: ${stats.brlFromCsv}, from config fallback: ${stats.brlFromConfig}`);
+  }
 
   if (stats.errors > 0) {
     console.log('\n⚠️  Errors found:');

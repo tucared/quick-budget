@@ -98,28 +98,45 @@ function parseDate(dateStr) {
  * Calculates converted amount and exchange rate
  * @param {number} amount - Original amount
  * @param {string} currency - Original currency code
- * @returns {Object} - {convertedAmount, exchangeRate}
+ * @param {string|null} expenseDate - ISO date string YYYY-MM-DD (used to look up per-date rate for BRL)
+ * @param {Map<string, number>|null} rateMap - Map of YYYY-MM-DD → EUR/BRL rate (e.g. 6.099); optional
+ * @returns {Object} - {convertedAmount, exchangeRate, rateSource}
  */
-function calculateConversion(amount, currency) {
+function calculateConversion(amount, currency, expenseDate = null, rateMap = null) {
   if (!amount || !currency) {
-    return { convertedAmount: null, exchangeRate: null };
+    return { convertedAmount: null, exchangeRate: null, rateSource: null };
   }
 
-  const rate = config.exchangeRates[currency] || 1.0;
-  const convertedAmount = amount / rate;
+  let eurToCurrencyRate;
+  let rateSource = 'config';
+
+  if (currency === 'BRL' && rateMap && expenseDate && rateMap.has(expenseDate)) {
+    // Per-date rate from historical CSV: rateMap value = EUR/BRL price (e.g. 6.099)
+    eurToCurrencyRate = rateMap.get(expenseDate);
+    rateSource = 'csv';
+  } else {
+    // Fallback: config stores rate_to_eur (e.g. BRL: 6.2267 means 1 EUR = 6.2267 BRL)
+    eurToCurrencyRate = config.exchangeRates[currency] || 1.0;
+  }
+
+  // rate_to_eur = how many EUR per 1 unit of currency = 1 / eurToCurrencyRate
+  const rateToEur = 1 / eurToCurrencyRate;
+  const convertedAmount = amount * rateToEur;
 
   return {
     convertedAmount: Math.round(convertedAmount * 100) / 100,  // Round to 2 decimals
-    exchangeRate: rate
+    exchangeRate: parseFloat(rateToEur.toFixed(6)),
+    rateSource
   };
 }
 
 /**
  * Validates and transforms expense row from CSV
  * @param {Object} row - Raw CSV row
+ * @param {Map<string, number>|null} rateMap - Optional per-date EUR/BRL rate map
  * @returns {Object} - {valid, data, errors}
  */
-function validateExpense(row) {
+function validateExpense(row, rateMap = null) {
   const errors = [];
 
   // Required fields
@@ -165,7 +182,7 @@ function validateExpense(row) {
   }
 
   // Calculate conversion
-  const { convertedAmount, exchangeRate } = calculateConversion(amount, currency);
+  const { convertedAmount, exchangeRate, rateSource } = calculateConversion(amount, currency, expenseDate, rateMap);
 
   // Transform to DB schema
   const data = {
@@ -180,7 +197,7 @@ function validateExpense(row) {
     account: row.Mean?.trim() || null
   };
 
-  return { valid: true, data };
+  return { valid: true, data, rateSource };
 }
 
 /**
