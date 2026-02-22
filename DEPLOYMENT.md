@@ -22,18 +22,27 @@ supabase link --project-ref your-project-ref
 
 # Push migrations (creates all tables)
 supabase db push
-
-# Seed production data (historical data from supabase/seeds/prod/)
-# Option 1: Run all seed files via psql
-psql $(supabase status | grep "DB URL" | awk '{print $3}') -f supabase/seeds/prod/01_seed_all.sql
-psql $(supabase status | grep "DB URL" | awk '{print $3}') -f supabase/seeds/prod/02_import_normalized.sql
-
-# Option 2: Copy and paste seed SQL in Supabase Dashboard → SQL Editor
-
-# Verify in Supabase Dashboard → Table Editor
 ```
 
-**Note:** Production seeds contain real historical data and should be run to populate initial accounts, categories, budget allocations, and expenses.
+> **Note:** `supabase db reset` only works locally. For production, you must seed manually (below).
+
+### Seed Production Data
+
+Seeds live in `supabase/seeds/prod/` and contain real historical data. Run them against the **production** DB URL (found in Supabase Dashboard → Project Settings → Database → Connection string):
+
+```bash
+# Use the production connection string from Supabase Dashboard
+PROD_DB_URL="postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres"
+
+psql "$PROD_DB_URL" -f supabase/seeds/prod/01_seed_all.sql
+psql "$PROD_DB_URL" -f supabase/seeds/prod/02_import_normalized.sql
+```
+
+Alternatively, copy and paste each seed file's SQL into Supabase Dashboard → SQL Editor.
+
+> **Important:** `02_import_normalized.sql` is auto-generated from CSVs via `npm run seed:transform`. Run this locally first if the file is out of date.
+
+Verify results in Supabase Dashboard → Table Editor.
 
 ## Step 3: Get Supabase Credentials
 
@@ -106,9 +115,10 @@ supabase db push
 
 **Rollback:**
 ```bash
-# Supabase doesn't support automatic rollback
-# Create a new migration that reverses changes
-supabase migration new rollback_feature_name
+# Supabase doesn't support automatic rollback.
+# This project uses a single migration file (20260116_initial_schema.sql).
+# To roll back: edit the migration file and run supabase db push again,
+# or apply a compensating SQL change directly via the Dashboard → SQL Editor.
 ```
 
 ### Viewing Data
