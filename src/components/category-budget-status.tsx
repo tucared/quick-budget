@@ -43,28 +43,18 @@ export function CategoryBudgetStatus({
 
   return (
     <div className={`p-3 rounded-md border ${statusColor.bg} ${statusColor.border}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          {budget.category_icon && (
-            <span className="text-lg">{budget.category_icon}</span>
-          )}
-          <span className="font-medium text-sm">{budget.category_name}</span>
-        </div>
-        <span className={`text-xs font-semibold ${statusColor.text} flex items-center gap-1`}>
-          <span>{getBudgetStatusIcon(newPercentSpent)}</span>
-          <span>{formatNumber(newPercentSpent, 0)} %</span>
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div className="mb-2">
-        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+      {/* Progress bar with percentage */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-300 ${statusColor.indicator}`}
             style={{ width: `${Math.min(newPercentSpent, 100)}%` }}
           />
         </div>
+        <span className={`text-xs font-semibold ${statusColor.text} flex items-center gap-1 shrink-0`}>
+          <span>{getBudgetStatusIcon(newPercentSpent)}</span>
+          <span>{formatNumber(newPercentSpent, 0)}%</span>
+        </span>
       </div>
 
       {/* Budget details */}
