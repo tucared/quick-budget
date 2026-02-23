@@ -1,29 +1,27 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
 import type { ExpenseWithDetails, Category } from "@/lib/types"
-import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
 
 interface ExpenseListClientProps {
-  initialExpenses: ExpenseWithDetails[]
-  initialCategories: Category[]
+  expenses: ExpenseWithDetails[]
+  categories: Category[]
   householdId: string
 }
 
 export function ExpenseListClient({
-  initialExpenses,
-  initialCategories,
+  expenses,
+  categories: categoryList,
   householdId: _householdId,
 }: ExpenseListClientProps) {
-  const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
-  const [categories, setCategories] = useState<Map<string, Category>>(() => {
+  const categories = useMemo(() => {
     const map = new Map<string, Category>()
-    initialCategories.forEach((cat) => map.set(cat.id, cat))
+    categoryList.forEach((cat) => map.set(cat.id, cat))
     return map
-  })
+  }, [categoryList])
   const [visibleCount, setVisibleCount] = useState(10)
 
   const {
@@ -35,35 +33,16 @@ export function ExpenseListClient({
     clearDeletingId,
   } = useExpenseDelete()
 
-  // Update state when initial data changes
+  // Clean up deleting animation state when expense is removed from list (via realtime DELETE)
   useEffect(() => {
-    setExpenses(initialExpenses)
-  }, [initialExpenses])
-
-  useEffect(() => {
-    const map = new Map<string, Category>()
-    initialCategories.forEach((cat) => map.set(cat.id, cat))
-    setCategories(map)
-  }, [initialCategories])
-
-  // Subscribe to real-time expense changes
-  useExpenseSubscription(
-    (event) => {
-      if (event.type === "INSERT") {
-        setExpenses((prev) => [event.new as ExpenseWithDetails, ...prev.slice(0, 19)])
-      } else if (event.type === "UPDATE") {
-        const updatedExpense = event.new as ExpenseWithDetails
-        setExpenses((prev) =>
-          prev.map((exp) => (exp.id === updatedExpense.id ? updatedExpense : exp))
-        )
-      } else if (event.type === "DELETE") {
-        const deletedExpense = event.old as ExpenseWithDetails
-        setExpenses((prev) => prev.filter((exp) => exp.id !== deletedExpense.id))
-        clearDeletingId(deletedExpense.id)
+    if (deletingIds.size === 0) return
+    const expenseIds = new Set(expenses.map((e) => e.id))
+    deletingIds.forEach((id) => {
+      if (!expenseIds.has(id)) {
+        clearDeletingId(id)
       }
-    },
-    true
-  )
+    })
+  }, [expenses, deletingIds, clearDeletingId])
 
   if (expenses.length === 0) {
     return (
