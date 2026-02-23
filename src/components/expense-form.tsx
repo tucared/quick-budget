@@ -7,7 +7,7 @@ import { Check } from "lucide-react"
 import { format, startOfMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
-import { getStorageKeys, type Category, type BudgetSummary } from "@/lib/types"
+import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
 import { convertToEUR, fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
@@ -25,9 +25,10 @@ import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface ExpenseFormProps {
   onSuccess?: () => void
+  onExpenseSaved?: (expense: Expense) => void
 }
 
-export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
+export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
   const { user } = useUser()
   const storageKeys = useMemo(
     () => (user?.householdId ? getStorageKeys(user.householdId) : null),
@@ -254,7 +255,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         return
       }
 
-      setLoadingBudget(true)
+      // Only show loading skeleton on initial load, not on refreshes (stale-while-revalidate)
+      if (!categoryBudget || categoryBudget.category_id !== selectedCategory) {
+        setLoadingBudget(true)
+      }
 
       try {
         const supabase = createClient()
@@ -283,6 +287,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     }
 
     loadCategoryBudget()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- categoryBudget intentionally excluded to avoid refetch loop
   }, [selectedCategory, user, categories, budgetRefreshTick])
 
   // Refresh budget status when any expense changes externally (partner added/deleted/updated)
@@ -319,8 +324,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       const exchangeRate = await fetchExchangeRateFromAPI(currency, data.expense_date)
       const convertedAmount = data.amount * exchangeRate
 
-      // Insert expense
-      const { error: insertError } = await supabase.from("expenses").insert({
+      // Insert expense and return the saved row
+      const { data: savedExpense, error: insertError } = await supabase.from("expenses").insert({
         logged_by_user_id: user.id,
         household_id: user.householdId,
         category_id: data.category_id,
@@ -332,12 +337,17 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         exchange_rate: exchangeRate,
         expense_date: data.expense_date,
         description: data.description || null,
-      })
+      }).select().single()
 
       if (insertError) {
         setError(getErrorMessage(insertError))
         setLoading(false)
         return
+      }
+
+      // Notify parent immediately for optimistic list update
+      if (savedExpense && onExpenseSaved) {
+        onExpenseSaved(savedExpense)
       }
 
       // Save defaults to localStorage and track usage (namespaced by household)
