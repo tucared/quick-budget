@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
-import { GroupedCombobox, type GroupedOption } from "@/components/grouped-combobox"
+import { type GroupedOption } from "@/components/grouped-combobox"
+import { CategoryTileSelector } from "@/components/category-tile-selector"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -38,6 +39,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [loadError, setLoadError] = useState("")
   const [error, setError] = useState("")
   const [showSuccess, setShowSuccess] = useState(false)
+  const [topCategoryIds, setTopCategoryIds] = useState<string[]>([])
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
@@ -166,6 +168,49 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
         if (categoriesData) {
           setCategories(categoriesData)
+        }
+
+        // Fetch top categories by expense count in the last 30 days
+        const thirtyDaysAgo = format(
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          "yyyy-MM-dd"
+        )
+        const { data: recentExpenses } = await supabase
+          .from("expenses")
+          .select("category_id")
+          .eq("household_id", householdId)
+          .gte("expense_date", thirtyDaysAgo)
+
+        if (recentExpenses && categoriesData) {
+          // Count expenses per category
+          const counts: Record<string, number> = {}
+          for (const exp of recentExpenses) {
+            if (exp.category_id) {
+              counts[exp.category_id] = (counts[exp.category_id] || 0) + 1
+            }
+          }
+
+          // Active category IDs for filtering
+          const activeCategoryIds = new Set(categoriesData.map((c) => c.id))
+
+          // Rank by count descending, take top 5
+          const ranked = Object.entries(counts)
+            .filter(([id]) => activeCategoryIds.has(id))
+            .sort((a, b) => b[1] - a[1])
+            .map(([id]) => id)
+            .slice(0, 5)
+
+          // If fewer than 5, fill with remaining active categories alphabetically
+          if (ranked.length < 5) {
+            const rankedSet = new Set(ranked)
+            const fillers = categoriesData
+              .filter((c) => !rankedSet.has(c.id))
+              .map((c) => c.id)
+              .slice(0, 5 - ranked.length)
+            ranked.push(...fillers)
+          }
+
+          setTopCategoryIds(ranked)
         }
 
         // Load smart defaults from localStorage (namespaced by household)
@@ -356,10 +401,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         {/* Amount + currency toggle Skeleton */}
         <Skeleton className="h-14 w-full" />
 
-        {/* Category Skeleton */}
+        {/* Category tile grid Skeleton */}
         <div className="space-y-2">
           <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-10 w-full" />
+          <div className="grid grid-cols-3 gap-1.5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-[3.25rem] w-full rounded-lg" />
+            ))}
+          </div>
         </div>
 
         {/* Date Skeleton */}
@@ -452,16 +501,15 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         )}
       </div>
 
-      {/* Category */}
+      {/* Category - tile grid for quick selection */}
       <div className="space-y-2">
         <Label htmlFor="category">Category *</Label>
-        <GroupedCombobox
-          options={getCategoryOptions()}
+        <CategoryTileSelector
+          categories={categories}
+          topCategoryIds={topCategoryIds}
           value={selectedCategory}
           onValueChange={(value) => setValue("category_id", value)}
-          placeholder="Select a category"
-          searchPlaceholder="Search categories..."
-          emptyMessage="No category found."
+          allOptions={getCategoryOptions()}
         />
         {errors.category_id && (
           <p className="text-sm text-destructive">
