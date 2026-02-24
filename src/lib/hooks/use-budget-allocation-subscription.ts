@@ -53,17 +53,36 @@ class BudgetAllocationSubscriptionManager {
           })
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error(`Budget allocation subscription ${status}:`, err)
+          this.removeChannel(householdId)
+          const subscribers = this.householdSubscribers.get(householdId)
+          if (subscribers && subscribers.size > 0) {
+            setTimeout(() => {
+              if (this.householdSubscribers.get(householdId)?.size) {
+                this.createSubscription(householdId)
+              }
+            }, 5000)
+          }
+        } else if (status === "CLOSED") {
+          console.warn("Budget allocation subscription closed")
+        }
+      })
 
     this.channels.set(householdId, channel)
   }
 
-  private cleanup(householdId: string) {
+  private removeChannel(householdId: string) {
     const channel = this.channels.get(householdId)
     if (channel) {
       this.supabase.removeChannel(channel)
       this.channels.delete(householdId)
     }
+  }
+
+  private cleanup(householdId: string) {
+    this.removeChannel(householdId)
     this.householdSubscribers.delete(householdId)
   }
 }
