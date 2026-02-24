@@ -22,18 +22,13 @@ export function BudgetHistoryMini({ categoryId, history }: BudgetHistoryMiniProp
   return (
     <div className="flex gap-3">
       {rows.map((row) => {
-        const allocated = Number(row.allocated_amount)
         const spent = Number(row.spent_amount)
-        const over = spent > allocated
         return (
-          <div key={row.budget_month} className="text-xs">
+          <div key={row.budget_month} className="text-xs text-center">
             <div className="text-muted-foreground font-medium">
               {format(parseISO(row.budget_month!), "MMM")}
             </div>
-            <div>
-              {formatCurrency(allocated, 0)}
-            </div>
-            <div className={over ? "text-destructive" : "text-green-600"}>
+            <div className="text-muted-foreground">
               {formatCurrency(spent, 0)}
             </div>
           </div>
