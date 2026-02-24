@@ -25,7 +25,7 @@ export function ExpensesPageClient({
   // Called immediately after the form saves — adds expense to list without waiting for realtime
   const handleExpenseSaved = useCallback((expense: Expense) => {
     optimisticIdsRef.current.add(expense.id)
-    setExpenses((prev) => [expense as ExpenseWithDetails, ...prev])
+    setExpenses((prev) => [expense as ExpenseWithDetails, ...prev].slice(0, 50))
   }, [])
 
   // Handle realtime events for partner-initiated changes and deletes/updates
@@ -38,7 +38,7 @@ export function ExpensesPageClient({
         return
       }
       // Partner added an expense — add to list (dedup by ID in case of race)
-      setExpenses((prev) => prev.some((exp) => exp.id === newExpense.id) ? prev : [newExpense, ...prev])
+      setExpenses((prev) => prev.some((exp) => exp.id === newExpense.id) ? prev : [newExpense, ...prev].slice(0, 50))
     } else if (event.type === "UPDATE") {
       const updated = event.new as ExpenseWithDetails
       setExpenses((prev) =>
