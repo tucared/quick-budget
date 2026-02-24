@@ -42,8 +42,11 @@ export function BudgetPageContent({
   const [editOpen, setEditOpen] = useState(false)
   const [rebalanceOpen, setRebalanceOpen] = useState(false)
   const [rebalanceDestId, setRebalanceDestId] = useState<string | null>(null)
-  const [selectedBudget, setSelectedBudget] = useState<BudgetSummary | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [categoryExpenseDialogOpen, setCategoryExpenseDialogOpen] = useState(false)
+  const selectedBudget = selectedCategoryId
+    ? ([...budgets, ...allowances].find((b) => b.category_id === selectedCategoryId) ?? null)
+    : null
 
   const isCurrentMonth =
     format(startOfMonth(new Date()), "yyyy-MM-dd") === budgetMonth
@@ -85,8 +88,11 @@ export function BudgetPageContent({
     if (!expense) return
 
     // Only apply changes for the current budget month
-    const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
-    if (expenseMonth !== budgetMonth) return
+    // For DELETE events the old record may lack expense_date; skip the month filter rather than crashing
+    if (expense.expense_date) {
+      const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
+      if (expenseMonth !== budgetMonth) return
+    }
 
     // Helper: recompute derived budget fields after mutating spent_amount
     function recompute(b: BudgetSummary): BudgetSummary {
@@ -149,7 +155,7 @@ export function BudgetPageContent({
   useBudgetAllocationSubscription(reloadBudgets, true)
 
   const handleCategoryClick = (budget: BudgetSummary) => {
-    setSelectedBudget(budget)
+    setSelectedCategoryId(budget.category_id)
     setCategoryExpenseDialogOpen(true)
   }
 
