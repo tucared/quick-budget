@@ -29,6 +29,10 @@ export function useExpenseDelete() {
         next.delete(expenseId)
         return next
       })
+    } else {
+      // Fallback: clear deleting state after 5s in case the realtime
+      // DELETE event is delayed or lost (normally it clears it sooner)
+      setTimeout(() => clearDeletingId(expenseId), 5000)
     }
   }
 

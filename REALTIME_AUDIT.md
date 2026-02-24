@@ -18,10 +18,12 @@ Neither subscription manager checks the return value of `.subscribe()` or handle
 
 ## Medium Impact
 
-### 3. `deletingIds` never cleared on success
+### ~~3. `deletingIds` never cleared on success~~ (Fixed)
 **File:** `use-expense-delete.ts:16-33`
 
-On successful delete, `deletingIds` is never explicitly cleared within the hook. Cleanup relies on the realtime DELETE event removing the expense from parent state. If the realtime event is delayed or lost, the expense card stays in "deleting" visual state indefinitely. A timeout fallback would be more robust.
+~~On successful delete, `deletingIds` is never explicitly cleared within the hook. Cleanup relies on the realtime DELETE event removing the expense from parent state. If the realtime event is delayed or lost, the expense card stays in "deleting" visual state indefinitely. A timeout fallback would be more robust.~~
+
+**Fix:** On successful delete, a 5-second timeout fallback now clears the deleting state, so the UI recovers even if the realtime DELETE event is delayed or lost.
 
 ### 4. Module-level singleton Supabase clients
 **Files:** `use-expense-subscription.ts:25`, `use-budget-allocation-subscription.ts:13`
