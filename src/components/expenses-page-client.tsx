@@ -37,8 +37,8 @@ export function ExpensesPageClient({
         optimisticIdsRef.current.delete(newExpense.id)
         return
       }
-      // Partner added an expense — add to list
-      setExpenses((prev) => [newExpense, ...prev])
+      // Partner added an expense — add to list (dedup by ID in case of race)
+      setExpenses((prev) => prev.some((exp) => exp.id === newExpense.id) ? prev : [newExpense, ...prev])
     } else if (event.type === "UPDATE") {
       const updated = event.new as ExpenseWithDetails
       setExpenses((prev) =>
