@@ -11,7 +11,6 @@ import { getStorageKeys, type Category, type Expense, type BudgetSummary } from 
 import { convertToEUR, fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
