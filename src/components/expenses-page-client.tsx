@@ -25,6 +25,8 @@ export function ExpensesPageClient({
   // Called immediately after the form saves — adds expense to list without waiting for realtime
   const handleExpenseSaved = useCallback((expense: Expense) => {
     optimisticIdsRef.current.add(expense.id)
+    // Prune after 10s in case the realtime INSERT echo never arrives
+    setTimeout(() => { optimisticIdsRef.current.delete(expense.id) }, 10_000)
     setExpenses((prev) => [expense as ExpenseWithDetails, ...prev].slice(0, 50))
   }, [])
 
