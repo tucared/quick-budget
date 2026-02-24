@@ -84,15 +84,6 @@ export function BudgetPageContent({
 
   // Apply expense changes optimistically so there's no reload flash
   useExpenseSubscription((event) => {
-    const expense = (event.type === "DELETE" ? event.old : event.new) as Expense | undefined
-    if (!expense) return
-
-    // Only apply changes for the current budget month
-    // If expense_date is missing (unlikely with REPLICA IDENTITY FULL), skip the event entirely
-    if (!expense.expense_date) return
-    const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
-    if (expenseMonth !== budgetMonth) return
-
     // Helper: recompute derived budget fields after mutating spent_amount
     function recompute(b: BudgetSummary): BudgetSummary {
       const remaining = Number(b.allocated_amount) - Number(b.spent_amount)
@@ -117,6 +108,30 @@ export function BudgetPageContent({
       )
     }
 
+    // With RLS enabled, DELETE events only contain the primary key in `old`.
+    // Look up the full expense from local state to get amount/category.
+    if (event.type === "DELETE") {
+      const oldId = (event.old as { id: string }).id
+      setExpenses((prev) => {
+        const deleted = prev.find((e) => e.id === oldId)
+        if (deleted) {
+          const delta = -Number(deleted.converted_amount)
+          setBudgets((b) => applyDelta(b, deleted.category_id, delta))
+          setAllowances((a) => applyDelta(a, deleted.category_id, delta))
+        }
+        return prev.filter((e) => e.id !== oldId)
+      })
+      return
+    }
+
+    const expense = event.new as Expense | undefined
+    if (!expense) return
+
+    // Only apply changes for the current budget month
+    if (!expense.expense_date) return
+    const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
+    if (expenseMonth !== budgetMonth) return
+
     if (event.type === "INSERT") {
       const newExpense = event.new as Expense
       setExpenses((prev) => {
@@ -126,12 +141,6 @@ export function BudgetPageContent({
       const delta = Number(newExpense.converted_amount)
       setBudgets((prev) => applyDelta(prev, newExpense.category_id, delta))
       setAllowances((prev) => applyDelta(prev, newExpense.category_id, delta))
-    } else if (event.type === "DELETE") {
-      const oldExpense = event.old as Expense
-      setExpenses((prev) => prev.filter((e) => e.id !== oldExpense.id))
-      const delta = -Number(oldExpense.converted_amount)
-      setBudgets((prev) => applyDelta(prev, oldExpense.category_id, delta))
-      setAllowances((prev) => applyDelta(prev, oldExpense.category_id, delta))
     } else if (event.type === "UPDATE") {
       const oldExpense = event.old as Expense
       const newExpense = event.new as Expense
