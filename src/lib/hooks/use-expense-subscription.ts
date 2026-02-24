@@ -22,7 +22,14 @@ class ExpenseSubscriptionManager {
     Set<ExpenseChangeCallback>
   >()
   private channels = new Map<string, RealtimeChannel>()
-  private supabase = createClient()
+  private supabase: ReturnType<typeof createClient> | null = null
+
+  private getClient() {
+    if (!this.supabase) {
+      this.supabase = createClient()
+    }
+    return this.supabase
+  }
 
   subscribe(
     householdId: string,
@@ -57,7 +64,7 @@ class ExpenseSubscriptionManager {
     // Create a household-specific channel
     const channelName = `expenses_household_${householdId}`
 
-    const channel = this.supabase
+    const channel = this.getClient()
       .channel(channelName)
       .on(
         "postgres_changes",
@@ -109,7 +116,7 @@ class ExpenseSubscriptionManager {
   private removeChannel(householdId: string) {
     const channel = this.channels.get(householdId)
     if (channel) {
-      this.supabase.removeChannel(channel)
+      this.getClient().removeChannel(channel)
       this.channels.delete(householdId)
     }
   }

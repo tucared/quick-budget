@@ -10,7 +10,14 @@ export type BudgetAllocationChangeCallback = () => void
 class BudgetAllocationSubscriptionManager {
   private householdSubscribers = new Map<string, Set<BudgetAllocationChangeCallback>>()
   private channels = new Map<string, RealtimeChannel>()
-  private supabase = createClient()
+  private supabase: ReturnType<typeof createClient> | null = null
+
+  private getClient() {
+    if (!this.supabase) {
+      this.supabase = createClient()
+    }
+    return this.supabase
+  }
 
   subscribe(householdId: string, callback: BudgetAllocationChangeCallback): () => void {
     if (!this.householdSubscribers.has(householdId)) {
@@ -32,7 +39,7 @@ class BudgetAllocationSubscriptionManager {
   }
 
   private createSubscription(householdId: string) {
-    const channel = this.supabase
+    const channel = this.getClient()
       .channel(`budget_allocations_household_${householdId}`)
       .on(
         "postgres_changes",
@@ -76,7 +83,7 @@ class BudgetAllocationSubscriptionManager {
   private removeChannel(householdId: string) {
     const channel = this.channels.get(householdId)
     if (channel) {
-      this.supabase.removeChannel(channel)
+      this.getClient().removeChannel(channel)
       this.channels.delete(householdId)
     }
   }
