@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
-import { format, parseISO, startOfMonth } from "date-fns"
+import { format, startOfMonth } from "date-fns"
 import { Pencil, Plus } from "lucide-react"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
@@ -79,25 +79,73 @@ export function BudgetPageContent({
       })
   }
 
-  function reloadExpenses() {
-    const supabase = createClient()
-    const currentDate = parseISO(budgetMonth)
-    const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
-    supabase
-      .from("expenses")
-      .select("*")
-      .eq("household_id", householdId)
-      .gte("expense_date", budgetMonth)
-      .lt("expense_date", format(nextMonth, "yyyy-MM-dd"))
-      .order("expense_date", { ascending: true })
-      .then(({ data, error: reloadError }) => {
-        if (reloadError) setError(getErrorMessage(reloadError))
-        else if (data) setExpenses(data as Expense[])
-      })
-  }
+  // Apply expense changes optimistically so there's no reload flash
+  useExpenseSubscription((event) => {
+    const expense = (event.type === "DELETE" ? event.old : event.new) as Expense | undefined
+    if (!expense) return
 
-  // Reload budgets and expenses when expenses or budget allocations change (real-time)
-  useExpenseSubscription(() => { reloadBudgets(); reloadExpenses() }, true)
+    // Only apply changes for the current budget month
+    const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
+    if (expenseMonth !== budgetMonth) return
+
+    // Helper: recompute derived budget fields after mutating spent_amount
+    function recompute(b: BudgetSummary): BudgetSummary {
+      const remaining = Number(b.allocated_amount) - Number(b.spent_amount)
+      const percent =
+        Number(b.allocated_amount) > 0
+          ? (Number(b.spent_amount) / Number(b.allocated_amount)) * 100
+          : 0
+      return { ...b, remaining_amount: remaining, percent_spent: percent }
+    }
+
+    // Helper: apply a delta to the matching category row
+    function applyDelta(
+      list: BudgetSummary[],
+      categoryId: string | null | undefined,
+      delta: number
+    ): BudgetSummary[] {
+      if (!categoryId) return list
+      return list.map((b) =>
+        b.category_id === categoryId
+          ? recompute({ ...b, spent_amount: Number(b.spent_amount) + delta })
+          : b
+      )
+    }
+
+    if (event.type === "INSERT") {
+      const newExpense = event.new as Expense
+      setExpenses((prev) => {
+        if (prev.some((e) => e.id === newExpense.id)) return prev
+        return [...prev, newExpense]
+      })
+      const delta = Number(newExpense.converted_amount)
+      setBudgets((prev) => applyDelta(prev, newExpense.category_id, delta))
+      setAllowances((prev) => applyDelta(prev, newExpense.category_id, delta))
+    } else if (event.type === "DELETE") {
+      const oldExpense = event.old as Expense
+      setExpenses((prev) => prev.filter((e) => e.id !== oldExpense.id))
+      const delta = -Number(oldExpense.converted_amount)
+      setBudgets((prev) => applyDelta(prev, oldExpense.category_id, delta))
+      setAllowances((prev) => applyDelta(prev, oldExpense.category_id, delta))
+    } else if (event.type === "UPDATE") {
+      const oldExpense = event.old as Expense
+      const newExpense = event.new as Expense
+      setExpenses((prev) => prev.map((e) => (e.id === newExpense.id ? newExpense : e)))
+      const delta = Number(newExpense.converted_amount) - Number(oldExpense.converted_amount)
+      // Also handle category reassignment
+      if (oldExpense.category_id !== newExpense.category_id) {
+        setBudgets((prev) =>
+          applyDelta(applyDelta(prev, oldExpense.category_id, -Number(oldExpense.converted_amount)), newExpense.category_id, Number(newExpense.converted_amount))
+        )
+        setAllowances((prev) =>
+          applyDelta(applyDelta(prev, oldExpense.category_id, -Number(oldExpense.converted_amount)), newExpense.category_id, Number(newExpense.converted_amount))
+        )
+      } else {
+        setBudgets((prev) => applyDelta(prev, newExpense.category_id, delta))
+        setAllowances((prev) => applyDelta(prev, newExpense.category_id, delta))
+      }
+    }
+  }, true)
   useBudgetAllocationSubscription(reloadBudgets, true)
 
   const handleCategoryClick = (budget: BudgetSummary) => {
