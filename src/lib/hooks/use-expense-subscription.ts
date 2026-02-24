@@ -85,17 +85,37 @@ class ExpenseSubscriptionManager {
           })
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error(`Expense subscription ${status}:`, err)
+          // Remove channel but keep subscribers for retry
+          this.removeChannel(householdId)
+          const subscribers = this.householdSubscribers.get(householdId)
+          if (subscribers && subscribers.size > 0) {
+            setTimeout(() => {
+              if (this.householdSubscribers.get(householdId)?.size) {
+                this.createSubscription(householdId)
+              }
+            }, 5000)
+          }
+        } else if (status === "CLOSED") {
+          console.warn("Expense subscription closed")
+        }
+      })
 
     this.channels.set(householdId, channel)
   }
 
-  private cleanup(householdId: string) {
+  private removeChannel(householdId: string) {
     const channel = this.channels.get(householdId)
     if (channel) {
       this.supabase.removeChannel(channel)
       this.channels.delete(householdId)
     }
+  }
+
+  private cleanup(householdId: string) {
+    this.removeChannel(householdId)
     this.householdSubscribers.delete(householdId)
   }
 }
