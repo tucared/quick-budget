@@ -88,11 +88,10 @@ export function BudgetPageContent({
     if (!expense) return
 
     // Only apply changes for the current budget month
-    // For DELETE events the old record may lack expense_date; skip the month filter rather than crashing
-    if (expense.expense_date) {
-      const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
-      if (expenseMonth !== budgetMonth) return
-    }
+    // If expense_date is missing (unlikely with REPLICA IDENTITY FULL), skip the event entirely
+    if (!expense.expense_date) return
+    const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
+    if (expenseMonth !== budgetMonth) return
 
     // Helper: recompute derived budget fields after mutating spent_amount
     function recompute(b: BudgetSummary): BudgetSummary {
