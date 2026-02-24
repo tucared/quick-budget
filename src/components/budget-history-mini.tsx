@@ -12,7 +12,7 @@ interface BudgetHistoryMiniProps {
 export function BudgetHistoryMini({ categoryId, history }: BudgetHistoryMiniProps) {
   const rows = history
     .filter((h) => h.category_id === categoryId)
-    .sort((a, b) => (a.budget_month! > b.budget_month! ? -1 : 1))
+    .sort((a, b) => (a.budget_month! > b.budget_month! ? 1 : -1))
     .slice(0, 3)
 
   if (rows.length === 0) {
