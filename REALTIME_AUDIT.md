@@ -9,10 +9,12 @@ Findings from auditing the subscription/state update patterns across the codebas
 
 Neither subscription manager checks the return value of `.subscribe()` or handles status callbacks (`CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`). If the WebSocket connection drops, users silently stop receiving realtime updates with no indication. Supabase JS v2 has built-in reconnection, but channel-level errors are not surfaced.
 
-### 2. Undebounced budget refetch in expense form
+### ~~2. Undebounced budget refetch in expense form~~ (Fixed)
 **File:** `expense-form.tsx:294-296`
 
-Every expense event (INSERT/UPDATE/DELETE across the entire household) triggers a full budget re-query via `setBudgetRefreshTick`. No debouncing or throttling. Rapid expense entry (or a partner bulk-entering) causes a cascade of database queries.
+~~Every expense event (INSERT/UPDATE/DELETE across the entire household) triggers a full budget re-query via `setBudgetRefreshTick`. No debouncing or throttling. Rapid expense entry (or a partner bulk-entering) causes a cascade of database queries.~~
+
+**Fix:** `budgetRefreshTick` is now debounced with a 500ms delay via `useDebouncedValue`, so rapid realtime events coalesce into a single budget query.
 
 ## Medium Impact
 

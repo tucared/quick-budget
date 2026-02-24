@@ -43,6 +43,7 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
+  const debouncedBudgetRefreshTick = useDebouncedValue(budgetRefreshTick, 500)
 
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
@@ -287,7 +288,7 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
 
     loadCategoryBudget()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- categoryBudget intentionally excluded to avoid refetch loop
-  }, [selectedCategory, user, categories, budgetRefreshTick])
+  }, [selectedCategory, user, categories, debouncedBudgetRefreshTick])
 
   // Refresh budget status when any expense changes externally (partner added/deleted/updated)
   useExpenseSubscription(() => {
