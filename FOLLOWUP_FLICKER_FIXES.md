@@ -15,5 +15,5 @@ Fixed: expense realtime events now apply optimistically (INSERT/UPDATE/DELETE mu
 ### Cap expense list state size
 The old code capped the in-memory list at 20 items (`prev.slice(0, 19)`). The new code grows unboundedly with each INSERT. Should add a cap (e.g., 50) to keep memory bounded, since only `visibleCount` items are rendered anyway.
 
-### Realtime / optimistic dedup race
-If the Supabase realtime INSERT event arrives before the `.select().single()` response, the `optimisticIdsRef` dedup won't catch it, briefly showing a duplicate. Extremely unlikely but could be guarded by also deduplicating on insert (check if ID already exists in list).
+### ~~Realtime / optimistic dedup race~~
+Fixed: realtime INSERT handler now checks `prev.some((exp) => exp.id === newExpense.id)` before adding, so a duplicate is never inserted even if the realtime event races ahead of the `.select().single()` response.
