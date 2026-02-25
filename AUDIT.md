@@ -23,7 +23,7 @@ Last updated: 2026-02-24
 | # | Issue | Location | Fix |
 |---|-------|----------|-----|
 | ~~7~~ | ~~**`useUser` makes 2 sequential DB calls on every client mount** (on top of server-side fetch)~~ | ~~`use-user.ts:26`~~ | ~~Fixed: `UserProvider` now accepts `initialUser` from the server layout, skipping redundant client-side auth + DB queries~~ |
-| 8 | **Expense form fetches all 30-day expenses for category ranking** | `expense-form.tsx:175` | Use `GROUP BY category_id ORDER BY count DESC LIMIT 5` in the query |
+| ~~8~~ | ~~**Expense form fetches all 30-day expenses for category ranking**~~ | ~~`expense-form.tsx:175`~~ | ~~Fixed: created `top_categories_by_usage` RPC that aggregates with `GROUP BY` server-side, returning only top 5 category IDs~~ |
 | 9 | **`reloadBudgets` runs 2 queries sequentially** | `budget-page-content.tsx:59` | Use `Promise.all()` to parallelize |
 
 ## High — UX

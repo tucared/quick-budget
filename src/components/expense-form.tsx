@@ -171,35 +171,18 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
           setCategories(categoriesData)
         }
 
-        // Fetch top categories by expense count in the last 30 days
-        const thirtyDaysAgo = format(
-          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-          "yyyy-MM-dd"
-        )
-        const { data: recentExpenses } = await supabase
-          .from("expenses")
-          .select("category_id")
-          .eq("household_id", householdId)
-          .gte("expense_date", thirtyDaysAgo)
+        // Fetch top 5 categories by expense count in the last 30 days (server-side aggregation)
+        if (categoriesData) {
+          const { data: topCategories } = await supabase.rpc(
+            "top_categories_by_usage",
+            { p_household_id: householdId, p_limit: 5 }
+          )
 
-        if (recentExpenses && categoriesData) {
-          // Count expenses per category
-          const counts: Record<string, number> = {}
-          for (const exp of recentExpenses) {
-            if (exp.category_id) {
-              counts[exp.category_id] = (counts[exp.category_id] || 0) + 1
-            }
-          }
-
-          // Active category IDs for filtering
-          const activeCategoryIds = new Set(categoriesData.map((c) => c.id))
-
-          // Rank by count descending, take top 5
-          const ranked = Object.entries(counts)
-            .filter(([id]) => activeCategoryIds.has(id))
-            .sort((a, b) => b[1] - a[1])
-            .map(([id]) => id)
-            .slice(0, 5)
+          const ranked = topCategories
+            ? topCategories.map(
+                (r: { category_id: string }) => r.category_id
+              )
+            : []
 
           // If fewer than 5, fill with remaining active categories alphabetically
           if (ranked.length < 5) {
