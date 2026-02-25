@@ -15,7 +15,7 @@ Last updated: 2026-02-24
 | ~~2~~ | ~~**Exchange rate API is unauthenticated** — anyone can flood it~~ | ~~`api/exchange-rates/route.ts`~~ | ~~Fixed: added `getUser()` session check returning 401 for unauthenticated requests~~ |
 | ~~3~~ | ~~**Rebalance is non-atomic** — if destination update fails after source update, money disappears~~ | ~~`rebalance-dialog.tsx:115`~~ | ~~Fixed: created `rebalance_budget` RPC that performs both updates in a single transaction with row locking~~ |
 | ~~4~~ | ~~**Budget save is non-atomic** — upsert + delete are separate calls~~ | ~~`budget-edit-dialog.tsx:154`~~ | ~~Fixed: created `save_budget` RPC that upserts and deletes allocations in a single transaction~~ |
-| 5 | **No server-side validation for budget mutations** — only client-side checks on transfer amounts, no guard against negative allocations | `rebalance-dialog.tsx`, `budget-edit-dialog.tsx` | Add Zod validation in an RPC or Server Action |
+| ~~5~~ | ~~**No server-side validation for budget mutations** — only client-side checks on transfer amounts, no guard against negative allocations~~ | ~~`rebalance-dialog.tsx`, `budget-edit-dialog.tsx`~~ | ~~Fixed: added server-side guards in RPCs — `rebalance_budget` rejects transfers that would result in negative allocations (and deletes fully drained rows), `save_budget` rejects negative amounts~~ |
 | 6 | **Login exposes raw Supabase error messages** | `login/page.tsx:38` | Map all auth errors to generic "Invalid email or password" |
 
 ## High — Performance

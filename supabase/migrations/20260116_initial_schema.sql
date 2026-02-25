@@ -418,12 +418,24 @@ BEGIN
     RAISE EXCEPTION 'Source budget allocation not found';
   END IF;
 
-  -- Update source (subtract)
-  UPDATE budget_allocations
-  SET allocated_amount = allocated_amount - p_amount
-  WHERE household_id = p_household_id
-    AND category_id = p_source_category_id
-    AND budget_month = p_budget_month;
+  -- Guard against negative resulting allocation
+  IF v_source_allocated - p_amount < 0 THEN
+    RAISE EXCEPTION 'Transfer would result in negative source allocation';
+  END IF;
+
+  -- Update or delete source depending on remaining amount
+  IF v_source_allocated - p_amount = 0 THEN
+    DELETE FROM budget_allocations
+    WHERE household_id = p_household_id
+      AND category_id = p_source_category_id
+      AND budget_month = p_budget_month;
+  ELSE
+    UPDATE budget_allocations
+    SET allocated_amount = allocated_amount - p_amount
+    WHERE household_id = p_household_id
+      AND category_id = p_source_category_id
+      AND budget_month = p_budget_month;
+  END IF;
 
   -- Upsert destination (add)
   INSERT INTO budget_allocations (household_id, category_id, budget_month, allocated_amount, currency)
@@ -465,6 +477,14 @@ BEGIN
   PERFORM 1 FROM budget_allocations
   WHERE household_id = p_household_id AND budget_month = p_budget_month
   FOR UPDATE;
+
+  -- Validate no negative amounts
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_allocations) AS elem
+    WHERE (elem->>'amount')::DECIMAL < 0
+  ) THEN
+    RAISE EXCEPTION 'Allocation amounts must not be negative';
+  END IF;
 
   -- Process each allocation
   FOR v_alloc IN SELECT * FROM jsonb_array_elements(p_allocations)
