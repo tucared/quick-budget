@@ -320,6 +320,16 @@ export type Database = {
     }
     Functions: {
       get_my_household_id: { Args: never; Returns: string }
+      rebalance_budget: {
+        Args: {
+          p_amount: number
+          p_budget_month: string
+          p_dest_category_id: string
+          p_household_id: string
+          p_source_category_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

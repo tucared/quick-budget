@@ -108,39 +108,17 @@ export function RebalanceDialog({
     setError("")
 
     const supabase = createClient()
-    const sourceNewAmount = Number(sourceBudget.allocated_amount) - transferAmount
-    const destNewAmount = Number(destBudget.allocated_amount) + transferAmount
 
-    // Update source allocation
-    const { error: sourceError } = await supabase
-      .from("budget_allocations")
-      .update({ allocated_amount: sourceNewAmount })
-      .eq("household_id", householdId)
-      .eq("category_id", sourceId)
-      .eq("budget_month", budgetMonth)
+    const { error: rpcError } = await supabase.rpc("rebalance_budget", {
+      p_household_id: householdId,
+      p_budget_month: budgetMonth,
+      p_source_category_id: sourceId,
+      p_dest_category_id: destId,
+      p_amount: transferAmount,
+    })
 
-    if (sourceError) {
-      setError(getErrorMessage(sourceError))
-      setSaving(false)
-      return
-    }
-
-    // Update destination allocation (upsert in case it doesn't exist yet)
-    const { error: destError } = await supabase
-      .from("budget_allocations")
-      .upsert(
-        {
-          household_id: householdId,
-          category_id: destId,
-          budget_month: budgetMonth,
-          allocated_amount: destNewAmount,
-          currency: "EUR",
-        },
-        { onConflict: "household_id,category_id,budget_month" }
-      )
-
-    if (destError) {
-      setError(getErrorMessage(destError))
+    if (rpcError) {
+      setError(getErrorMessage(rpcError))
       setSaving(false)
       return
     }

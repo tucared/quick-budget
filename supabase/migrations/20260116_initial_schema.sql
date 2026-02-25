@@ -378,6 +378,64 @@ GROUP BY
 ALTER VIEW budget_summary SET (security_invoker = true);
 
 -- ============================================================================
+-- REBALANCE RPC
+-- ============================================================================
+-- Atomically transfers budget between two categories in a single transaction
+-- Prevents money from "disappearing" if one update fails
+CREATE OR REPLACE FUNCTION public.rebalance_budget(
+  p_household_id UUID,
+  p_budget_month DATE,
+  p_source_category_id UUID,
+  p_dest_category_id UUID,
+  p_amount DECIMAL(12, 2)
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_source_allocated DECIMAL(12, 2);
+BEGIN
+  -- Validate amount
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Transfer amount must be positive';
+  END IF;
+
+  IF p_source_category_id = p_dest_category_id THEN
+    RAISE EXCEPTION 'Source and destination must be different';
+  END IF;
+
+  -- Get current source allocation and lock the row
+  SELECT allocated_amount INTO v_source_allocated
+  FROM budget_allocations
+  WHERE household_id = p_household_id
+    AND category_id = p_source_category_id
+    AND budget_month = p_budget_month
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Source budget allocation not found';
+  END IF;
+
+  -- Update source (subtract)
+  UPDATE budget_allocations
+  SET allocated_amount = allocated_amount - p_amount
+  WHERE household_id = p_household_id
+    AND category_id = p_source_category_id
+    AND budget_month = p_budget_month;
+
+  -- Upsert destination (add)
+  INSERT INTO budget_allocations (household_id, category_id, budget_month, allocated_amount, currency)
+  VALUES (p_household_id, p_dest_category_id, p_budget_month, p_amount, 'EUR')
+  ON CONFLICT (household_id, category_id, budget_month)
+  DO UPDATE SET allocated_amount = budget_allocations.allocated_amount + p_amount;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rebalance_budget(UUID, DATE, UUID, UUID, DECIMAL) TO authenticated;
+
+-- ============================================================================
 -- REALTIME PUBLICATION
 -- ============================================================================
 -- Enable Supabase Realtime for tables that need live updates
