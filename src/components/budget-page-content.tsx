@@ -112,15 +112,20 @@ export function BudgetPageContent({
     // Look up the full expense from local state to get amount/category.
     if (event.type === "DELETE") {
       const oldId = (event.old as { id: string }).id
+      // Capture the deleted expense before removing it from state.
+      // setBudgets/setAllowances must be called OUTSIDE the setExpenses
+      // updater — React StrictMode double-invokes updater functions, which
+      // would apply the delta twice if nested inside.
+      let deleted: Expense | undefined
       setExpenses((prev) => {
-        const deleted = prev.find((e) => e.id === oldId)
-        if (deleted) {
-          const delta = -Number(deleted.converted_amount)
-          setBudgets((b) => applyDelta(b, deleted.category_id, delta))
-          setAllowances((a) => applyDelta(a, deleted.category_id, delta))
-        }
+        deleted = prev.find((e) => e.id === oldId)
         return prev.filter((e) => e.id !== oldId)
       })
+      if (deleted) {
+        const delta = -Number(deleted.converted_amount)
+        setBudgets((b) => applyDelta(b, deleted!.category_id, delta))
+        setAllowances((a) => applyDelta(a, deleted!.category_id, delta))
+      }
       return
     }
 
