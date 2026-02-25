@@ -6,7 +6,7 @@ Last updated: 2026-02-24
 
 | # | Issue | Location | Fix |
 |---|-------|----------|-----|
-| 1 | **No auth middleware** — routes are only protected by server components, so unauthenticated requests still hit the full render pipeline | Missing `src/middleware.ts` | Create middleware using `@supabase/ssr` to redirect unauthenticated users at the edge |
+| ~~1~~ | ~~**No auth middleware** — routes are only protected by server components, so unauthenticated requests still hit the full render pipeline~~ | ~~Missing `src/middleware.ts`~~ | ~~Fixed: created `src/middleware.ts` that refreshes sessions and redirects unauthenticated users at the edge~~ |
 
 ## High — Security & Data Integrity
 
