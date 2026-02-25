@@ -11,11 +11,16 @@ interface UserContextValue {
 
 const UserContext = createContext<UserContextValue | undefined>(undefined)
 
-export function UserProvider({ children }: { children: ReactNode }) {
-  const { user, loading, error } = useUserHook()
+interface UserProviderProps {
+  children: ReactNode
+  initialUser?: UserData | null
+}
+
+export function UserProvider({ children, initialUser }: UserProviderProps) {
+  const value = useUserHook(initialUser)
 
   return (
-    <UserContext.Provider value={{ user, loading, error }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   )
