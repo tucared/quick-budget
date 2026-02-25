@@ -338,6 +338,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      top_categories_by_usage: {
+        Args: { p_household_id: string; p_limit?: number }
+        Returns: {
+          category_id: string
+          expense_count: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
