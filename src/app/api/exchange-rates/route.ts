@@ -54,6 +54,15 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServerSupabaseClient()
 
+    // Verify the user is authenticated
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     // Check if rate exists in database
     const { data: cachedRate, error: selectError } = await supabase
       .from('exchange_rates')
