@@ -330,6 +330,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_budget: {
+        Args: {
+          p_allocations: Json
+          p_budget_month: string
+          p_household_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

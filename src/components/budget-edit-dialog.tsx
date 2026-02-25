@@ -148,41 +148,22 @@ export function BudgetEditDialog({
 
     const supabase = createClient()
 
-    const toUpsert = entries.filter((e) => e.cents > 0)
-    const toDelete = entries.filter((e) => e.cents === 0 && e.existingAllocationId)
+    const allocations = entries.map((e) => ({
+      category_id: e.categoryId,
+      amount: e.cents / 100,
+    }))
 
     try {
-      if (toUpsert.length > 0) {
-        const { error: upsertError } = await supabase
-          .from("budget_allocations")
-          .upsert(
-            toUpsert.map((e) => ({
-              household_id: householdId,
-              category_id: e.categoryId,
-              budget_month: budgetMonth,
-              allocated_amount: e.cents / 100,
-              currency: "EUR",
-            })),
-            { onConflict: "household_id,category_id,budget_month" }
-          )
-        if (upsertError) {
-          setError(getErrorMessage(upsertError))
-          setSaving(false)
-          return
-        }
-      }
+      const { error: rpcError } = await supabase.rpc("save_budget", {
+        p_household_id: householdId,
+        p_budget_month: budgetMonth,
+        p_allocations: allocations,
+      })
 
-      if (toDelete.length > 0) {
-        const deleteIds = toDelete.map((e) => e.existingAllocationId!)
-        const { error: deleteError } = await supabase
-          .from("budget_allocations")
-          .delete()
-          .in("id", deleteIds)
-        if (deleteError) {
-          setError(getErrorMessage(deleteError))
-          setSaving(false)
-          return
-        }
+      if (rpcError) {
+        setError(getErrorMessage(rpcError))
+        setSaving(false)
+        return
       }
 
       onOpenChange(false)
