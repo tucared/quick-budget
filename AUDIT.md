@@ -18,7 +18,7 @@ Last updated: 2026-02-25
 |---|-------|----------|-----|
 | 1 | **Missing INSERT/UPDATE/DELETE policies on `households` table** — any authenticated user can create/modify/delete households | `migrations:103-106` | Add restrictive policies (e.g. deny all mutations, or restrict UPDATE to household members) |
 | 2 | **Missing household ownership validation in RPCs** — `rebalance_budget()` and `save_budget()` accept arbitrary `p_household_id` without verifying the caller belongs to that household. RLS on underlying tables provides partial protection but the RPCs execute multiple statements | `migrations:385,455` | Add `IF p_household_id != get_my_household_id() THEN RAISE EXCEPTION; END IF;` at start of each RPC |
-| 3 | **Missing `logged_by_user_id` guard on expenses INSERT policy** — only validates `household_id`, allowing a user to impersonate another household member when logging expenses | `migrations:201-204` | Add `AND logged_by_user_id = (SELECT auth.uid())` to WITH CHECK clause |
+| ~~3~~ | ~~**Missing `logged_by_user_id` guard on expenses INSERT policy** — only validates `household_id`, allowing a user to impersonate another household member when logging expenses~~ | ~~`migrations:201-204`~~ | Fixed: added `AND logged_by_user_id = (SELECT auth.uid())` to WITH CHECK clause |
 
 ## High — Security & Data Integrity
 
@@ -84,6 +84,7 @@ Last updated: 2026-02-25
 | ~~P6~~ | ~~Login exposes raw Supabase error messages~~ | Fixed: generic error messages |
 | ~~P7~~ | ~~`useUser` makes 2 sequential DB calls on every client mount~~ | Fixed: `initialUser` from server |
 | ~~P8~~ | ~~Expense form fetches all 30-day expenses for ranking~~ | Fixed: `top_categories_by_usage` RPC |
+| ~~P9~~ | ~~Missing `logged_by_user_id` guard on expenses INSERT policy~~ | Fixed: `AND logged_by_user_id = (SELECT auth.uid())` added to WITH CHECK clause |
 
 ---
 
