@@ -12,12 +12,15 @@ export interface UserData {
  * Custom hook to load the current authenticated user and their details
  * Returns the user's display name and household ID
  */
-export function useUser() {
-  const [user, setUser] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(true)
+export function useUser(initialUser?: UserData | null) {
+  const [user, setUser] = useState<UserData | null>(initialUser ?? null)
+  const [loading, setLoading] = useState(initialUser === undefined)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Skip client-side fetch when server-provided data is available
+    if (initialUser !== undefined) return
+
     const loadUser = async () => {
       try {
         const supabase = createClient()
@@ -72,7 +75,7 @@ export function useUser() {
     }
 
     loadUser()
-  }, [])
+  }, [initialUser])
 
   return { user, loading, error }
 }
