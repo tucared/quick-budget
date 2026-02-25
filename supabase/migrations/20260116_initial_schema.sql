@@ -201,6 +201,7 @@ CREATE POLICY "Household members can view expenses" ON expenses
 CREATE POLICY "Household members can insert expenses" ON expenses
   FOR INSERT WITH CHECK (
     household_id = (SELECT household_id FROM users WHERE users.id = (SELECT auth.uid()))
+    AND logged_by_user_id = (SELECT auth.uid())
   );
 
 CREATE POLICY "Household members can update expenses" ON expenses
