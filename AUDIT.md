@@ -25,7 +25,7 @@ Last updated: 2026-02-25
 | # | Issue | Location | Fix |
 |---|-------|----------|-----|
 | ~~4~~ | ~~**No security headers configured** — missing CSP, X-Frame-Options, X-Content-Type-Options, HSTS~~ | ~~`next.config.js`~~ | Fixed: added `headers()` with CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS |
-| 5 | **No rate limiting on exchange-rate API** — authenticated but no throttling; repeated non-cached requests stress Frankfurter API | `api/exchange-rates/route.ts` | Add rate-limiting middleware or use Vercel's built-in |
+| ~~5~~ | ~~**No rate limiting on exchange-rate API** — authenticated but no throttling; repeated non-cached requests stress Frankfurter API~~ | ~~`api/exchange-rates/route.ts`~~ | Fixed: added in-memory sliding-window rate limiter (20 req/user/min) |
 | 6 | **Missing UPDATE/DELETE policies on `exchange_rates`** — any authenticated user can modify/delete cached rate history | `migrations:240-245` | Add `FOR UPDATE USING (FALSE)` and `FOR DELETE USING (FALSE)` policies |
 | 7 | **Missing DELETE policy on `users` table** — relies on default-deny; an explicit policy is safer | `migrations:100` | Add `CREATE POLICY ... FOR DELETE USING (id = auth.uid())` |
 
@@ -94,6 +94,7 @@ Last updated: 2026-02-25
 | ~~P16~~ | ~~Inconsistent decimal precision in category expense dialog~~ | Fixed: consistent 2-decimal formatting |
 | ~~P17~~ | ~~Duplicate `PGRST116` code check — unreachable branch~~ | Fixed: consolidated with message disambiguation |
 | ~~P18~~ | ~~No `aria-live` region for form success feedback~~ | Fixed: added sr-only `aria-live="polite"` region |
+| ~~P19~~ | ~~No rate limiting on exchange-rate API~~ | Fixed: in-memory sliding-window rate limiter (20 req/user/min) with 429 + Retry-After |
 
 ---
 
