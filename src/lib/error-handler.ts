@@ -60,20 +60,14 @@ export function handleSupabaseError(error: unknown): AppError {
       }
     }
 
-    // Not found errors (single() with 0 rows)
-    if (err.code === "PGRST116" || err.message?.includes("0 rows")) {
+    // PostgREST single() errors — both 0 rows and multiple rows use PGRST116
+    if (err.code === "PGRST116" || err.message?.includes("0 rows") || err.message?.includes("more than one row")) {
+      const isMultiple = err.message?.includes("more than one row")
       return {
         type: "database",
-        message: "The requested data was not found.",
-        originalError: error,
-      }
-    }
-
-    // Multiple rows when expecting one
-    if (err.code === "PGRST116" || err.message?.includes("more than one row")) {
-      return {
-        type: "database",
-        message: "Multiple records found when expecting one.",
+        message: isMultiple
+          ? "Multiple records found when expecting one."
+          : "The requested data was not found.",
         originalError: error,
       }
     }

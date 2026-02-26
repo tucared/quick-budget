@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { format, subMonths, parseISO } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
@@ -47,9 +47,9 @@ export function BudgetEditDialog({
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const activeCategories = categories.filter((c) => c.is_active)
-  const regularCategories = activeCategories.filter((c) => !c.exclude_from_budget_total)
-  const allowanceCategories = activeCategories.filter((c) => c.exclude_from_budget_total)
+  const activeCategories = useMemo(() => categories.filter((c) => c.is_active), [categories])
+  const regularCategories = useMemo(() => activeCategories.filter((c) => !c.exclude_from_budget_total), [activeCategories])
+  const allowanceCategories = useMemo(() => activeCategories.filter((c) => c.exclude_from_budget_total), [activeCategories])
 
   const loadData = useCallback(async () => {
     if (!open) return
