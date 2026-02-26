@@ -19,24 +19,18 @@ Last updated: 2026-02-26
 | 1 | **No loading state when navigating between months** | `budget/page.tsx` | Add `loading.tsx` or use `useTransition` |
 | 2 | **`autoFocus` on hidden input causes keyboard flicker on iOS** | `expense-form.tsx:455` | Test on iOS Safari; consider a visible focusable element |
 
-## Medium
-
-| # | Issue | Location | Fix |
-|---|-------|----------|-----|
-| 3 | Inconsistent RLS policy pattern — some tables use inline subquery, others use `get_my_household_id()` helper | `migrations` (categories, expenses, budget_allocations) | Refactor to use helper consistently |
-
 ## Low
 
 | # | Issue | Location | Fix |
 |---|-------|----------|-----|
-| 4 | `_householdId` prop unused in expense list and burndown chart | `expense-list-client.tsx:18`, `budget-burndown-chart-client.tsx:49` | Remove unused props |
-| 5 | `logError` is a no-op in production (no Sentry/observability) | `error-handler.ts:111` | Wire up an error reporting service |
-| 6 | No favicon | `layout.tsx` | Add `favicon.ico` to `src/app/` |
-| 7 | Duplicate subscription manager pattern (~130 lines each) | `use-expense-subscription.ts`, `use-budget-allocation-subscription.ts` | Extract generic `RealtimeSubscriptionManager<T>` |
-| 8 | Redundant `idx_exchange_rates_date` index — covered by `idx_exchange_rates_currency_date` | `migrations:249` | Remove redundant index |
-| 9 | npm audit: 2 dev-only vulnerabilities — `minimatch` (high, ReDoS) and `ajv` (moderate, ReDoS) | transitive deps | Run `npm audit fix` |
-| 10 | `console.log` in production code for weekend date adjustment | `exchange-rate-api.ts:54` | Remove or gate behind debug flag |
-| 11 | Categories table not in realtime publication — renames/additions won't push to other clients | `migrations:550-556` | Add `ALTER PUBLICATION supabase_realtime ADD TABLE categories` |
+| 3 | `_householdId` prop unused in expense list and burndown chart | `expense-list-client.tsx:18`, `budget-burndown-chart-client.tsx:49` | Remove unused props |
+| 4 | `logError` is a no-op in production (no Sentry/observability) | `error-handler.ts:111` | Wire up an error reporting service |
+| 5 | No favicon | `layout.tsx` | Add `favicon.ico` to `src/app/` |
+| 6 | Duplicate subscription manager pattern (~130 lines each) | `use-expense-subscription.ts`, `use-budget-allocation-subscription.ts` | Extract generic `RealtimeSubscriptionManager<T>` |
+| 7 | Redundant `idx_exchange_rates_date` index — covered by `idx_exchange_rates_currency_date` | `migrations:249` | Remove redundant index |
+| 8 | npm audit: 2 dev-only vulnerabilities — `minimatch` (high, ReDoS) and `ajv` (moderate, ReDoS) | transitive deps | Run `npm audit fix` |
+| 9 | `console.log` in production code for weekend date adjustment | `exchange-rate-api.ts:54` | Remove or gate behind debug flag |
+| 10 | Categories table not in realtime publication — renames/additions won't push to other clients | `migrations:550-556` | Add `ALTER PUBLICATION supabase_realtime ADD TABLE categories` |
 
 ---
 
