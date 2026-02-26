@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { createClient } from "@/lib/supabase"
-import type { RealtimeChannel } from "@supabase/supabase-js"
 import { useUser } from "./use-user"
+import { RealtimeSubscriptionManager } from "./realtime-subscription-manager"
 
 // Expense change event types
 export type ExpenseChangeEvent = {
@@ -15,120 +14,16 @@ export type ExpenseChangeEvent = {
 // Callback type for expense changes
 export type ExpenseChangeCallback = (event: ExpenseChangeEvent) => void
 
-// Module-level subscription manager with household-scoped channels
-class ExpenseSubscriptionManager {
-  private householdSubscribers = new Map<
-    string,
-    Set<ExpenseChangeCallback>
-  >()
-  private channels = new Map<string, RealtimeChannel>()
-  private supabase: ReturnType<typeof createClient> | null = null
-
-  private getClient() {
-    if (!this.supabase) {
-      this.supabase = createClient()
-    }
-    return this.supabase
-  }
-
-  subscribe(
-    householdId: string,
-    callback: ExpenseChangeCallback
-  ): () => void {
-    // Get or create subscriber set for this household
-    if (!this.householdSubscribers.has(householdId)) {
-      this.householdSubscribers.set(householdId, new Set())
-    }
-    const subscribers = this.householdSubscribers.get(householdId)!
-
-    // Add subscriber
-    subscribers.add(callback)
-
-    // Create subscription if this is the first subscriber for this household
-    if (subscribers.size === 1 && !this.channels.has(householdId)) {
-      this.createSubscription(householdId)
-    }
-
-    // Return unsubscribe function
-    return () => {
-      subscribers.delete(callback)
-
-      // Clean up subscription if no more subscribers for this household
-      if (subscribers.size === 0) {
-        this.cleanup(householdId)
-      }
-    }
-  }
-
-  private createSubscription(householdId: string) {
-    // Create a household-specific channel
-    const channelName = `expenses_household_${householdId}`
-
-    const channel = this.getClient()
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "expenses",
-          filter: `household_id=eq.${householdId}`,
-        },
-        (payload) => {
-          const event: ExpenseChangeEvent = {
-            type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
-            new: payload.new,
-            old: payload.old,
-          }
-
-          // Notify all subscribers for this household
-          const subscribers = this.householdSubscribers.get(householdId)
-          subscribers?.forEach((callback) => {
-            try {
-              callback(event)
-            } catch (error) {
-              console.error("Error in expense subscription callback:", error)
-            }
-          })
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error(`Expense subscription ${status}:`, err)
-          // Remove channel but keep subscribers for retry
-          this.removeChannel(householdId)
-          const subscribers = this.householdSubscribers.get(householdId)
-          if (subscribers && subscribers.size > 0) {
-            setTimeout(() => {
-              if (this.householdSubscribers.get(householdId)?.size) {
-                this.createSubscription(householdId)
-              }
-            }, 5000)
-          }
-        } else if (status === "CLOSED") {
-          console.warn("Expense subscription closed")
-        }
-      })
-
-    this.channels.set(householdId, channel)
-  }
-
-  private removeChannel(householdId: string) {
-    const channel = this.channels.get(householdId)
-    if (channel) {
-      this.getClient().removeChannel(channel)
-      this.channels.delete(householdId)
-    }
-  }
-
-  private cleanup(householdId: string) {
-    this.removeChannel(householdId)
-    this.householdSubscribers.delete(householdId)
-  }
-}
-
 // Singleton instance
-const subscriptionManager = new ExpenseSubscriptionManager()
+const subscriptionManager = new RealtimeSubscriptionManager<ExpenseChangeCallback>({
+  table: "expenses",
+  channelPrefix: "expenses_household",
+  buildCallbackArgs: (payload) => [{
+    type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
+    new: payload.new,
+    old: payload.old,
+  }],
+})
 
 /**
  * Hook to subscribe to real-time expense changes for the current user's household.
@@ -164,9 +59,9 @@ export function useExpenseSubscription(
     // Subscribe with a stable wrapper that uses the ref
     const unsubscribe = subscriptionManager.subscribe(
       user.householdId,
-      (event) => {
+      ((event: ExpenseChangeEvent) => {
         callbackRef.current(event)
-      }
+      }) as ExpenseChangeCallback
     )
 
     return unsubscribe
