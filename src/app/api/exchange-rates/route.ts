@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { fetchExchangeRate, adjustToWorkingDay } from '@/lib/exchange-rate-api'
+import { createRateLimiter } from '@/lib/rate-limit'
+
+// 20 requests per user per minute — generous for normal use,
+// but prevents runaway loops from hammering Frankfurter.
+const rateLimiter = createRateLimiter({ maxRequests: 20, windowMs: 60_000 })
 
 /**
  * GET /api/exchange-rates?currency=BRL&date=2024-01-15
@@ -60,6 +65,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      )
+    }
+
+    // Rate-limit by authenticated user ID
+    const { allowed, retryAfterMs } = rateLimiter(user.id)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again shortly.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((retryAfterMs ?? 1000) / 1000)),
+          },
+        }
       )
     }
 
