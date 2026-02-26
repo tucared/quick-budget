@@ -8,7 +8,7 @@ import { format, startOfMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { convertToEUR, fetchExchangeRateFromAPI } from "@/lib/currency"
+import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -43,6 +43,7 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
+  const [previewExchangeRate, setPreviewExchangeRate] = useState<number>(1.0)
   const debouncedBudgetRefreshTick = useDebouncedValue(budgetRefreshTick, 500)
 
   // Cents-first input state (POS-style: digits fill from the right)
@@ -272,6 +273,19 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
     loadCategoryBudget()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- categoryBudget intentionally excluded to avoid refetch loop
   }, [selectedCategory, user, categories, debouncedBudgetRefreshTick])
+
+  // Fetch exchange rate for budget preview when currency or date changes
+  useEffect(() => {
+    if (!selectedCurrency || selectedCurrency === "EUR") {
+      setPreviewExchangeRate(1.0)
+      return
+    }
+    let cancelled = false
+    fetchExchangeRateFromAPI(selectedCurrency, expenseDate).then((rate) => {
+      if (!cancelled) setPreviewExchangeRate(rate)
+    })
+    return () => { cancelled = true }
+  }, [selectedCurrency, expenseDate])
 
   // Refresh budget status when any expense changes externally (partner added/deleted/updated)
   useExpenseSubscription(() => {
@@ -513,7 +527,7 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
         {selectedCategory && (
           <CategoryBudgetStatus
             budget={categoryBudget}
-            additionalAmount={debouncedAmount > 0 ? convertToEUR(debouncedAmount, selectedCurrency || "EUR") : 0}
+            additionalAmount={debouncedAmount > 0 ? debouncedAmount * previewExchangeRate : 0}
             loading={loadingBudget}
           />
         )}
