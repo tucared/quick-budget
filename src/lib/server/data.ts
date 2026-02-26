@@ -223,6 +223,7 @@ export async function getCategories(householdId: string): Promise<Category[]> {
     .from("categories")
     .select("*")
     .eq("household_id", householdId)
+    .eq("is_active", true)
 
   if (error) {
     console.error("Failed to fetch categories:", error)

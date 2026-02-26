@@ -602,6 +602,9 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
           "Save Expense"
         )}
       </Button>
+      <div aria-live="polite" className="sr-only">
+        {showSuccess ? "Expense saved successfully" : ""}
+      </div>
     </form>
   )
 }
