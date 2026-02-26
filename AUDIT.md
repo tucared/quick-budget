@@ -49,12 +49,12 @@ Last updated: 2026-02-25
 | # | Issue | Location | Fix |
 |---|-------|----------|-----|
 | ~~13~~ | ~~Budget preview uses deprecated `convertToEUR()` with hardcoded rate instead of fetched rate~~ | ~~`expense-form.tsx:516`~~ | Fixed: preview now uses exchange rate fetched from API |
-| 14 | `getCategories` fetches inactive categories server-side (filtered again in JS) | `server/data.ts:222-225` | Add `.eq("is_active", true)` to the query |
-| 15 | Date parsing UTC vs local inconsistency — `new Date("2026-01-15")` is UTC, but month boundaries are local | `category-expense-dialog.tsx:67` | Use `new Date(date + "T00:00:00")` for local parsing |
-| 16 | `activeCategories` computed inline breaks `useCallback` memoization | `budget-edit-dialog.tsx:50,101` | Wrap in `useMemo` |
-| 17 | Inconsistent decimal precision in category expense dialog (0 vs 2 decimals) | `category-expense-dialog.tsx:99-110` | Use same precision for allocated/spent/remaining |
-| 18 | Duplicate `PGRST116` code check — second branch unreachable | `error-handler.ts:64,73` | Fix the second code to match the intended PostgREST error (e.g. `PGRST200` for multiple rows) |
-| 19 | No `aria-live` region for form success feedback | `expense-form.tsx:580-583` | Add `aria-live="polite"` to success message |
+| ~~14~~ | ~~`getCategories` fetches inactive categories server-side (filtered again in JS)~~ | ~~`server/data.ts:222-225`~~ | Fixed: added `.eq("is_active", true)` to the query |
+| ~~15~~ | ~~Date parsing UTC vs local inconsistency — `new Date("2026-01-15")` is UTC, but month boundaries are local~~ | ~~`category-expense-dialog.tsx:67`~~ | Fixed: uses `new Date(date + "T00:00:00")` for local parsing |
+| ~~16~~ | ~~`activeCategories` computed inline breaks `useCallback` memoization~~ | ~~`budget-edit-dialog.tsx:50,101`~~ | Fixed: wrapped in `useMemo` |
+| ~~17~~ | ~~Inconsistent decimal precision in category expense dialog (0 vs 2 decimals)~~ | ~~`category-expense-dialog.tsx:99-110`~~ | Fixed: consistent 2-decimal precision for allocated/spent/remaining |
+| ~~18~~ | ~~Duplicate `PGRST116` code check — second branch unreachable~~ | ~~`error-handler.ts:64,73`~~ | Fixed: consolidated into single PGRST116 block with message-based disambiguation |
+| ~~19~~ | ~~No `aria-live` region for form success feedback~~ | ~~`expense-form.tsx:580-583`~~ | Fixed: added `aria-live="polite"` sr-only region for screen readers |
 | 20 | Inconsistent RLS policy pattern — some tables use inline subquery, others use `get_my_household_id()` helper | `migrations` (categories, expenses, budget_allocations) | Refactor to use helper consistently |
 
 ## Low
@@ -88,6 +88,12 @@ Last updated: 2026-02-25
 | ~~P10~~ | ~~Missing INSERT/UPDATE/DELETE policies on `households` table~~ | Fixed: added restrictive policies |
 | ~~P11~~ | ~~Missing household ownership validation in RPCs~~ | Fixed: added `get_my_household_id()` ownership check at start of each RPC |
 | ~~P12~~ | ~~Budget preview uses deprecated `convertToEUR()` with hardcoded rate~~ | Fixed: preview now uses exchange rate fetched from API |
+| ~~P13~~ | ~~`getCategories` fetches inactive categories server-side~~ | Fixed: added `.eq("is_active", true)` filter |
+| ~~P14~~ | ~~Date parsing UTC vs local inconsistency~~ | Fixed: local date parsing with `"T00:00:00"` suffix |
+| ~~P15~~ | ~~`activeCategories` computed inline breaks memoization~~ | Fixed: wrapped in `useMemo` |
+| ~~P16~~ | ~~Inconsistent decimal precision in category expense dialog~~ | Fixed: consistent 2-decimal formatting |
+| ~~P17~~ | ~~Duplicate `PGRST116` code check — unreachable branch~~ | Fixed: consolidated with message disambiguation |
+| ~~P18~~ | ~~No `aria-live` region for form success feedback~~ | Fixed: added sr-only `aria-live="polite"` region |
 
 ---
 

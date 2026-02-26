@@ -64,7 +64,7 @@ export function CategoryExpenseDialog({
     const monthEnd = endOfMonth(parseISO(budgetMonth))
 
     return allExpenses.filter((expense) => {
-      const expenseDate = new Date(expense.expense_date)
+      const expenseDate = new Date(expense.expense_date + "T00:00:00")
       return (
         !deletedIds.has(expense.id) &&
         expense.category_id === budget.category_id &&
@@ -96,7 +96,7 @@ export function CategoryExpenseDialog({
         <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Allocated</div>
-            <div className="font-semibold">{formatCurrency(allocated, 0)}</div>
+            <div className="font-semibold">{formatCurrency(allocated)}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Spent</div>
