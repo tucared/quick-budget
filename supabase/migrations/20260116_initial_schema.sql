@@ -258,7 +258,6 @@ CREATE POLICY "No one can delete exchange rates" ON exchange_rates
 
 -- Create indexes
 CREATE INDEX idx_exchange_rates_currency_date ON exchange_rates(currency, rate_date DESC);
-CREATE INDEX idx_exchange_rates_date ON exchange_rates(rate_date DESC);
 
 -- ============================================================================
 -- BUDGET_ALLOCATIONS TABLE
@@ -562,7 +561,9 @@ GRANT EXECUTE ON FUNCTION public.top_categories_by_usage(UUID, INT) TO authentic
 -- Enable Supabase Realtime for tables that need live updates
 ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
 ALTER PUBLICATION supabase_realtime ADD TABLE budget_allocations;
+ALTER PUBLICATION supabase_realtime ADD TABLE categories;
 
 -- Set REPLICA IDENTITY FULL so DELETE events include all columns (needed for household_id filter)
 ALTER TABLE expenses REPLICA IDENTITY FULL;
 ALTER TABLE budget_allocations REPLICA IDENTITY FULL;
+ALTER TABLE categories REPLICA IDENTITY FULL;

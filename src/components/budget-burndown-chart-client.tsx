@@ -38,14 +38,12 @@ interface WeekendRange {
 
 interface BudgetBurndownChartClientProps {
   budgets: BudgetSummary[]
-  householdId: string
   currentMonth: string // "2026-01-01" format
   initialExpenses: Expense[]
 }
 
 export function BudgetBurndownChartClient({
   budgets,
-  householdId: _householdId,
   currentMonth,
   initialExpenses,
 }: BudgetBurndownChartClientProps) {

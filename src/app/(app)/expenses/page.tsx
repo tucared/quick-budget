@@ -24,7 +24,6 @@ export default async function ExpensesPage() {
       <ExpensesPageClient
         initialExpenses={expenses}
         initialCategories={categories}
-        householdId={user.householdId}
       />
     </main>
   )

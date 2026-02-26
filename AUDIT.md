@@ -21,16 +21,16 @@ Last updated: 2026-02-26
 
 ## Low
 
-| # | Issue | Location | Fix |
-|---|-------|----------|-----|
-| 3 | `_householdId` prop unused in expense list and burndown chart | `expense-list-client.tsx:18`, `budget-burndown-chart-client.tsx:49` | Remove unused props |
-| 4 | `logError` is a no-op in production (no Sentry/observability) | `error-handler.ts:111` | Wire up an error reporting service |
-| 5 | No favicon | `layout.tsx` | Add `favicon.ico` to `src/app/` |
-| 6 | Duplicate subscription manager pattern (~130 lines each) | `use-expense-subscription.ts`, `use-budget-allocation-subscription.ts` | Extract generic `RealtimeSubscriptionManager<T>` |
-| 7 | Redundant `idx_exchange_rates_date` index — covered by `idx_exchange_rates_currency_date` | `migrations:249` | Remove redundant index |
-| 8 | npm audit: 2 dev-only vulnerabilities — `minimatch` (high, ReDoS) and `ajv` (moderate, ReDoS) | transitive deps | Run `npm audit fix` |
-| 9 | `console.log` in production code for weekend date adjustment | `exchange-rate-api.ts:54` | Remove or gate behind debug flag |
-| 10 | Categories table not in realtime publication — renames/additions won't push to other clients | `migrations:550-556` | Add `ALTER PUBLICATION supabase_realtime ADD TABLE categories` |
+| # | Issue | Location | Fix | Status |
+|---|-------|----------|-----|--------|
+| 3 | ~~`_householdId` prop unused in expense list and burndown chart~~ | `expense-list-client.tsx`, `budget-burndown-chart-client.tsx` | Removed unused props and cleaned up callers | **Fixed** |
+| 4 | `logError` is a no-op in production (no Sentry/observability) | `error-handler.ts:111` | Wire up an error reporting service | Open |
+| 5 | No favicon | `layout.tsx` | Add `favicon.ico` to `src/app/` | Open |
+| 6 | ~~Duplicate subscription manager pattern (~130 lines each)~~ | `use-expense-subscription.ts`, `use-budget-allocation-subscription.ts` | Extracted generic `RealtimeSubscriptionManager<T>` in `realtime-subscription-manager.ts` | **Fixed** |
+| 7 | ~~Redundant `idx_exchange_rates_date` index~~ | `migrations` | Removed redundant index | **Fixed** |
+| 8 | ~~npm audit: 2 dev-only vulnerabilities~~ | transitive deps | Ran `npm audit fix` — 0 vulnerabilities | **Fixed** |
+| 9 | ~~`console.log` in production code for weekend date adjustment~~ | `exchange-rate-api.ts` | Removed console.log | **Fixed** |
+| 10 | ~~Categories table not in realtime publication~~ | `migrations` | Added `ALTER PUBLICATION supabase_realtime ADD TABLE categories` + `REPLICA IDENTITY FULL` | **Fixed** |
 
 ---
 
@@ -40,7 +40,7 @@ Last updated: 2026-02-26
 |-------|--------|
 | `npm run build` | Compiles successfully, no TypeScript errors |
 | `npm run lint` | Clean, no warnings or errors |
-| `npm audit` | 2 dev-only vulnerabilities (fixable via `npm audit fix`) |
+| `npm audit` | 0 vulnerabilities |
 
 | Package | Current | Note |
 |---------|---------|------|
