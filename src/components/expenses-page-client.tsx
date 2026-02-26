@@ -9,13 +9,11 @@ import { ExpenseListClient } from "@/components/expense-list-client"
 interface ExpensesPageClientProps {
   initialExpenses: ExpenseWithDetails[]
   initialCategories: Category[]
-  householdId: string
 }
 
 export function ExpensesPageClient({
   initialExpenses,
   initialCategories,
-  householdId,
 }: ExpensesPageClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
 
@@ -69,7 +67,6 @@ export function ExpensesPageClient({
       <ExpenseListClient
         expenses={expenses}
         categories={initialCategories}
-        householdId={householdId}
       />
     </>
   )

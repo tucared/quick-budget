@@ -223,7 +223,6 @@ export function BudgetPageContent({
           {/* Burndown Chart */}
           <BudgetBurndownChartClient
             budgets={budgets}
-            householdId={householdId}
             currentMonth={budgetMonth}
             initialExpenses={expenses}
           />

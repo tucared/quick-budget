@@ -9,13 +9,11 @@ import { ExpenseCard } from "@/components/expense-card"
 interface ExpenseListClientProps {
   expenses: ExpenseWithDetails[]
   categories: Category[]
-  householdId: string
 }
 
 export function ExpenseListClient({
   expenses,
   categories: categoryList,
-  householdId: _householdId,
 }: ExpenseListClientProps) {
   const categories = useMemo(() => {
     const map = new Map<string, Category>()

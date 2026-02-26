@@ -50,10 +50,6 @@ export async function fetchExchangeRate(
   const requestedDate = date || new Date().toISOString().split('T')[0]
   const workingDayDate = adjustToWorkingDay(requestedDate)
 
-  if (workingDayDate !== requestedDate) {
-    console.log(`Adjusted weekend date ${requestedDate} to working day ${workingDayDate} for forex rate`)
-  }
-
   const url = `https://api.frankfurter.dev/v1/${workingDayDate}?base=EUR&symbols=${currency}`
 
   const response = await fetch(url)
