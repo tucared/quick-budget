@@ -48,7 +48,6 @@ export function BudgetBurndownChartClient({
   initialExpenses,
 }: BudgetBurndownChartClientProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all")
-  const [error] = useState("")
 
   // expenses come from parent (kept live via parent's subscription)
   const expenses = initialExpenses
@@ -157,21 +156,6 @@ export function BudgetBurndownChartClient({
         .map((b) => ({ id: b.category_id!, name: b.category_name! })),
     ]
   }, [budgets])
-
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Budget Burndown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-            {error}
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
 
   if (budgets.length === 0) {
     return null
