@@ -4,7 +4,14 @@ import * as React from "react"
 import { Check, MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Category } from "@/lib/types"
-import type { GroupedOption } from "@/components/grouped-combobox"
+
+export interface GroupedOption {
+  value: string
+  label: string
+  icon?: string
+  group: string
+  frequency?: number // Higher = more recently/frequently used
+}
 import {
   Dialog,
   DialogContent,

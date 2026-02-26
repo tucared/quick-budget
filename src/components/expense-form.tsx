@@ -15,19 +15,17 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
-import { type GroupedOption } from "@/components/grouped-combobox"
-import { CategoryTileSelector } from "@/components/category-tile-selector"
+import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface ExpenseFormProps {
-  onSuccess?: () => void
   onExpenseSaved?: (expense: Expense) => void
 }
 
-export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
+export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
   const { user } = useUser()
   const storageKeys = useMemo(
     () => (user?.householdId ? getStorageKeys(user.householdId) : null),
@@ -388,11 +386,6 @@ export function ExpenseForm({ onSuccess, onExpenseSaved }: ExpenseFormProps) {
       if (amountInputRef.current) {
         amountInputRef.current.focus()
         amountInputRef.current.select()
-      }
-
-      // Call onSuccess callback
-      if (onSuccess) {
-        onSuccess()
       }
 
       setLoading(false)

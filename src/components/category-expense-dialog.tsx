@@ -17,7 +17,6 @@ interface CategoryExpenseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   budget: BudgetSummary | null
-  householdId: string
   budgetMonth: string
   allExpenses: Expense[]
   categories: Category[]
@@ -27,7 +26,6 @@ export function CategoryExpenseDialog({
   open,
   onOpenChange,
   budget,
-  householdId: _householdId,
   budgetMonth,
   allExpenses,
   categories,

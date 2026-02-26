@@ -1,6 +1,6 @@
-export type BudgetStatus = "over" | "critical" | "warning" | "on_track"
+type BudgetStatus = "over" | "critical" | "warning" | "on_track"
 
-export function getBudgetStatus(percentSpent: number): BudgetStatus {
+function getBudgetStatus(percentSpent: number): BudgetStatus {
   if (percentSpent >= 100) return "over"
   if (percentSpent >= 95) return "critical"
   if (percentSpent >= 75) return "warning"
@@ -38,17 +38,6 @@ const statusLabels: Record<BudgetStatus, string> = {
 
 export function getBudgetStatusLabel(percentSpent: number): string {
   return statusLabels[getBudgetStatus(percentSpent)]
-}
-
-const statusIcons: Record<BudgetStatus, string> = {
-  over: "●",
-  critical: "●",
-  warning: "●",
-  on_track: "●",
-}
-
-export function getBudgetStatusIcon(percentSpent: number): string {
-  return statusIcons[getBudgetStatus(percentSpent)]
 }
 
 export interface BudgetStatusTheme {
