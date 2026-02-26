@@ -289,7 +289,6 @@ export function BudgetPageContent({
         open={categoryExpenseDialogOpen}
         onOpenChange={setCategoryExpenseDialogOpen}
         budget={selectedBudget}
-        householdId={householdId}
         budgetMonth={budgetMonth}
         allExpenses={expenses}
         categories={categories}

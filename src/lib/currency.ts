@@ -1,47 +1,14 @@
 // Currency conversion utilities
 
-// ============================================================================
-// DEPRECATED FUNCTIONS - Use fetchExchangeRateFromAPI() instead
-// These fallback functions are kept for backwards compatibility only
-// ============================================================================
-
-const FALLBACK_RATES_TO_EUR: Record<string, number> = {
+export const FALLBACK_RATES_TO_EUR: Record<string, number> = {
   EUR: 1.0,
   BRL: 0.17, // 1 BRL ≈ 0.17 EUR (fallback only)
   USD: 0.92, // 1 USD ≈ 0.92 EUR (fallback only)
   GBP: 1.17, // 1 GBP ≈ 1.17 EUR (fallback only)
+  CHF: 1.05, // 1 CHF ≈ 1.05 EUR (fallback only)
+  JPY: 0.0062, // 1 JPY ≈ 0.0062 EUR (fallback only)
+  CAD: 0.65, // 1 CAD ≈ 0.65 EUR (fallback only)
 }
-
-/**
- * @deprecated Use fetchExchangeRateFromAPI() instead
- */
-export function convertToEUR(amount: number, fromCurrency: string): number {
-  const rate = FALLBACK_RATES_TO_EUR[fromCurrency]
-  if (!rate) {
-    console.warn(`Exchange rate not found for ${fromCurrency}, using 1.0`)
-    return amount
-  }
-  return amount * rate
-}
-
-/**
- * @deprecated Use fetchExchangeRateFromAPI() instead
- */
-export function getExchangeRate(fromCurrency: string, toCurrency: string = "EUR"): number {
-  if (fromCurrency === toCurrency) return 1.0
-
-  const rate = FALLBACK_RATES_TO_EUR[fromCurrency]
-  if (!rate) {
-    console.warn(`Exchange rate not found for ${fromCurrency}, using 1.0`)
-    return 1.0
-  }
-
-  return rate
-}
-
-// ============================================================================
-// NEW API-BASED EXCHANGE RATE FUNCTIONS
-// ============================================================================
 
 interface ExchangeRateResponse {
   currency: string

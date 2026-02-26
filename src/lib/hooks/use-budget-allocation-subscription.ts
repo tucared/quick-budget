@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useUser } from "./use-user"
+import { useUser } from "@/lib/contexts/user-context"
 import { RealtimeSubscriptionManager } from "./realtime-subscription-manager"
 
 export type BudgetAllocationChangeCallback = () => void

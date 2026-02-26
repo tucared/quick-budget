@@ -1,12 +1,8 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
+import type { UserData } from "@/lib/types"
 
-export interface UserData {
-  id: string
-  email: string | undefined
-  fullName: string
-  householdId: string
-}
+export type { UserData }
 
 /**
  * Custom hook to load the current authenticated user and their details

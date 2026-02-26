@@ -1,6 +1,6 @@
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
-import { getBudgetStatusTheme, getBudgetStatusIcon } from "@/lib/budget-utils"
+import { getBudgetStatusTheme } from "@/lib/budget-utils"
 
 interface CategoryBudgetStatusProps {
   budget: BudgetSummary | null
@@ -52,7 +52,7 @@ export function CategoryBudgetStatus({
           />
         </div>
         <span className={`text-xs font-semibold ${statusColor.text} flex items-center gap-1 shrink-0`}>
-          <span>{getBudgetStatusIcon(newPercentSpent)}</span>
+          <span>{"●"}</span>
           <span>{formatNumber(newPercentSpent, 0)}%</span>
         </span>
       </div>

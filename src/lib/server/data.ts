@@ -1,19 +1,12 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, parseISO, startOfMonth } from "date-fns"
 import type {
-  BudgetAllocation,
   BudgetSummary,
   Category,
   Expense,
   ExpenseWithDetails,
+  UserData,
 } from "@/lib/types"
-
-interface UserData {
-  id: string
-  email: string | undefined
-  fullName: string
-  householdId: string
-}
 
 /**
  * Server-side function to get authenticated user and their household
@@ -95,59 +88,6 @@ export async function getAllowanceSummary(
 
   if (error) {
     console.error("Failed to fetch allowance summary:", error)
-    return []
-  }
-
-  return data || []
-}
-
-/**
- * Server-side function to fetch raw budget allocations for a given month
- */
-export async function getBudgetAllocations(
-  householdId: string,
-  budgetMonth: string
-): Promise<BudgetAllocation[]> {
-  const supabase = await createServerSupabaseClient()
-
-  const { data, error } = await supabase
-    .from("budget_allocations")
-    .select("*")
-    .eq("household_id", householdId)
-    .eq("budget_month", budgetMonth)
-
-  if (error) {
-    console.error("Failed to fetch budget allocations:", error)
-    return []
-  }
-
-  return data || []
-}
-
-/**
- * Server-side function to fetch budget summary history for last N months
- * Returns all budget_summary rows (including allowances) for historical comparison
- */
-export async function getBudgetHistory(
-  householdId: string,
-  months: number = 3
-): Promise<BudgetSummary[]> {
-  const supabase = await createServerSupabaseClient()
-
-  // Calculate the start month (N months ago)
-  const now = new Date()
-  const startDate = new Date(now.getFullYear(), now.getMonth() - months, 1)
-  const startMonth = format(startDate, 'yyyy-MM-dd')
-
-  const { data, error } = await supabase
-    .from("budget_summary")
-    .select("*")
-    .eq("household_id", householdId)
-    .gte("budget_month", startMonth)
-    .order("budget_month", { ascending: false })
-
-  if (error) {
-    console.error("Failed to fetch budget history:", error)
     return []
   }
 

@@ -1,17 +1,14 @@
 // Error handling utilities for consistent error messages
 
-export type ErrorType = "auth" | "validation" | "network" | "database" | "unknown"
+type ErrorType = "auth" | "validation" | "network" | "database" | "unknown"
 
-export interface AppError {
+interface AppError {
   type: ErrorType
   message: string
   originalError?: unknown
 }
 
-/**
- * Determines the type of error and returns a user-friendly message
- */
-export function handleSupabaseError(error: unknown): AppError {
+function handleSupabaseError(error: unknown): AppError {
   if (!error) {
     return {
       type: "unknown",
@@ -102,7 +99,7 @@ export function handleSupabaseError(error: unknown): AppError {
 /**
  * Logs error to console in development, could be extended to send to error tracking service
  */
-export function logError(error: AppError): void {
+function logError(error: AppError): void {
   if (process.env.NODE_ENV === "development") {
     console.error(`[${error.type.toUpperCase()}]`, error.message, error.originalError)
   }
