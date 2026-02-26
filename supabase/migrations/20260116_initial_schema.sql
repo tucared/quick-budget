@@ -99,6 +99,9 @@ CREATE POLICY "Users can view household members" ON users
 CREATE POLICY "Users can update own profile" ON users
   FOR UPDATE USING (id = (SELECT auth.uid()));
 
+CREATE POLICY "Users can delete own profile" ON users
+  FOR DELETE USING (id = (SELECT auth.uid()));
+
 -- Now create RLS policy for households (after household_id exists on users)
 CREATE POLICY "Users can view own household" ON households
   FOR SELECT USING (
@@ -244,6 +247,13 @@ CREATE POLICY "Authenticated users can view exchange rates" ON exchange_rates
 -- Only authenticated users can insert rates (for API route to cache rates)
 CREATE POLICY "Authenticated users can insert exchange rates" ON exchange_rates
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Prevent modification/deletion of cached exchange rates
+CREATE POLICY "No one can update exchange rates" ON exchange_rates
+  FOR UPDATE USING (FALSE);
+
+CREATE POLICY "No one can delete exchange rates" ON exchange_rates
+  FOR DELETE USING (FALSE);
 
 -- Create indexes
 CREATE INDEX idx_exchange_rates_currency_date ON exchange_rates(currency, rate_date DESC);
