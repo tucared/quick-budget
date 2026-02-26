@@ -219,6 +219,7 @@ CREATE POLICY "Household members can delete expenses" ON expenses
 
 -- Create indexes for common queries
 CREATE INDEX idx_expenses_household ON expenses(household_id);
+CREATE INDEX idx_expenses_household_date ON expenses(household_id, expense_date DESC);
 CREATE INDEX idx_expenses_logged_by ON expenses(logged_by_user_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
 CREATE INDEX idx_expenses_category ON expenses(category_id);
