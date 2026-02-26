@@ -33,9 +33,9 @@ Last updated: 2026-02-25
 
 | # | Issue | Location | Fix |
 |---|-------|----------|-----|
-| 8 | **Missing composite index on `expenses(household_id, expense_date)`** — monthly queries filter both columns but only have separate indexes | `migrations:217-220` | Add `CREATE INDEX idx_expenses_household_date ON expenses(household_id, expense_date DESC)` |
-| 9 | **`reloadBudgets` runs 2 queries sequentially** | `budget-page-content.tsx:59` | Use `Promise.all()` to parallelize |
-| 10 | **`recharts` not lazy-loaded** — adds ~200KB to initial bundle | `budget-burndown-chart-client.tsx` | Use `next/dynamic({ ssr: false })` |
+| ~~8~~ | ~~**Missing composite index on `expenses(household_id, expense_date)`** — monthly queries filter both columns but only have separate indexes~~ | ~~`migrations:217-220`~~ | Fixed: added `idx_expenses_household_date` composite index |
+| ~~9~~ | ~~**`reloadBudgets` runs 2 queries sequentially**~~ | ~~`budget-page-content.tsx:59`~~ | Fixed: parallelized with `Promise.all()` |
+| ~~10~~ | ~~**`recharts` not lazy-loaded** — adds ~200KB to initial bundle~~ | ~~`budget-burndown-chart-client.tsx`~~ | Fixed: lazy-loaded with `next/dynamic({ ssr: false })` |
 
 ## High — UX
 
@@ -97,6 +97,9 @@ Last updated: 2026-02-25
 | ~~P19~~ | ~~No rate limiting on exchange-rate API~~ | Fixed: in-memory sliding-window rate limiter (20 req/user/min) with 429 + Retry-After |
 | ~~P20~~ | ~~Missing UPDATE/DELETE policies on `exchange_rates`~~ | Fixed: `FOR UPDATE USING (FALSE)` and `FOR DELETE USING (FALSE)` policies |
 | ~~P21~~ | ~~Missing DELETE policy on `users` table~~ | Fixed: `FOR DELETE USING (id = auth.uid())` policy |
+| ~~P22~~ | ~~Missing composite index on `expenses(household_id, expense_date)`~~ | Fixed: added `idx_expenses_household_date` composite index |
+| ~~P23~~ | ~~`reloadBudgets` runs 2 queries sequentially~~ | Fixed: parallelized with `Promise.all()` |
+| ~~P24~~ | ~~`recharts` not lazy-loaded~~ | Fixed: lazy-loaded with `next/dynamic({ ssr: false })` |
 
 ---
 

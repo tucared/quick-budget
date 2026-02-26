@@ -6,7 +6,12 @@ import { format, startOfMonth } from "date-fns"
 import { Pencil, Plus } from "lucide-react"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
-import { BudgetBurndownChartClient } from "@/components/budget-burndown-chart-client"
+import dynamic from "next/dynamic"
+
+const BudgetBurndownChartClient = dynamic(
+  () => import("@/components/budget-burndown-chart-client").then((mod) => mod.BudgetBurndownChartClient),
+  { ssr: false }
+)
 import { formatCurrency } from "@/lib/currency"
 import { getBudgetProgressBarColor, getBudgetStatusColor } from "@/lib/budget-utils"
 import { MonthNavigator } from "@/components/month-navigator"
@@ -58,28 +63,27 @@ export function BudgetPageContent({
 
   function reloadBudgets() {
     const supabase = createClient()
-    supabase
-      .from("budget_summary")
-      .select("*")
-      .eq("household_id", householdId)
-      .eq("budget_month", budgetMonth)
-      .eq("exclude_from_budget_total", false)
-      .order("category_name", { ascending: true })
-      .then(({ data, error: reloadError }) => {
-        if (reloadError) setError(getErrorMessage(reloadError))
-        else if (data) setBudgets(data)
-      })
-    supabase
-      .from("budget_summary")
-      .select("*")
-      .eq("household_id", householdId)
-      .eq("budget_month", budgetMonth)
-      .eq("exclude_from_budget_total", true)
-      .order("category_name", { ascending: true })
-      .then(({ data, error: reloadError }) => {
-        if (reloadError) setError(getErrorMessage(reloadError))
-        else if (data) setAllowances(data)
-      })
+    Promise.all([
+      supabase
+        .from("budget_summary")
+        .select("*")
+        .eq("household_id", householdId)
+        .eq("budget_month", budgetMonth)
+        .eq("exclude_from_budget_total", false)
+        .order("category_name", { ascending: true }),
+      supabase
+        .from("budget_summary")
+        .select("*")
+        .eq("household_id", householdId)
+        .eq("budget_month", budgetMonth)
+        .eq("exclude_from_budget_total", true)
+        .order("category_name", { ascending: true }),
+    ]).then(([budgetResult, allowanceResult]) => {
+      if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
+      else if (budgetResult.data) setBudgets(budgetResult.data)
+      if (allowanceResult.error) setError(getErrorMessage(allowanceResult.error))
+      else if (allowanceResult.data) setAllowances(allowanceResult.data)
+    })
   }
 
   // Apply expense changes optimistically so there's no reload flash
