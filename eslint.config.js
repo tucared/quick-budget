@@ -49,4 +49,12 @@ export default [
       },
     },
   },
+  {
+    files: ['next.config.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+      },
+    },
+  },
 ];
