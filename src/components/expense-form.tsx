@@ -1,12 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { Check } from "lucide-react"
 import { format, startOfMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
-import { expenseSchema, type ExpenseFormValues } from "@/lib/validations"
+import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
 import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
@@ -53,28 +51,19 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
   // Ref to store success state timer for cleanup
   const successTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<ExpenseFormValues>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: {
-      amount: NaN,
-      expense_date: format(new Date(), 'yyyy-MM-dd'),
-      currency: "EUR",
-      is_cash: false,
-    },
-  })
+  // Form state (replaces React Hook Form)
+  const [amount, setAmount] = useState<number>(NaN)
+  const [categoryId, setCategoryId] = useState<string>("")
+  const [currency, setCurrency] = useState<string>("EUR")
+  const [isCash, setIsCash] = useState<boolean>(false)
+  const [expenseDate, setExpenseDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
+  const [description, setDescription] = useState<string>("")
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  const selectedCategory = watch("category_id")
-  const selectedCurrency = watch("currency")
-  const isCash = watch("is_cash")
-  const expenseAmount = watch("amount")
-  const expenseDate = watch("expense_date")
+  // Aliases for readability in the template
+  const selectedCategory = categoryId
+  const selectedCurrency = currency
+  const expenseAmount = amount
 
   // Debounce the amount for budget calculations to avoid re-rendering on every keystroke
   const debouncedAmount = useDebouncedValue(expenseAmount, 300)
@@ -97,13 +86,13 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       const next = centsRaw * 10 + parseInt(e.key)
       if (next <= 999999999) { // cap at ~10M
         setCentsRaw(next)
-        setValue("amount", next / 100, { shouldValidate: true })
+        setAmount(next / 100)
       }
     } else if (e.key === "Backspace") {
       e.preventDefault()
       const next = Math.floor(centsRaw / 10)
       setCentsRaw(next)
-      setValue("amount", next > 0 ? next / 100 : NaN, { shouldValidate: false })
+      setAmount(next > 0 ? next / 100 : NaN)
     }
   }
 
@@ -203,11 +192,11 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
           const lastCurrency = localStorage.getItem(keys.LAST_CURRENCY)
 
           if (lastCategory) {
-            setValue("category_id", lastCategory)
+            setCategoryId(lastCategory)
           }
 
           if (lastCurrency) {
-            setValue("currency", lastCurrency)
+            setCurrency(lastCurrency)
           }
         } catch (_err) {
           // localStorage might be disabled (incognito mode, etc.)
@@ -221,7 +210,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
     }
 
     loadData()
-  }, [setValue, user])
+  }, [user])
 
   // Load budget status when category is selected
   useEffect(() => {
@@ -299,8 +288,31 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
     }
   }, [])
 
-  const onSubmit = async (data: ExpenseFormValues) => {
+  const onSubmit = async () => {
     setError("")
+    setFormErrors({})
+
+    // Validate with Zod
+    const result = expenseSchema.safeParse({
+      amount,
+      category_id: categoryId,
+      currency,
+      is_cash: isCash,
+      expense_date: expenseDate,
+      description: description || undefined,
+    })
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {}
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as string
+        if (!fieldErrors[key]) fieldErrors[key] = issue.message
+      }
+      setFormErrors(fieldErrors)
+      return
+    }
+
+    const data = result.data
     setLoading(true)
 
     if (!user?.id || !user?.householdId) {
@@ -313,10 +325,10 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       const supabase = createClient()
 
       // Convert to EUR for consistent tracking
-      const currency = data.currency || "EUR"
+      const cur = data.currency || "EUR"
 
       // Fetch exchange rate from API (with database caching)
-      const exchangeRate = await fetchExchangeRateFromAPI(currency, data.expense_date)
+      const exchangeRate = await fetchExchangeRateFromAPI(cur, data.expense_date)
       const convertedAmount = data.amount * exchangeRate
 
       // Insert expense and return the saved row
@@ -326,7 +338,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
         category_id: data.category_id,
         is_cash: data.is_cash ?? false,
         amount: data.amount,
-        currency: currency,
+        currency: cur,
         converted_amount: convertedAmount,
         converted_currency: "EUR",
         exchange_rate: exchangeRate,
@@ -373,14 +385,8 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
 
       // Reset form but keep category, currency, and date
       setCentsRaw(0)
-      reset({
-        amount: NaN,
-        category_id: data.category_id,
-        is_cash: data.is_cash,
-        expense_date: data.expense_date,
-        description: "",
-        currency: data.currency,
-      })
+      setAmount(NaN)
+      setDescription("")
 
       // Focus on amount input for next entry
       if (amountInputRef.current) {
@@ -441,7 +447,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit() }} className="space-y-4">
       {error && (
         <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {error}
@@ -451,7 +457,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       {/* Amount - hero cents-first input with inline currency toggle */}
       <div>
         <div
-          className={`flex items-center h-14 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${errors.amount ? "border-destructive" : "border-input"}`}
+          className={`flex items-center h-14 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${formErrors.amount ? "border-destructive" : "border-input"}`}
           onClick={() => amountInputRef.current?.focus()}
         >
           {/* Invisible input that captures keyboard events */}
@@ -474,7 +480,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
           <div className="inline-flex rounded-md shrink-0" role="group">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setValue("currency", "EUR"); amountInputRef.current?.focus() }}
+              onClick={(e) => { e.stopPropagation(); setCurrency("EUR"); amountInputRef.current?.focus() }}
               className={`px-2.5 py-1 text-xs font-semibold border rounded-l-md transition-colors ${
                 selectedCurrency === "EUR"
                   ? "bg-primary text-primary-foreground border-primary"
@@ -485,7 +491,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             </button>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setValue("currency", "BRL"); amountInputRef.current?.focus() }}
+              onClick={(e) => { e.stopPropagation(); setCurrency("BRL"); amountInputRef.current?.focus() }}
               className={`px-2.5 py-1 text-xs font-semibold border-l-0 border rounded-r-md transition-colors ${
                 selectedCurrency === "BRL"
                   ? "bg-primary text-primary-foreground border-primary"
@@ -496,8 +502,8 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             </button>
           </div>
         </div>
-        {errors.amount && (
-          <p className="text-sm text-destructive mt-1">{errors.amount.message}</p>
+        {formErrors.amount && (
+          <p className="text-sm text-destructive mt-1">{formErrors.amount}</p>
         )}
       </div>
 
@@ -508,12 +514,12 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
           categories={categories}
           topCategoryIds={topCategoryIds}
           value={selectedCategory}
-          onValueChange={(value) => setValue("category_id", value)}
+          onValueChange={(value) => setCategoryId(value)}
           allOptions={getCategoryOptions()}
         />
-        {errors.category_id && (
+        {formErrors.category_id && (
           <p className="text-sm text-destructive">
-            {errors.category_id.message}
+            {formErrors.category_id}
           </p>
         )}
         {/* Budget status preview */}
@@ -534,7 +540,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             <input
               type="checkbox"
               checked={isCash}
-              onChange={(e) => setValue("is_cash", e.target.checked)}
+              onChange={(e) => setIsCash(e.target.checked)}
               className="h-4 w-4 rounded border-input accent-primary"
             />
             Cash
@@ -544,14 +550,14 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
           date={dateAsObject}
           onDateChange={(date) => {
             if (date) {
-              setValue("expense_date", format(date, 'yyyy-MM-dd'))
+              setExpenseDate(format(date, 'yyyy-MM-dd'))
             }
           }}
           placeholder="Select expense date"
         />
-        {errors.expense_date && (
+        {formErrors.expense_date && (
           <p className="text-sm text-destructive">
-            {errors.expense_date.message}
+            {formErrors.expense_date}
           </p>
         )}
       </div>
@@ -564,16 +570,17 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
           placeholder="Optional notes about this expense"
           rows={1}
           className="min-h-0 resize-none overflow-hidden"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           onInput={(e) => {
             const el = e.currentTarget
             el.style.height = "auto"
             el.style.height = `${el.scrollHeight}px`
           }}
-          {...register("description")}
         />
-        {errors.description && (
+        {formErrors.description && (
           <p className="text-sm text-destructive">
-            {errors.description.message}
+            {formErrors.description}
           </p>
         )}
       </div>

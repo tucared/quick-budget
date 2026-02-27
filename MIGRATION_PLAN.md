@@ -144,8 +144,8 @@ Drastically simpler but loses the custom popover UX. The quick-pick buttons ("To
 
 ## Definition of done
 
-- [ ] `expense-form.tsx` uses `useState` + `expenseSchema.safeParse()` instead of RHF
-- [ ] `react-hook-form` and `@hookform/resolvers` removed from `package.json`
-- [ ] `npm run lint` passes
-- [ ] `npm run build` passes
+- [x] `expense-form.tsx` uses `useState` + `expenseSchema.safeParse()` instead of RHF
+- [x] `react-hook-form` and `@hookform/resolvers` removed from `package.json`
+- [x] `npm run lint` passes
+- [x] `npm run build` passes
 - [ ] Manual test: create expense in EUR and BRL, verify validation errors, verify form reset
