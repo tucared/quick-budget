@@ -136,3 +136,40 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your-anon-key
 ```
 
 Exchange rates are fetched from [Frankfurter](https://www.frankfurter.dev) — free, no API key required.
+
+## Backups
+
+Supabase Free tier has **no built-in backups**. This project includes an automated GitHub Action that runs `pg_dump` daily and stores the result as a GitHub Actions artifact (retained 90 days).
+
+### Setup (one-time, after creating Supabase project)
+
+1. Get your database connection string from **Supabase Dashboard → Project Settings → Database → Connection string (URI)**
+2. In your GitHub repo, go to **Settings → Secrets and variables → Actions**
+3. Add a new repository secret:
+   - **Name**: `SUPABASE_DB_URL`
+   - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres`
+4. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Daily Database Backup → Run workflow**
+
+### Restoring from backup
+
+1. Go to **Actions → Daily Database Backup** and download the artifact for the desired date
+2. Unzip it to get the `.sql` file
+3. Run against your database:
+   ```bash
+   psql "$SUPABASE_DB_URL" < quick-budget-YYYYMMDD-HHMMSS.sql
+   ```
+
+### Before risky operations
+
+Always run a manual backup before migrations or schema changes:
+```bash
+# Trigger backup manually from GitHub Actions UI, or:
+pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > backup-$(date +%Y%m%d).sql
+```
+
+### Upgrading backup strategy
+
+If data becomes critical, upgrade to **Supabase Pro** ($25/mo) for:
+- Automated daily backups with 7-day retention
+- Point-in-Time Recovery (PITR) — restore to any second
+- No setup required

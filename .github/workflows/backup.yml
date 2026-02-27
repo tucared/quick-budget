@@ -1,0 +1,56 @@
+name: Daily Database Backup
+
+# Runs every day at 03:00 UTC (05:00 CET)
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Run pg_dump
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          BACKUP_FILE="quick-budget-${TIMESTAMP}.sql"
+
+          pg_dump "$DATABASE_URL" \
+            --no-owner \
+            --no-privileges \
+            --clean \
+            --if-exists \
+            --format=plain \
+            > "$BACKUP_FILE"
+
+          # Verify the dump is non-empty and contains expected tables
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "::error::Backup file is empty"
+            exit 1
+          fi
+
+          for table in users households categories expenses budget_allocations; do
+            if ! grep -q "CREATE TABLE.*${table}" "$BACKUP_FILE" 2>/dev/null && \
+               ! grep -q "COPY.*${table}" "$BACKUP_FILE" 2>/dev/null; then
+              echo "::warning::Table '${table}' not found in backup — may be expected if empty"
+            fi
+          done
+
+          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_ENV"
+          echo "Backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ env.backup_file }}
+          path: ${{ env.backup_file }}
+          retention-days: 90
