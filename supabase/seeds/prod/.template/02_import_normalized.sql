@@ -19,6 +19,12 @@ BEGIN
   SELECT id INTO shared_household_id FROM public.households LIMIT 1;
   SELECT id INTO user1_id FROM public.users WHERE email = 'user1@example.com';
 
+  -- Idempotency: skip if data already imported
+  IF EXISTS (SELECT 1 FROM public.expenses WHERE household_id = shared_household_id) THEN
+    RAISE NOTICE '  → Data already imported, skipping';
+    RETURN;
+  END IF;
+
   -- ============================================================================
   -- Import Budget Allocations
   -- ============================================================================

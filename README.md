@@ -83,9 +83,8 @@ src/
 supabase/
 ├── migrations/            # Database migrations
 ├── seeds/
-│   ├── dev/              # Dev-only seeds (user creation with passwords)
-│   ├── prod/             # Shared seeds (categories, historical data)
-│   └── prod-setup.sql    # Production household merge (manual, no passwords)
+│   ├── dev/              # User creation + household setup (idempotent)
+│   └── prod/             # Shared seeds (categories, historical data)
 └── config.toml           # Supabase config
 ```
 
@@ -156,15 +155,13 @@ Seeds are split into dev-only (user credentials) and shared (categories, data):
 ```
 supabase/seeds/
   dev/
-    00_create_users.sql            — Dev user creation with passwords (git-ignored)
+    00_create_users.sql            — Idempotent user + household setup (git-ignored)
     .template/00_create_users.sql  — Template with example values
   prod/
     01_seed_categories.sql         — Categories (git-ignored)
     02_import_normalized.sql       — Historical data (auto-generated)
     03_import_exchange_rates.sql   — Exchange rates (auto-generated)
     .template/                     — Committed templates
-  prod-setup.sql                   — Production household merge (git-ignored)
-  .template/prod-setup.sql         — Template
 ```
 
 `supabase db reset` runs: `dev/00_create_users.sql` → `prod/01_*` → `prod/02_*` → `prod/03_*`

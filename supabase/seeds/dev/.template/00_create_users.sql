@@ -1,7 +1,10 @@
 -- ============================================================================
--- 00_create_users.sql - Dev User Creation
+-- 00_create_users.sql - Idempotent User & Household Setup
 -- ============================================================================
--- Creates test users with passwords for local development
+-- Safe to run in any environment:
+--   Local dev (db reset): creates users + merges households
+--   Production (db push --include-seed): skips user creation, merges households
+--   Re-runs: no-op if already set up
 -- This file is git-ignored (copy from .template/ and customize)
 -- ============================================================================
 
@@ -12,83 +15,106 @@ DECLARE
   household1_id UUID;
   household2_id UUID;
   shared_household_id UUID;
+  v_user1_email TEXT := 'user1@example.com';
+  v_user2_email TEXT := 'user2@example.com';
+  v_user1_password TEXT := 'password1';
+  v_user2_password TEXT := 'password2';
+  v_user1_name TEXT := 'User One';
+  v_user2_name TEXT := 'User Two';
 BEGIN
   RAISE NOTICE '========================================';
-  RAISE NOTICE 'Creating dev users and household...';
+  RAISE NOTICE 'Idempotent user & household setup...';
   RAISE NOTICE '========================================';
 
-  -- Clean up any existing users (for local re-runs)
-  DELETE FROM auth.users WHERE email IN (
-    'user1@example.com',
-    'user2@example.com'
-  );
+  -- ----------------------------------------------------------------
+  -- Step 1: Ensure users exist (create only if missing)
+  -- ----------------------------------------------------------------
+  SELECT id INTO user1_id FROM auth.users WHERE email = v_user1_email;
+  SELECT id INTO user2_id FROM auth.users WHERE email = v_user2_email;
 
-  -- Create User 1
-  INSERT INTO auth.users (
-    instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at, confirmation_token, email_change,
-    email_change_token_new, recovery_token
-  ) VALUES (
-    '00000000-0000-0000-0000-000000000000',
-    gen_random_uuid(),
-    'authenticated', 'authenticated',
-    'user1@example.com',
-    crypt('password1', gen_salt('bf')),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"full_name":"User One"}',
-    NOW(), NOW(), '', '', '', ''
-  ) RETURNING id INTO user1_id;
+  IF user1_id IS NULL THEN
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at, confirmation_token, email_change,
+      email_change_token_new, recovery_token
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      gen_random_uuid(),
+      'authenticated', 'authenticated',
+      v_user1_email,
+      crypt(v_user1_password, gen_salt('bf')),
+      NOW(),
+      '{"provider":"email","providers":["email"]}',
+      format('{"full_name":"%s"}', v_user1_name)::jsonb,
+      NOW(), NOW(), '', '', '', ''
+    ) RETURNING id INTO user1_id;
 
-  INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
-  VALUES (
-    user1_id, user1_id,
-    format('{"sub": "%s", "email": "user1@example.com"}', user1_id)::jsonb,
-    'email', user1_id, NOW(), NOW(), NOW()
-  );
+    INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+    VALUES (
+      user1_id, user1_id,
+      format('{"sub": "%s", "email": "%s"}', user1_id, v_user1_email)::jsonb,
+      'email', user1_id, NOW(), NOW(), NOW()
+    );
 
-  -- Create User 2
-  INSERT INTO auth.users (
-    instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at, confirmation_token, email_change,
-    email_change_token_new, recovery_token
-  ) VALUES (
-    '00000000-0000-0000-0000-000000000000',
-    gen_random_uuid(),
-    'authenticated', 'authenticated',
-    'user2@example.com',
-    crypt('password2', gen_salt('bf')),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"full_name":"User Two"}',
-    NOW(), NOW(), '', '', '', ''
-  ) RETURNING id INTO user2_id;
+    RAISE NOTICE '  ✓ Created user %', v_user1_email;
+  ELSE
+    RAISE NOTICE '  → User % already exists, skipping creation', v_user1_email;
+  END IF;
 
-  INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
-  VALUES (
-    user2_id, user2_id,
-    format('{"sub": "%s", "email": "user2@example.com"}', user2_id)::jsonb,
-    'email', user2_id, NOW(), NOW(), NOW()
-  );
+  IF user2_id IS NULL THEN
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at, confirmation_token, email_change,
+      email_change_token_new, recovery_token
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      gen_random_uuid(),
+      'authenticated', 'authenticated',
+      v_user2_email,
+      crypt(v_user2_password, gen_salt('bf')),
+      NOW(),
+      '{"provider":"email","providers":["email"]}',
+      format('{"full_name":"%s"}', v_user2_name)::jsonb,
+      NOW(), NOW(), '', '', '', ''
+    ) RETURNING id INTO user2_id;
 
-  -- Get auto-created household IDs (from handle_new_user trigger)
+    INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+    VALUES (
+      user2_id, user2_id,
+      format('{"sub": "%s", "email": "%s"}', user2_id, v_user2_email)::jsonb,
+      'email', user2_id, NOW(), NOW(), NOW()
+    );
+
+    RAISE NOTICE '  ✓ Created user %', v_user2_email;
+  ELSE
+    RAISE NOTICE '  → User % already exists, skipping creation', v_user2_email;
+  END IF;
+
+  -- ----------------------------------------------------------------
+  -- Step 2: Merge households (skip if already sharing one)
+  -- ----------------------------------------------------------------
   SELECT household_id INTO household1_id FROM public.users WHERE id = user1_id;
   SELECT household_id INTO household2_id FROM public.users WHERE id = user2_id;
 
-  -- Create shared household named 'Home'
-  INSERT INTO public.households (name) VALUES ('Home')
-  RETURNING id INTO shared_household_id;
+  IF household1_id = household2_id THEN
+    RAISE NOTICE '  → Users already share household, nothing to do';
+  ELSE
+    -- Create shared household named 'Home'
+    INSERT INTO public.households (name) VALUES ('Home')
+    RETURNING id INTO shared_household_id;
 
-  -- Consolidate users into shared household
-  UPDATE public.users SET household_id = shared_household_id WHERE id IN (user1_id, user2_id);
+    -- Consolidate users into shared household
+    UPDATE public.users SET household_id = shared_household_id WHERE id IN (user1_id, user2_id);
 
-  -- Delete auto-created households
-  DELETE FROM public.households WHERE id IN (household1_id, household2_id);
+    -- Delete auto-created households
+    DELETE FROM public.households WHERE id IN (household1_id, household2_id);
 
-  RAISE NOTICE '  ✓ Created 2 users in shared household "Home"';
-  RAISE NOTICE 'Login credentials:';
-  RAISE NOTICE '  user1@example.com / password1';
-  RAISE NOTICE '  user2@example.com / password2';
+    RAISE NOTICE '  ✓ Merged users into shared household "Home"';
+  END IF;
+
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'Setup complete.';
+  RAISE NOTICE '========================================';
 END $$;

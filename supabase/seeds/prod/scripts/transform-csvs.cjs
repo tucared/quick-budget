@@ -370,7 +370,13 @@ function main() {
     sqlLines.push('');
     sqlLines.push('  -- Get IDs');
     sqlLines.push('  SELECT id INTO shared_household_id FROM public.households LIMIT 1;');
-    sqlLines.push('  SELECT id INTO user1_id FROM public.users WHERE email = \'max.perdrigeat@gmail.com\';');
+    sqlLines.push(`  SELECT id INTO user1_id FROM public.users WHERE email = '${config.users.user1.email}';`);
+    sqlLines.push('');
+    sqlLines.push('  -- Idempotency: skip if data already imported');
+    sqlLines.push('  IF EXISTS (SELECT 1 FROM public.expenses WHERE household_id = shared_household_id) THEN');
+    sqlLines.push('    RAISE NOTICE \'  → Data already imported, skipping\';');
+    sqlLines.push('    RETURN;');
+    sqlLines.push('  END IF;');
     sqlLines.push('');
     sqlLines.push('  -- ============================================================================');
     sqlLines.push('  -- Import Budget Allocations');

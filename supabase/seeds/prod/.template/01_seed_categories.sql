@@ -16,7 +16,13 @@ BEGIN
   SELECT id INTO shared_household_id FROM public.households WHERE name = 'Home';
 
   IF shared_household_id IS NULL THEN
-    RAISE EXCEPTION 'Household "Home" not found. Run dev/00_create_users.sql or prod-setup.sql first.';
+    RAISE EXCEPTION 'Household "Home" not found. Run dev/00_create_users.sql first.';
+  END IF;
+
+  -- Idempotency: skip if categories already exist for this household
+  IF EXISTS (SELECT 1 FROM public.categories WHERE household_id = shared_household_id) THEN
+    RAISE NOTICE '  → Categories already exist, skipping';
+    RETURN;
   END IF;
 
   -- Spending categories (customize as needed)
