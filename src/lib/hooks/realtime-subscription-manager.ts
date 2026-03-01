@@ -50,8 +50,20 @@ export class RealtimeSubscriptionManager<TCallback extends (...args: never[]) =>
     }
   }
 
-  private createSubscription(householdId: string) {
-    const channel = this.getClient()
+  private async createSubscription(householdId: string) {
+    // Ensure a valid auth session exists before subscribing to Realtime.
+    // Without this, the websocket connects without a token and gets rejected.
+    const client = this.getClient()
+    const { data: { session } } = await client.auth.getSession()
+
+    // Check if we were cleaned up while awaiting, or if auth is invalid
+    if (!this.householdSubscribers.get(householdId)?.size) return
+    if (!session) {
+      console.warn(`${this.config.table} subscription skipped: no valid auth session`)
+      return
+    }
+
+    const channel = client
       .channel(`${this.config.channelPrefix}_${householdId}`)
       .on(
         "postgres_changes",
@@ -75,7 +87,7 @@ export class RealtimeSubscriptionManager<TCallback extends (...args: never[]) =>
       )
       .subscribe((status, err) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error(`${this.config.table} subscription ${status}:`, err)
+          console.warn(`${this.config.table} subscription ${status}:`, err)
           this.removeChannel(householdId)
           const subscribers = this.householdSubscribers.get(householdId)
           if (subscribers && subscribers.size > 0) {
@@ -86,7 +98,7 @@ export class RealtimeSubscriptionManager<TCallback extends (...args: never[]) =>
             }, 5000)
           }
         } else if (status === "CLOSED") {
-          console.warn(`${this.config.table} subscription closed`)
+          console.debug(`${this.config.table} subscription closed`)
         }
       })
 
