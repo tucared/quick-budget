@@ -464,10 +464,9 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
           <input
             ref={amountInputRef}
             type="text"
-            inputMode="none"
+            inputMode="decimal"
             autoFocus
             autoComplete="off"
-            readOnly
             onKeyDown={handleAmountKeyDown}
             className="sr-only"
             aria-label="Amount"
