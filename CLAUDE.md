@@ -13,6 +13,7 @@
 - When editing the seeds, dont forget to update the corresponding `.template/` files as well (in `supabase/seeds/dev/.template/`, `supabase/seeds/prod/.template/`, `supabase/seeds/.template/`)
 - After modifying the database schema in migrations, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
+- Local credentials can be found in @supabase/seeds/dev/00_create_users.sql:36-37
 
 ## Exchange Rate System
 
