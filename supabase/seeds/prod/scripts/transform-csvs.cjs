@@ -15,7 +15,7 @@ const { parse } = require('csv-parse/sync');
 const { validateExpense, validateBudgetAllocation } = require('./validators.cjs');
 
 /**
- * Parses valid category names from 01_seed_all.sql (single source of truth)
+ * Parses valid category names from 01_seed_categories.sql (single source of truth)
  */
 function parseCategoriesFromSeed(seedFilePath) {
   const content = fs.readFileSync(seedFilePath, 'utf-8');
@@ -340,9 +340,9 @@ function main() {
 
   try {
     // Parse valid categories from seed (single source of truth)
-    const seedFile = path.join(SEED_DIR, '01_seed_all.sql');
+    const seedFile = path.join(SEED_DIR, '01_seed_categories.sql');
     const VALID_CATEGORIES = parseCategoriesFromSeed(seedFile);
-    console.log(`\n📂 Parsed ${VALID_CATEGORIES.size} valid categories from 01_seed_all.sql`);
+    console.log(`\n📂 Parsed ${VALID_CATEGORIES.size} valid categories from 01_seed_categories.sql`);
 
     const expenseResult = transformExpenses();
     const budgetResult = transformBudgetAllocations();
