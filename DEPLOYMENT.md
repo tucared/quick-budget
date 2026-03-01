@@ -28,14 +28,16 @@ supabase db push
 
 ### Seed Production Data
 
-Seeds live in `supabase/seeds/prod/` and contain real historical data. Run them against the **production** DB URL (found in Supabase Dashboard → Project Settings → Database → Connection string):
+Production seeding is a manual process (no passwords in seed files):
 
 ```bash
-# Use the production connection string from Supabase Dashboard
-PROD_DB_URL="postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres"
-
-psql "$PROD_DB_URL" -f supabase/seeds/prod/01_seed_all.sql
-psql "$PROD_DB_URL" -f supabase/seeds/prod/02_import_normalized.sql
+# 1. Create both users in Supabase Dashboard → Authentication → Add user (auto-confirm)
+# 2. Merge their auto-created households into a shared one
+supabase db execute --file supabase/seeds/prod-setup.sql
+# 3. Seed categories and historical data
+supabase db execute --file supabase/seeds/prod/01_seed_categories.sql
+supabase db execute --file supabase/seeds/prod/02_import_normalized.sql
+supabase db execute --file supabase/seeds/prod/03_import_exchange_rates.sql
 ```
 
 Alternatively, copy and paste each seed file's SQL into Supabase Dashboard → SQL Editor.
