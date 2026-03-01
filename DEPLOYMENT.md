@@ -17,30 +17,14 @@ Guide for deploying Quick Budget to production using Vercel + Supabase Cloud.
 ## Step 2: Push Database Schema & Seed Data
 
 ```bash
-# Link to your production project
+# Link to your production project (`supabase login` may be required before)
 supabase link --project-ref your-project-ref
 
-# Push migrations (creates all tables)
-supabase db push
-```
-
-> **Note:** `supabase db reset` only works locally. For production, you must seed manually (below).
-
-### Seed Production Data
-
-Production seeding is a manual process (no passwords in seed files):
-
-```bash
 # 1. Create both users in Supabase Dashboard → Authentication → Add user (auto-confirm)
-# 2. Merge their auto-created households into a shared one
-supabase db execute --file supabase/seeds/prod-setup.sql
-# 3. Seed categories and historical data
-supabase db execute --file supabase/seeds/prod/01_seed_categories.sql
-supabase db execute --file supabase/seeds/prod/02_import_normalized.sql
-supabase db execute --file supabase/seeds/prod/03_import_exchange_rates.sql
-```
 
-Alternatively, copy and paste each seed file's SQL into Supabase Dashboard → SQL Editor.
+# 2. Push migrations + seed data (seeds are idempotent — safe to re-run)
+supabase db push --include-seed
+```
 
 > **Important:** `02_import_normalized.sql` is auto-generated from CSVs via `npm run seed:transform`. Run this locally first if the file is out of date.
 

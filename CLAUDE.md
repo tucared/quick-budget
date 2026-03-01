@@ -4,7 +4,7 @@
 - Read @DATA_MODEL.md when planning for data changes
 - Read @README.md to know about the stack and how to launch server
 - Keep all *.md files mentionned up to date when you perform changes or see drift
-- Supabase seeds follow the pattern `supabase/seeds/{dev,prod}/**/*.sql` and `supabase/seeds/prod-setup.sql`
+- Supabase seeds follow the pattern `supabase/seeds/{dev,prod}/**/*.sql`
 
 # Development guidelines
 

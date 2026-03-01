@@ -39,7 +39,6 @@ chrome/
 
 # Supabase seeds (contain real user data and credentials)
 supabase/seeds/dev/*.sql
-supabase/seeds/prod-setup.sql
 supabase/seeds/prod/*.sql
 supabase/seeds/prod/*.csv
 supabase/seeds/prod/raw/
