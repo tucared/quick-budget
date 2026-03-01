@@ -83,7 +83,9 @@ src/
 supabase/
 ├── migrations/            # Database migrations
 ├── seeds/
-│   └── prod/             # Production seeds (real historical data)
+│   ├── dev/              # Dev-only seeds (user creation with passwords)
+│   ├── prod/             # Shared seeds (categories, historical data)
+│   └── prod-setup.sql    # Production household merge (manual, no passwords)
 └── config.toml           # Supabase config
 ```
 
@@ -149,11 +151,23 @@ Application-specific types in `src/lib/types.ts` can extend or compose these gen
 
 ## Database Seeding
 
-Seeds live in `supabase/seeds/prod/` and are executed automatically by `supabase db reset`. Three files run in order:
+Seeds are split into dev-only (user credentials) and shared (categories, data):
 
-1. `01_seed_all.sql` — Users, accounts, categories (base data, hand-authored)
-2. `02_import_normalized.sql` — Historical expenses + budget allocations (**auto-generated** from CSVs)
-3. `03_import_exchange_rates.sql` — Historical exchange rates (**auto-generated** from CSV)
+```
+supabase/seeds/
+  dev/
+    00_create_users.sql            — Dev user creation with passwords (git-ignored)
+    .template/00_create_users.sql  — Template with example values
+  prod/
+    01_seed_categories.sql         — Categories (git-ignored)
+    02_import_normalized.sql       — Historical data (auto-generated)
+    03_import_exchange_rates.sql   — Exchange rates (auto-generated)
+    .template/                     — Committed templates
+  prod-setup.sql                   — Production household merge (git-ignored)
+  .template/prod-setup.sql         — Template
+```
+
+`supabase db reset` runs: `dev/00_create_users.sql` → `prod/01_*` → `prod/02_*` → `prod/03_*`
 
 ```bash
 # Full workflow: Transform CSVs → SQL, then reset DB
@@ -164,7 +178,7 @@ npm run seed:transform  # Regenerate 02_import_normalized.sql from raw CSVs
 npm run seed:reset      # Reset database with migrations and seeds
 ```
 
-> **Important:** After modifying categories in `01_seed_all.sql`, always re-run `npm run seed:transform` because the generated file references categories by name. If a category is renamed or removed, the generated SQL will fail with a NULL constraint violation.
+> **Important:** After modifying categories in `01_seed_categories.sql`, always re-run `npm run seed:transform` because the generated file references categories by name. If a category is renamed or removed, the generated SQL will fail with a NULL constraint violation.
 
 ## Other Documentation
 

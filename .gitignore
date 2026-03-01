@@ -37,7 +37,9 @@ next-env.d.ts
 chrome/
 .playwright-mcp
 
-# Supabase production seeds (contain real user data)
+# Supabase seeds (contain real user data and credentials)
+supabase/seeds/dev/*.sql
+supabase/seeds/prod-setup.sql
 supabase/seeds/prod/*.sql
 supabase/seeds/prod/*.csv
 supabase/seeds/prod/raw/
@@ -46,6 +48,7 @@ supabase/seeds/prod/raw/
 supabase/seeds/prod/normalized/
 supabase/seeds/prod/scripts/config.local.js
 # Keep scripts and templates
+!supabase/seeds/dev/.template/
 !supabase/seeds/prod/scripts/
 !supabase/seeds/prod/.template/
 

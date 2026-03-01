@@ -4,13 +4,13 @@
 - Read @DATA_MODEL.md when planning for data changes
 - Read @README.md to know about the stack and how to launch server
 - Keep all *.md files mentionned up to date when you perform changes or see drift
-- Supabase seeds follow the pattern `supabase/seeds/**/*.sql`
+- Supabase seeds follow the pattern `supabase/seeds/{dev,prod}/**/*.sql` and `supabase/seeds/prod-setup.sql`
 
 # Development guidelines
 
 - Use Supabase MCP instead of docker for interactive with the database
 - DO NOT WRITE ANY new migrations, just edit @supabase/migrations/20260116_initial_schema.sql and run `supabase db reset`
-- When editing the seeds, dont forget to update @supabase/seeds/prod/.template files as well
+- When editing the seeds, dont forget to update the corresponding `.template/` files as well (in `supabase/seeds/dev/.template/`, `supabase/seeds/prod/.template/`, `supabase/seeds/.template/`)
 - After modifying the database schema in migrations, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 
