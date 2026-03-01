@@ -59,7 +59,7 @@ export function CentsInput({
       <input
         ref={inputRef}
         type="text"
-        inputMode="none"
+        inputMode="decimal"
         value=""
         onChange={() => {}}
         onKeyDown={handleKeyDown}
