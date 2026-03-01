@@ -32,9 +32,9 @@ Verify results in Supabase Dashboard → Table Editor.
 
 ## Step 3: Get Supabase Credentials
 
-In Supabase Dashboard → Project Settings → API:
+In Supabase Project Overview, get:
 - **Project URL**: `https://xxxxx.supabase.co`
-- **Anon/Public Key**: `eyJhbGc...` (long JWT token)
+- **Publishable Key**: `sb_publishable_...`
 
 Save these for Vercel.
 
@@ -46,7 +46,7 @@ Save these for Vercel.
 4. Vercel auto-detects Next.js
 5. Add environment variables:
    - `NEXT_PUBLIC_SUPABASE_URL` = Your project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = Your anon key
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = Your publishable key
 6. Click "Deploy"
 
 **Automatic Deployments**: When you import from GitHub, Vercel automatically installs the [Vercel GitHub App](https://github.com/apps/vercel) which enables:
@@ -118,7 +118,7 @@ supabase db push
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...your-publishable-key
 ```
 
 Exchange rates are fetched from [Frankfurter](https://www.frankfurter.dev) — free, no API key required.
