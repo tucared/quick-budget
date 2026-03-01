@@ -268,8 +268,7 @@ function transformBudgetAllocations() {
   console.log('\n💰 Transforming budget allocations...');
 
   const inputFiles = [
-    path.join(RAW_DIR, 'budget_allocations_1.csv'),
-    path.join(RAW_DIR, 'budget_allocations_2.csv')
+    path.join(RAW_DIR, 'budget_allocations.csv')
   ];
 
   const transformed = [];
@@ -310,7 +309,7 @@ function transformBudgetAllocations() {
     });
   });
 
-  console.log(`  ✓ Processed ${stats.total} rows from 2 files`);
+  console.log(`  ✓ Processed ${stats.total} rows`);
   console.log(`    • Valid: ${stats.valid}`);
   console.log(`    • Skipped: ${stats.skipped}`);
   console.log(`    • Errors: ${stats.errors}`);
