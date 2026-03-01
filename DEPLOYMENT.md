@@ -79,38 +79,15 @@ With the Vercel GitHub integration enabled:
 - **Production**: Push to `main` → Vercel automatically deploys to production
 - **Preview**: Create a PR → Vercel creates a preview deployment and posts the URL in PR comments
 
-### Managing Deployments
-
-- **View all deployments**: Vercel Dashboard → Deployments
-- **Rollback**: Vercel Dashboard → Deployments → Promote to Production (on any previous deployment)
-- **Environment variables**: Vercel Dashboard → Settings → Environment Variables
-  - Changes to env vars require redeployment (trigger via Dashboard or new commit)
-- **Preview branches**: By default, all branches get previews. Configure in Vercel Dashboard → Settings → Git
-
 ## Database Management
 
 ### Running Migrations
 
-**Production:**
 ```bash
 # After creating new migrations locally
 supabase link --project-ref your-project-ref
 supabase db push
 ```
-
-**Rollback:**
-```bash
-# Supabase doesn't support automatic rollback.
-# This project uses a single migration file (20260116_initial_schema.sql).
-# To roll back: edit the migration file and run supabase db push again,
-# or apply a compensating SQL change directly via the Dashboard → SQL Editor.
-```
-
-### Viewing Data
-
-- **Supabase Dashboard**: https://app.supabase.com → Your Project → Table Editor
-- **Direct SQL**: Dashboard → SQL Editor
-- **Logs**: Dashboard → Logs
 
 ## Environment Variables
 
@@ -129,11 +106,12 @@ Supabase Free tier has **no built-in backups**. This project includes an automat
 
 ### Setup (one-time, after creating Supabase project)
 
-1. Get your database connection string from **Supabase Dashboard → Project Settings → Database → Connection string (URI)**
+1. Get your database connection string from **Supabase → Project Overview → Database → Connection string (URI), method Transaction pooler**
 2. In your GitHub repo, go to **Settings → Secrets and variables → Actions**
 3. Add a new repository secret:
    - **Name**: `SUPABASE_DB_URL`
-   - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres`
+   - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
+   - **Important**: If your database password contains special characters, URL-encode them (e.g., `!` → `%21`, `@` → `%40`, `#` → `%23`)
 4. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Daily Database Backup → Run workflow**
 
 ### Restoring from backup
@@ -152,10 +130,3 @@ Always run a manual backup before migrations or schema changes:
 # Trigger backup manually from GitHub Actions UI, or:
 pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > backup-$(date +%Y%m%d).sql
 ```
-
-### Upgrading backup strategy
-
-If data becomes critical, upgrade to **Supabase Pro** ($25/mo) for:
-- Automated daily backups with 7-day retention
-- Point-in-Time Recovery (PITR) — restore to any second
-- No setup required
