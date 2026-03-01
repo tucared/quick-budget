@@ -5,9 +5,6 @@
 -- Suppress informational notices during migration
 SET client_min_messages = warning;
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Restore normal message level
 RESET client_min_messages;
 
@@ -62,7 +59,7 @@ $$;
 -- ============================================================================
 -- Represents a household that shares financial data
 CREATE TABLE households (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -119,7 +116,7 @@ CREATE TRIGGER on_auth_user_created
 -- Spending categories and personal allowances
 -- Categories are household-scoped to allow customization (e.g., "Max's Allowance")
 CREATE TABLE categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   exclude_from_budget_total BOOLEAN NOT NULL DEFAULT FALSE,
@@ -167,7 +164,7 @@ CREATE INDEX idx_categories_household_active ON categories(household_id, is_acti
 -- Individual expense transactions
 -- Expenses are household-scoped via account relationship
 CREATE TABLE expenses (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   logged_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
@@ -264,7 +261,7 @@ CREATE INDEX idx_exchange_rates_currency_date ON exchange_rates(currency, rate_d
 -- Monthly budget allocations for categories
 -- Household-scoped: shared budget planning for partners
 CREATE TABLE budget_allocations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   budget_month DATE NOT NULL, -- First day of the month (e.g., 2026-01-01)
