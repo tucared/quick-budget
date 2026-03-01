@@ -7,7 +7,6 @@ import { clearStorageKeys } from "@/lib/types"
 import { Receipt, Wallet, LogOut } from "lucide-react"
 import { UserProvider } from "@/lib/contexts/user-context"
 import type { UserData } from "@/lib/hooks/use-user"
-import { useKeyboardVisible } from "@/lib/hooks/use-keyboard-visible"
 
 const tabs = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
@@ -23,8 +22,6 @@ export default function AppLayoutClient({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const isKeyboardVisible = useKeyboardVisible()
-
   const handleLogout = async () => {
     clearStorageKeys()
     const supabase = createClient()
@@ -53,8 +50,8 @@ export default function AppLayoutClient({
         {/* Page content */}
         <div className="pb-16">{children}</div>
 
-        {/* Bottom tab bar - hidden when mobile keyboard is open */}
-        <nav className={`fixed bottom-0 left-0 right-0 z-10 bg-background border-t transition-transform duration-200 ${isKeyboardVisible ? "translate-y-full" : ""}`}>
+        {/* Bottom tab bar */}
+        <nav className="fixed bottom-0 left-0 right-0 z-10 bg-background border-t">
           <div className="flex">
             {tabs.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href
