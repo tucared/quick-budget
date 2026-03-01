@@ -5,8 +5,10 @@ const nextConfig = {
   async headers() {
     // Build connect-src to include the configured Supabase URL
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
-    // Convert https:// to wss:// for WebSocket realtime connections
-    const supabaseWs = supabaseUrl.replace(/^https?:\/\//, "wss://")
+    // Convert http(s):// to ws(s):// for WebSocket realtime connections
+    const supabaseWs = supabaseUrl
+      .replace(/^https:\/\//, "wss://")
+      .replace(/^http:\/\//, "ws://")
     const connectSrc = [
       "'self'",
       supabaseUrl,
