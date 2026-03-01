@@ -46,7 +46,7 @@ Save these for Vercel.
 4. Vercel auto-detects Next.js
 5. Add environment variables:
    - `NEXT_PUBLIC_SUPABASE_URL` = Your project URL
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = Your publishable key
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` = Your publishable key
 6. Click "Deploy"
 
 **Automatic Deployments**: When you import from GitHub, Vercel automatically installs the [Vercel GitHub App](https://github.com/apps/vercel) which enables:
@@ -118,7 +118,7 @@ supabase db push
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...your-publishable-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_...your-publishable-key
 ```
 
 Exchange rates are fetched from [Frankfurter](https://www.frankfurter.dev) — free, no API key required.
