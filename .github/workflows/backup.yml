@@ -29,7 +29,7 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           BACKUP_FILE="quick-budget-${TIMESTAMP}.sql"
 
-          pg_dump "$DATABASE_URL" \
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" \
             --no-owner \
             --no-privileges \
             --clean \
