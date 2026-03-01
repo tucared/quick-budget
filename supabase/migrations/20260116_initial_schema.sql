@@ -185,7 +185,6 @@ CREATE TABLE expenses (
   -- Transaction details
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
   description TEXT,
-  notes TEXT,
 
   -- Tracking
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
