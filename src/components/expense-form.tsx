@@ -9,7 +9,6 @@ import { getStorageKeys, type Category, type Expense, type BudgetSummary } from 
 import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetStatus } from "@/components/category-budget-status"
@@ -173,12 +172,12 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             : []
 
           // If fewer than 5, fill with remaining active categories alphabetically
-          if (ranked.length < 5) {
+          if (ranked.length < 7) {
             const rankedSet = new Set(ranked)
             const fillers = categoriesData
               .filter((c) => !rankedSet.has(c.id))
               .map((c) => c.id)
-              .slice(0, 5 - ranked.length)
+              .slice(0, 7 - ranked.length)
             ranked.push(...fillers)
           }
 
@@ -405,35 +404,26 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
     return (
       <div className="space-y-4">
         {/* Amount + currency toggle Skeleton */}
-        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-16 w-full" />
 
         {/* Category tile grid Skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-24" />
-          <div className="grid grid-cols-3 gap-1.5">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-[3.25rem] w-full rounded-lg" />
-            ))}
-          </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded-lg" />
+          ))}
         </div>
 
-        {/* Date Skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-10 w-full" />
+        {/* Date + Cash row Skeleton */}
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 flex-1" />
+          <Skeleton className="h-5 w-16" />
         </div>
 
         {/* Description Skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-
-        {/* Cash checkbox Skeleton */}
-        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-20 w-full" />
 
         {/* Submit Button Skeleton */}
-        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-11 w-full" />
       </div>
     )
   }
@@ -457,7 +447,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       {/* Amount - hero cents-first input with inline currency toggle */}
       <div>
         <div
-          className={`flex items-center h-14 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${formErrors.amount ? "border-destructive" : "border-input"}`}
+          className={`flex items-center h-16 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${formErrors.amount ? "border-destructive" : "border-input"}`}
           onClick={() => amountInputRef.current?.focus()}
         >
           {/* Invisible input that captures keyboard events */}
@@ -472,7 +462,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             aria-label="Amount"
           />
           {/* Display */}
-          <span className={`flex-1 text-2xl font-semibold text-center tabular-nums ${centsRaw === 0 ? "text-muted-foreground" : ""}`}>
+          <span className={`flex-1 text-3xl font-semibold text-center tabular-nums ${centsRaw === 0 ? "text-muted-foreground" : ""}`}>
             {formatCentsDisplay(centsRaw)}
           </span>
           {/* Currency toggle inline */}
@@ -507,8 +497,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       </div>
 
       {/* Category - tile grid for quick selection */}
-      <div className="space-y-2">
-        <Label htmlFor="category">Category *</Label>
+      <div className="space-y-1.5" aria-label="Category">
         <CategoryTileSelector
           categories={categories}
           topCategoryIds={topCategoryIds}
@@ -531,10 +520,21 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
         )}
       </div>
 
-      {/* Date + Cash checkbox */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="expense_date">Date *</Label>
+      {/* Date + Cash checkbox inline */}
+      <div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <DatePicker
+              date={dateAsObject}
+              onDateChange={(date) => {
+                if (date) {
+                  setExpenseDate(format(date, 'yyyy-MM-dd'))
+                }
+              }}
+              placeholder="Select expense date"
+              aria-label="Expense date"
+            />
+          </div>
           <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
             <input
               type="checkbox"
@@ -545,25 +545,15 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             Cash
           </label>
         </div>
-        <DatePicker
-          date={dateAsObject}
-          onDateChange={(date) => {
-            if (date) {
-              setExpenseDate(format(date, 'yyyy-MM-dd'))
-            }
-          }}
-          placeholder="Select expense date"
-        />
         {formErrors.expense_date && (
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-destructive mt-1">
             {formErrors.expense_date}
           </p>
         )}
       </div>
 
       {/* Description (optional) */}
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+      <div>
         <Textarea
           id="description"
           placeholder="Optional notes about this expense"
@@ -587,7 +577,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       {/* Submit Button - Large touch target for mobile */}
       <Button
         type="submit"
-        className="w-full h-12 text-lg font-semibold transition-colors"
+        className="w-full h-11 text-base font-semibold transition-colors"
         disabled={loading || showSuccess}
       >
         {showSuccess ? (
