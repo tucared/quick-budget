@@ -184,18 +184,16 @@ export function BudgetEditDialog({
     const entry = entries.find((e) => e.categoryId === cat.id)
     if (!entry) return null
     return (
-      <div key={cat.id} className="flex items-center gap-3 py-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {cat.icon && <span className="text-lg shrink-0">{cat.icon}</span>}
+      <div key={cat.id} className="flex items-center gap-2 sm:gap-3 py-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+          {cat.icon && <span className="text-base sm:text-lg shrink-0">{cat.icon}</span>}
           <span className="text-sm font-medium truncate">{cat.name}</span>
         </div>
-        <div className="hidden sm:block">
-          <BudgetHistoryMini categoryId={cat.id} history={history} />
-        </div>
+        <BudgetHistoryMini categoryId={cat.id} history={history} />
         <CentsInput
           value={entry.cents}
           onChange={(cents) => updateCents(cat.id, cents)}
-          className="w-28 shrink-0 h-8"
+          className="w-20 sm:w-28 shrink-0 h-8"
         />
       </div>
     )
