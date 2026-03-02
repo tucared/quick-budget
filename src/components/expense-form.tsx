@@ -79,17 +79,22 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
     return `${intFormatted},${String(decPart).padStart(2, "0")}`
   }
 
+  // Use onChange for digit/backspace handling instead of onKeyDown,
+  // because Firefox Android fires onKeyDown with e.key === "Unidentified"
+  // for the virtual keyboard's backspace key.
   const handleAmountKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key >= "0" && e.key <= "9") {
-      e.preventDefault()
-      const next = centsRaw * 10 + parseInt(e.key)
-      if (next <= 999999999) { // cap at ~10M
-        setCentsRaw(next)
-        setAmount(next / 100)
-      }
-    } else if (e.key === "Backspace") {
-      e.preventDefault()
-      const next = Math.floor(centsRaw / 10)
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+    if (allowedKeys.includes(e.key)) return
+    if (e.key >= '0' && e.key <= '9') return
+    if (e.ctrlKey || e.metaKey) return
+    if (e.key === 'Unidentified') return
+    e.preventDefault()
+  }
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '')
+    const next = parseInt(raw, 10) || 0
+    if (next <= 999999999) { // cap at ~10M
       setCentsRaw(next)
       setAmount(next > 0 ? next / 100 : NaN)
     }
@@ -457,6 +462,8 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             inputMode="decimal"
             autoFocus
             autoComplete="off"
+            value={centsRaw > 0 ? String(centsRaw) : ""}
+            onChange={handleAmountChange}
             onKeyDown={handleAmountKeyDown}
             className="sr-only"
             aria-label="Amount"

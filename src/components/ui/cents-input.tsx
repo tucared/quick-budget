@@ -34,16 +34,23 @@ export function CentsInput({
 }: CentsInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Use onChange for digit/backspace handling instead of onKeyDown,
+  // because Firefox Android fires onKeyDown with e.key === "Unidentified"
+  // for the virtual keyboard's backspace key.
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key >= "0" && e.key <= "9") {
-      e.preventDefault()
-      const next = value * 10 + parseInt(e.key)
-      if (next <= 999999999) {
-        onChange(next)
-      }
-    } else if (e.key === "Backspace") {
-      e.preventDefault()
-      onChange(Math.floor(value / 10))
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+    if (allowedKeys.includes(e.key)) return
+    if (e.key >= '0' && e.key <= '9') return
+    if (e.ctrlKey || e.metaKey) return
+    if (e.key === 'Unidentified') return
+    e.preventDefault()
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '')
+    const next = parseInt(raw, 10) || 0
+    if (next <= 999999999) {
+      onChange(next)
     }
   }
 
@@ -60,8 +67,9 @@ export function CentsInput({
         ref={inputRef}
         type="text"
         inputMode="decimal"
-        value=""
-        onChange={() => {}}
+        autoComplete="off"
+        value={value > 0 ? String(value) : ""}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         autoFocus={autoFocus}
         className="absolute inset-0 opacity-0 w-full cursor-text"
