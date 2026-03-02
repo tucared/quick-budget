@@ -5,6 +5,7 @@ import { format, isToday, isYesterday, parseISO } from "date-fns"
 import type { ExpenseWithDetails, Category } from "@/lib/types"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
+import { EditExpenseDialog } from "@/components/edit-expense-dialog"
 
 interface ExpenseListClientProps {
   expenses: ExpenseWithDetails[]
@@ -22,6 +23,8 @@ export function ExpenseListClient({
   }, [categoryList])
   const [visibleCount, setVisibleCount] = useState(10)
 
+  const [editingExpense, setEditingExpense] = useState<ExpenseWithDetails | null>(null)
+
   const {
     showingDeleteId,
     deletingIds,
@@ -30,6 +33,12 @@ export function ExpenseListClient({
     handleDelete,
     clearDeletingId,
   } = useExpenseDelete()
+
+  const handleEdit = (expenseId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const exp = expenses.find((ex) => ex.id === expenseId)
+    if (exp) setEditingExpense(exp)
+  }
 
   // Clean up deleting animation state when expense is removed from list (via realtime DELETE)
   useEffect(() => {
@@ -96,6 +105,7 @@ export function ExpenseListClient({
                 isShowingDelete={showingDeleteId === expense.id}
                 isDeleting={deletingIds.has(expense.id)}
                 onCardClick={handleCardClick}
+                onEdit={handleEdit}
                 onDelete={handleDelete}
               />
             ))}
@@ -113,6 +123,13 @@ export function ExpenseListClient({
           </button>
         </div>
       )}
+
+      <EditExpenseDialog
+        open={editingExpense !== null}
+        onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
+        expense={editingExpense}
+        categories={categoryList}
+      />
     </div>
   )
 }

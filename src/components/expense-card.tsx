@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
-import { Trash2 } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import type { Category } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/currency"
@@ -25,6 +25,7 @@ interface ExpenseCardProps {
   /** Show date + cash inline below description (dialog view). Default: show cash-only badge (list view). */
   showDate?: boolean
   onCardClick: (id: string) => void
+  onEdit?: (id: string, e: React.MouseEvent) => void
   onDelete: (id: string, e: React.MouseEvent) => void
 }
 
@@ -35,6 +36,7 @@ export function ExpenseCard({
   isDeleting,
   showDate = false,
   onCardClick,
+  onEdit,
   onDelete,
 }: ExpenseCardProps) {
   return (
@@ -89,7 +91,7 @@ export function ExpenseCard({
               <div className="relative flex items-start">
                 <div
                   className={`text-right transition-all ${
-                    isShowingDelete ? "mr-10" : "md:group-hover:mr-10"
+                    isShowingDelete ? "mr-[4.5rem]" : "md:group-hover:mr-[4.5rem]"
                   }`}
                 >
                   <div className="font-semibold text-lg">
@@ -101,17 +103,30 @@ export function ExpenseCard({
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={(e) => onDelete(expense.id, e)}
-                  className={`absolute right-0 top-0 transition-opacity p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive ${
+                <div
+                  className={`absolute right-0 top-0 flex items-center gap-0.5 transition-opacity ${
                     isShowingDelete
                       ? "opacity-100 pointer-events-auto"
                       : "opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto"
                   }`}
-                  aria-label="Delete expense"
                 >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                  {onEdit && (
+                    <button
+                      onClick={(e) => onEdit(expense.id, e)}
+                      className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground"
+                      aria-label="Edit expense"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => onDelete(expense.id, e)}
+                    className="p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive"
+                    aria-label="Delete expense"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </CardContent>

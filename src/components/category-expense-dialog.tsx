@@ -12,6 +12,7 @@ import {
 import { formatCurrency } from "@/lib/currency"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
+import { EditExpenseDialog } from "@/components/edit-expense-dialog"
 
 interface CategoryExpenseDialogProps {
   open: boolean
@@ -30,6 +31,8 @@ export function CategoryExpenseDialog({
   allExpenses,
   categories,
 }: CategoryExpenseDialogProps) {
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+
   // Optimistic delete: track IDs removed in this session so they disappear immediately
   // before the parent's reloadExpenses() finishes. Safe to keep across category/open changes
   // since deleted IDs won't appear in allExpenses once the parent reloads.
@@ -47,6 +50,12 @@ export function CategoryExpenseDialog({
   const handleDelete = (expenseId: string, e: React.MouseEvent) => {
     setDeletedIds((prev) => new Set([...prev, expenseId]))
     handleDeleteBase(expenseId, e)
+  }
+
+  const handleEdit = (expenseId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const exp = allExpenses.find((ex) => ex.id === expenseId)
+    if (exp) setEditingExpense(exp)
   }
 
   const categoryMap = useMemo(() => {
@@ -134,12 +143,20 @@ export function CategoryExpenseDialog({
                   isDeleting={deletingIds.has(expense.id)}
                   showDate
                   onCardClick={handleCardClick}
+                  onEdit={handleEdit}
                   onDelete={handleDelete}
                 />
               ))}
             </div>
           )}
         </div>
+
+        <EditExpenseDialog
+          open={editingExpense !== null}
+          onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
+          expense={editingExpense}
+          categories={categories}
+        />
       </DialogContent>
     </Dialog>
   )
