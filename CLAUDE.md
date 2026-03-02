@@ -10,6 +10,7 @@
 - Use Supabase MCP instead of docker for interacting with the database
 - When adding frontend feature, remember to handle Safari on iOs and Firefox on Android
 - When editing the seeds, dont forget to update the corresponding `.template/` files as well (in `supabase/seeds/dev/.template/`, `supabase/seeds/prod/.template/`, `supabase/seeds/.template/`)
+- Database schema is declarative: edit files in `supabase/schemas/`, then run `supabase db diff -f migration_name` to generate a migration
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 - Local credentials can be found in @supabase/seeds/dev/00_create_users.sql:36-37
