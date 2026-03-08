@@ -30,3 +30,9 @@
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 - Local credentials: `user1@example.com` / `password1` (see `supabase/seeds/01_create_users.sql`)
+
+## Browser agent guardrails
+
+- **Dialog overlays block clicks.** Dialogs render a full-screen overlay with `pointer-events: none` on elements behind it. Never try to click the backdrop to dismiss — use the Cancel/X button inside the dialog, or press Escape.
+- **Test data cleanup.** If a UI action (e.g., deleting an expense) fails or times out during testing, do not retry the same broken flow in a loop. Fall back to SQL cleanup via `mcp execute_sql` immediately.
+- **Seed data awareness.** Creating real expenses during testing affects budget summaries and category totals. Clean up test data immediately after verification, preferably via SQL.
