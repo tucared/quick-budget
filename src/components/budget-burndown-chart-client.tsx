@@ -228,7 +228,7 @@ export function BudgetBurndownChartClient({
                   border: "1px solid var(--border)",
                   borderRadius: "8px",
                 }}
-                formatter={(value: number | undefined) => [value !== undefined ? formatCurrency(value) : "", ""]}
+                formatter={(value) => [typeof value === "number" ? formatCurrency(value) : "", ""]}
                 labelStyle={{ color: "var(--foreground)" }}
               />
               <Legend />
