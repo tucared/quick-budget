@@ -10,7 +10,8 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
   # Download Chromium + Linux system libs needed by agent-browser
   # (agent-browser CLI is now installed via npm install above)
   echo "Installing Chromium for agent-browser..."
-  npx agent-browser install --with-deps || true
+  npx agent-browser close 2>/dev/null || true
+  npx agent-browser install --with-deps
 
   # Write .env.local from env vars set in the Claude Code web environment settings
   if [ ! -f .env.local ] && [ -n "$NEXT_PUBLIC_SUPABASE_URL" ]; then
