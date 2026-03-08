@@ -1,97 +1,94 @@
-# Production Deployment Guide
+# Deployment Guide
 
-Guide for deploying Quick Budget to production using Vercel + Supabase Cloud.
+Guide for deploying Quick Budget using Vercel + Supabase Cloud.
 
 > **Note:** For local development, see [README.md](./README.md)
 
-## Step 1: Create Supabase Project
+## Environments
 
-1. Go to https://app.supabase.com
-2. Click "New Project"
-3. Choose organization and set:
-   - **Name**: quick-budget-prod (or your choice)
-   - **Database Password**: (save this securely)
-   - **Region**: Choose closest to your users
-4. Wait ~2 minutes for provisioning
+| Environment | Database | Frontend | Purpose |
+|---|---|---|---|
+| **Local** | `supabase start` (Docker) | `npm run dev` (localhost:3000) | Development |
+| **Dev** | Supabase Cloud (dev project) | Vercel preview | Testing with cloud infra |
+| **Prod** | Supabase Cloud (prod project) | Vercel production | Live app |
 
-## Step 2: Push Database Schema & Seed Data
+## Initial Setup (New Supabase Project)
+
+1. Go to https://app.supabase.com → "New Project"
+2. Set name, database password, and region
+3. Wait ~2 minutes for provisioning
 
 ```bash
-# Link to your production project (`supabase login` may be required before)
-supabase link --project-ref your-project-ref
-
-# 1. Create both users in Supabase Dashboard → Authentication → Add user (auto-confirm)
-
-# 2. Push migrations + seed data (seeds are idempotent — safe to re-run)
+# Link and push schema + seeds
+supabase link --project-ref <project-ref>
 supabase db push --include-seed
 ```
 
-> **Important:** `02_import_normalized.sql` is auto-generated from CSVs via `npm run seed:transform`. Run this locally first if the file is out of date.
+Seeds create two test users, categories, budget allocations, expenses, and exchange rates with fake data. No manual setup needed.
 
 Verify results in Supabase Dashboard → Table Editor.
 
-## Step 3: Get Supabase Credentials
+## Database Baseline
 
-In Supabase Project Overview, get:
-- **Project URL**: `https://xxxxx.supabase.co`
-- **Publishable Key**: `sb_publishable_...`
+The baseline migration (`supabase/migrations/`) is generated from prod via `supabase db dump`. It captures the full schema as the starting point for new environments.
 
-Save these for Vercel.
+**Limitation:** `pg_dump` doesn't capture cross-schema triggers (e.g., the `on_auth_user_created` trigger on `auth.users`). These are added manually to the baseline.
 
-## Step 4: Deploy to Vercel
-
-1. Push code to GitHub
-2. Go to https://vercel.com/new
-3. Import your repository
-4. Vercel auto-detects Next.js
-5. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL` = Your project URL
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` = Your publishable key
-6. Click "Deploy"
-
-**Automatic Deployments**: When you import from GitHub, Vercel automatically installs the [Vercel GitHub App](https://github.com/apps/vercel) which enables:
-- **Production deployments**: Every push to `main` branch automatically deploys to production
-- **Preview deployments**: Every PR gets a unique preview URL for testing
-- **Deployment comments**: Vercel posts deployment status and preview URLs directly in PRs
-
-No additional configuration needed - this is enabled by default when connecting a GitHub repository.
-
-## Step 5: Configure Supabase Auth
-
-In Supabase Dashboard → Authentication → URL Configuration:
-
-- **Site URL**: `https://your-app.vercel.app`
-- **Redirect URLs**: `https://your-app.vercel.app/**`
-
-## Step 6: Verify Deployment
-
-1. Visit your Vercel URL
-2. Sign up or log in with your account
-3. Test expense creation
-4. Check Supabase Dashboard → Table Editor to see data
-
-## Deployment Workflow
-
-### Automatic Deployments
-
-With the Vercel GitHub integration enabled:
-
-- **Production**: Push to `main` → Vercel automatically deploys to production
-- **Preview**: Create a PR → Vercel creates a preview deployment and posts the URL in PR comments
-
-## Database Management
-
-### Running Migrations
+### Regenerating the baseline from prod
 
 ```bash
-# After creating new migrations locally
-supabase link --project-ref your-project-ref
+supabase link --project-ref <prod-project-ref>
+supabase db dump -f supabase/migrations/<timestamp>_baseline.sql
+# Manually add the auth trigger (see comment in the file)
+supabase db reset  # Verify locally
+```
+
+## Deploying Schema Changes
+
+1. Edit declarative schema files in `supabase/schemas/`
+2. Generate a migration: `supabase db diff -f descriptive_name`
+3. Verify locally: `supabase db reset`
+4. Push to target environment:
+
+```bash
+# Push to dev
+supabase link --project-ref <dev-project-ref>
+supabase db push
+
+# Push to prod (back up first!)
+supabase link --project-ref <prod-project-ref>
 supabase db push
 ```
 
-## Environment Variables
+### Resetting a dev environment
 
-### Production (.env.production or Vercel dashboard)
+```bash
+supabase link --project-ref <dev-project-ref>
+supabase db reset --linked
+```
+
+This drops everything, reapplies migrations, and runs seeds.
+
+## Vercel Deployment
+
+1. Push code to GitHub
+2. Go to https://vercel.com/new → Import repository
+3. Add environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL` = Project URL
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` = Publishable key
+4. Click "Deploy"
+
+**Automatic deployments** (enabled by default with Vercel GitHub integration):
+- Push to `main` → production deployment
+- Create a PR → preview deployment with unique URL
+
+### Supabase Auth Configuration
+
+In Supabase Dashboard → Authentication → URL Configuration:
+- **Site URL**: `https://your-app.vercel.app`
+- **Redirect URLs**: `https://your-app.vercel.app/**`
+
+## Environment Variables
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
