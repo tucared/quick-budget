@@ -18,6 +18,11 @@
   ```bash
   npx agent-browser --proxy "$HTTP_PROXY" --proxy-bypass "localhost,127.0.0.1" open http://localhost:3000 --ignore-https-errors
   ```
+- To test mobile viewports after opening, run:
+  ```bash
+  npx agent-browser --session <s> viewport 402 714   # Safari on iOS
+  npx agent-browser --session <s> viewport 427 804   # Firefox on Android
+  ```
 - `src/instrumentation.ts` configures Node.js to route server-side fetch through the proxy (via undici `EnvHttpProxyAgent`)
 - The dev server is started with `NODE_TLS_REJECT_UNAUTHORIZED=0` to accept the proxy's TLS certificates
 - Seeds are committed directly in `supabase/seeds/` with fake data
