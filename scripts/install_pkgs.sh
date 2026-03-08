@@ -7,11 +7,41 @@ npm install
 # Cloud-only setup (CLAUDE_CODE_REMOTE=true is injected by Claude Code web)
 if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
 
-  # Download Chromium + Linux system libs needed by agent-browser
-  # (agent-browser CLI is now installed via npm install above)
+  # Download Chromium + Linux system libs needed by agent-browser.
+  # agent-browser install downloads Chromium for its *bundled* playwright-core,
+  # but the cloud image may ship a different Playwright revision. After install,
+  # we patch any gap by symlinking the available headless-shell into the path
+  # that playwright-core actually expects. This avoids "Executable doesn't exist"
+  # errors when cdn.playwright.dev is blocked by the network proxy.
   echo "Installing Chromium for agent-browser..."
   npx agent-browser close 2>/dev/null || true
   npx agent-browser install --with-deps
+
+  # --- Playwright revision compatibility shim ---
+  # Detect which chromium_headless_shell revision playwright-core expects vs.
+  # what is actually installed, and create a symlink if they differ.
+  EXPECTED_DIR=$(node -e "
+    try {
+      const cr = require('playwright-core').chromium;
+      const m = cr.executablePath().match(/chromium_headless_shell-(\d+)/);
+      if (m) console.log(m[1]);
+    } catch(e) {}
+  " 2>/dev/null)
+
+  if [ -n "$EXPECTED_DIR" ]; then
+    EXPECTED_SHELL="/root/.cache/ms-playwright/chromium_headless_shell-${EXPECTED_DIR}/chrome-headless-shell-linux64/chrome-headless-shell"
+    if [ ! -f "$EXPECTED_SHELL" ]; then
+      # Find any installed headless_shell binary
+      INSTALLED_SHELL=$(find /root/.cache/ms-playwright -name "headless_shell" -type f 2>/dev/null | head -1)
+      if [ -n "$INSTALLED_SHELL" ]; then
+        mkdir -p "$(dirname "$EXPECTED_SHELL")"
+        ln -sf "$INSTALLED_SHELL" "$EXPECTED_SHELL"
+        echo "Patched Playwright chromium: linked $INSTALLED_SHELL -> $EXPECTED_SHELL"
+      else
+        echo "WARNING: No headless_shell binary found to patch Playwright revision mismatch"
+      fi
+    fi
+  fi
 
   # Write .env.local from env vars set in the Claude Code web environment settings
   if [ ! -f .env.local ] && [ -n "$NEXT_PUBLIC_SUPABASE_URL" ]; then
