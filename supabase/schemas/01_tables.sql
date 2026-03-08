@@ -89,7 +89,6 @@ CREATE TABLE expenses (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_expenses_household ON expenses(household_id);
 CREATE INDEX idx_expenses_household_date ON expenses(household_id, expense_date DESC);
 CREATE INDEX idx_expenses_logged_by ON expenses(logged_by_user_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
@@ -130,9 +129,7 @@ CREATE TABLE budget_allocations (
   UNIQUE(household_id, category_id, budget_month)
 );
 
-CREATE INDEX idx_budget_allocations_household ON budget_allocations(household_id);
 CREATE INDEX idx_budget_allocations_household_month ON budget_allocations(household_id, budget_month DESC);
-CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
