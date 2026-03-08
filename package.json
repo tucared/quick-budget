@@ -9,10 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "types:generate": "supabase gen types typescript --local > src/lib/database.types.ts",
-    "seed:transform": "node supabase/seeds/prod/scripts/transform-csvs.cjs",
-    "seed:exchange-rates": "node supabase/seeds/prod/scripts/generate-exchange-rates.cjs",
-    "seed:reset": "supabase db reset",
-    "seed:full": "npm run seed:transform && npm run seed:exchange-rates && npm run seed:reset"
+    "seed:reset": "supabase db reset"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -43,9 +40,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "agent-browser": "^0.16.3",
-    "csv-parse": "^6.1.0",
-    "csv-stringify": "^6.5.0",
-    "dotenv": "^17.3.1",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.6",
     "eslint-plugin-react": "^7.37.5",

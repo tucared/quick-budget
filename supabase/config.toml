@@ -70,7 +70,7 @@ enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 # Production seeds are in seeds/prod/ and run automatically on db reset.
-sql_paths = ['./seeds/dev/*.sql', './seeds/prod/0[1-9]*.sql']
+sql_paths = ['./seeds/*.sql']
 
 [db.network_restrictions]
 # Enable management of network restrictions.

@@ -33,23 +33,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Playwright
-chrome/
-.playwright-mcp
-
-# Supabase seeds (contain real user data and credentials)
-supabase/seeds/dev/*.sql
-supabase/seeds/prod/*.sql
-supabase/seeds/prod/*.csv
-supabase/seeds/prod/raw/
-# Includes: eur_brl_historical_rates.csv
-# Re-download EUR/BRL from: https://www.investing.com/currencies/eur-brl-historical-data (requires account)
-supabase/seeds/prod/normalized/
-supabase/seeds/prod/scripts/config.local.js
-# Keep scripts and templates
-!supabase/seeds/dev/.template/
-!supabase/seeds/prod/scripts/
-!supabase/seeds/prod/.template/
+# Agent browser
+dogfood-output/*
 
 # Claude
 .claude/settings.local.json

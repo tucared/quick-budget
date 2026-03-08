@@ -1,11 +1,8 @@
 -- ============================================================================
--- 00_create_users.sql - Idempotent User & Household Setup
+-- 01_create_users.sql - Idempotent User & Household Setup
 -- ============================================================================
--- Safe to run in any environment:
---   Local dev (db reset): creates users + merges households
---   Production (db push --include-seed): skips user creation, merges households
---   Re-runs: no-op if already set up
--- This file is git-ignored (copy from .template/ and customize)
+-- Creates two test users and merges them into a shared household.
+-- Safe to re-run: skips existing users and already-merged households.
 -- ============================================================================
 
 DO $$
@@ -101,14 +98,10 @@ BEGIN
   IF household1_id = household2_id THEN
     RAISE NOTICE '  → Users already share household, nothing to do';
   ELSE
-    -- Create shared household named 'Home'
     INSERT INTO public.households (name) VALUES ('Home')
     RETURNING id INTO shared_household_id;
 
-    -- Consolidate users into shared household
     UPDATE public.users SET household_id = shared_household_id WHERE id IN (user1_id, user2_id);
-
-    -- Delete auto-created households
     DELETE FROM public.households WHERE id IN (household1_id, household2_id);
 
     RAISE NOTICE '  ✓ Merged users into shared household "Home"';
