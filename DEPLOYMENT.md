@@ -79,20 +79,25 @@ supabase db reset  # Verify locally
 3. Verify locally: `supabase db reset`
 4. Push to each environment:
 
+**Dev** (CLI linked to dev project):
 ```bash
-# Push to dev
-supabase link --project-ref <dev-project-ref>
-supabase db push
-
-# Push to prod (back up first!)
-supabase link --project-ref <prod-project-ref>
 supabase db push
 ```
+
+**Prod** (automated via GitHub Actions):
+Merging to `main` with changes in `supabase/migrations/` automatically triggers the `Apply Database Migrations to Prod` workflow. You can also trigger it manually from **Actions → Apply Database Migrations to Prod → Run workflow**.
+
+### Prod migration setup (one-time)
+
+1. Create an access token at https://supabase.com/dashboard/account/tokens
+2. In your GitHub repo, go to **Settings → Secrets and variables → Actions**
+3. Add two repository secrets:
+   - **`SUPABASE_ACCESS_TOKEN`**: the token from step 1
+   - **`SUPABASE_PROD_PROJECT_REF`**: your prod project ref (from Supabase Dashboard → Project Settings)
 
 ### Resetting the dev environment
 
 ```bash
-supabase link --project-ref <dev-project-ref>
 supabase db reset --linked
 ```
 
