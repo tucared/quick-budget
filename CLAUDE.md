@@ -8,7 +8,9 @@
 # Development guidelines
 
 - Use Supabase MCP instead of docker for interacting with the database
-- When adding frontend feature, remember to handle Safari on iOs and Firefox on Android
+- Use the `dogfood` skill for exploratory UI testing & remember to pass the `--viewport` flag to `agent-browser` (test one viewport in general, 2 for larger changes)
+   - Safari on iOs (target 402x714)
+   - Firefox on Android (target 427x804)
 - When editing the seeds, dont forget to update the corresponding `.template/` files as well (in `supabase/seeds/dev/.template/`, `supabase/seeds/prod/.template/`, `supabase/seeds/.template/`)
 - Database schema is declarative: edit files in `supabase/schemas/`, then run `supabase db diff -f migration_name` to generate a migration
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
