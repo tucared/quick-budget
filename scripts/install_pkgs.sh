@@ -102,9 +102,17 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
     echo ".env.local written from environment variables."
   fi
 
+  # Persist NODE_TLS_REJECT_UNAUTHORIZED for subsequent Bash commands so that
+  # Node.js processes (e.g. Next.js server) accept the proxy's TLS certificates.
+  if [ -n "$CLAUDE_ENV_FILE" ] && [ -n "$HTTPS_PROXY" ]; then
+    echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> "$CLAUDE_ENV_FILE"
+  fi
+
   # Start Next.js dev server in background
+  # NODE_TLS_REJECT_UNAUTHORIZED=0 is needed because the cloud security proxy
+  # performs TLS inspection, and Node.js would otherwise reject its certificate.
   echo "Starting Next.js dev server..."
-  npm run dev > /tmp/nextjs.log 2>&1 &
+  NODE_TLS_REJECT_UNAUTHORIZED=0 npm run dev > /tmp/nextjs.log 2>&1 &
 
   # Wait up to 30s for the app to be ready
   echo "Waiting for app on port 3000..."
