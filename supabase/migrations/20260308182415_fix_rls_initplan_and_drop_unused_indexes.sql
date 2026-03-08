@@ -2,8 +2,6 @@ drop policy "Authenticated users can insert exchange rates" on "public"."exchang
 
 drop policy "Authenticated users can view exchange rates" on "public"."exchange_rates";
 
-drop function if exists "public"."rls_auto_enable"();
-
 drop index if exists "public"."idx_budget_allocations_category";
 
 drop index if exists "public"."idx_budget_allocations_household";
