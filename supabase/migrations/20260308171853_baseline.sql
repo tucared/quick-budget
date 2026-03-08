@@ -1,268 +1,72 @@
 
-  create table "public"."budget_allocations" (
-    "id" uuid not null default gen_random_uuid(),
-    "household_id" uuid not null,
-    "category_id" uuid not null,
-    "budget_month" date not null,
-    "allocated_amount" numeric(12,2) not null,
-    "currency" text not null default 'EUR'::text,
-    "created_at" timestamp with time zone not null default now(),
-    "updated_at" timestamp with time zone not null default now()
-      );
 
 
-alter table "public"."budget_allocations" enable row level security;
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
 
 
-  create table "public"."categories" (
-    "id" uuid not null default gen_random_uuid(),
-    "household_id" uuid not null,
-    "name" text not null,
-    "exclude_from_budget_total" boolean not null default false,
-    "icon" text,
-    "color" text,
-    "is_active" boolean not null default true,
-    "created_at" timestamp with time zone not null default now(),
-    "updated_at" timestamp with time zone not null default now()
-      );
+COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
-alter table "public"."categories" enable row level security;
 
+CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
 
-  create table "public"."exchange_rates" (
-    "currency" text not null,
-    "rate_date" date not null,
-    "rate_to_eur" numeric(12,6) not null,
-    "created_at" timestamp with time zone not null default now(),
-    "updated_at" timestamp with time zone not null default now()
-      );
 
 
-alter table "public"."exchange_rates" enable row level security;
 
 
-  create table "public"."expenses" (
-    "id" uuid not null default gen_random_uuid(),
-    "logged_by_user_id" uuid not null,
-    "household_id" uuid not null,
-    "category_id" uuid,
-    "is_cash" boolean not null default false,
-    "amount" numeric(12,2) not null,
-    "currency" text not null default 'EUR'::text,
-    "converted_amount" numeric(12,2) not null,
-    "converted_currency" text not null default 'EUR'::text,
-    "exchange_rate" numeric(12,6) not null default 1.0,
-    "expense_date" date not null default CURRENT_DATE,
-    "description" text,
-    "created_at" timestamp with time zone not null default now(),
-    "updated_at" timestamp with time zone not null default now()
-      );
 
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
 
-alter table "public"."expenses" enable row level security;
 
 
-  create table "public"."households" (
-    "id" uuid not null default gen_random_uuid(),
-    "name" text not null,
-    "created_at" timestamp with time zone not null default now(),
-    "updated_at" timestamp with time zone not null default now()
-      );
 
 
-alter table "public"."households" enable row level security;
 
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
 
-  create table "public"."users" (
-    "id" uuid not null,
-    "email" text not null,
-    "full_name" text,
-    "household_id" uuid not null,
-    "created_at" timestamp with time zone not null default now(),
-    "updated_at" timestamp with time zone not null default now()
-      );
 
 
-alter table "public"."users" enable row level security;
 
-CREATE UNIQUE INDEX budget_allocations_household_id_category_id_budget_month_key ON public.budget_allocations USING btree (household_id, category_id, budget_month);
 
-CREATE UNIQUE INDEX budget_allocations_pkey ON public.budget_allocations USING btree (id);
 
-CREATE UNIQUE INDEX categories_pkey ON public.categories USING btree (id);
+CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
 
-CREATE UNIQUE INDEX exchange_rates_pkey ON public.exchange_rates USING btree (currency, rate_date);
 
-CREATE UNIQUE INDEX expenses_pkey ON public.expenses USING btree (id);
 
-CREATE UNIQUE INDEX households_pkey ON public.households USING btree (id);
 
-CREATE INDEX idx_budget_allocations_category ON public.budget_allocations USING btree (category_id);
 
-CREATE INDEX idx_budget_allocations_household ON public.budget_allocations USING btree (household_id);
 
-CREATE INDEX idx_budget_allocations_household_month ON public.budget_allocations USING btree (household_id, budget_month DESC);
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
-CREATE INDEX idx_categories_household ON public.categories USING btree (household_id);
 
-CREATE INDEX idx_categories_household_active ON public.categories USING btree (household_id, is_active) WHERE (is_active = true);
 
-CREATE INDEX idx_exchange_rates_currency_date ON public.exchange_rates USING btree (currency, rate_date DESC);
 
-CREATE INDEX idx_expenses_category ON public.expenses USING btree (category_id);
 
-CREATE INDEX idx_expenses_date ON public.expenses USING btree (expense_date DESC);
 
-CREATE INDEX idx_expenses_household ON public.expenses USING btree (household_id);
-
-CREATE INDEX idx_expenses_household_date ON public.expenses USING btree (household_id, expense_date DESC);
-
-CREATE INDEX idx_expenses_logged_by ON public.expenses USING btree (logged_by_user_id);
-
-CREATE INDEX idx_users_household ON public.users USING btree (household_id);
-
-CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email);
-
-CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id);
-
-alter table "public"."budget_allocations" add constraint "budget_allocations_pkey" PRIMARY KEY using index "budget_allocations_pkey";
-
-alter table "public"."categories" add constraint "categories_pkey" PRIMARY KEY using index "categories_pkey";
-
-alter table "public"."exchange_rates" add constraint "exchange_rates_pkey" PRIMARY KEY using index "exchange_rates_pkey";
-
-alter table "public"."expenses" add constraint "expenses_pkey" PRIMARY KEY using index "expenses_pkey";
-
-alter table "public"."households" add constraint "households_pkey" PRIMARY KEY using index "households_pkey";
-
-alter table "public"."users" add constraint "users_pkey" PRIMARY KEY using index "users_pkey";
-
-alter table "public"."budget_allocations" add constraint "budget_allocations_allocated_amount_check" CHECK ((allocated_amount <> (0)::numeric)) not valid;
-
-alter table "public"."budget_allocations" validate constraint "budget_allocations_allocated_amount_check";
-
-alter table "public"."budget_allocations" add constraint "budget_allocations_category_id_fkey" FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE CASCADE not valid;
-
-alter table "public"."budget_allocations" validate constraint "budget_allocations_category_id_fkey";
-
-alter table "public"."budget_allocations" add constraint "budget_allocations_currency_check" CHECK ((length(currency) = 3)) not valid;
-
-alter table "public"."budget_allocations" validate constraint "budget_allocations_currency_check";
-
-alter table "public"."budget_allocations" add constraint "budget_allocations_household_id_category_id_budget_month_key" UNIQUE using index "budget_allocations_household_id_category_id_budget_month_key";
-
-alter table "public"."budget_allocations" add constraint "budget_allocations_household_id_fkey" FOREIGN KEY (household_id) REFERENCES public.households(id) ON DELETE CASCADE not valid;
-
-alter table "public"."budget_allocations" validate constraint "budget_allocations_household_id_fkey";
-
-alter table "public"."categories" add constraint "categories_household_id_fkey" FOREIGN KEY (household_id) REFERENCES public.households(id) ON DELETE CASCADE not valid;
-
-alter table "public"."categories" validate constraint "categories_household_id_fkey";
-
-alter table "public"."exchange_rates" add constraint "exchange_rates_currency_check" CHECK ((length(currency) = 3)) not valid;
-
-alter table "public"."exchange_rates" validate constraint "exchange_rates_currency_check";
-
-alter table "public"."exchange_rates" add constraint "exchange_rates_rate_to_eur_check" CHECK ((rate_to_eur > (0)::numeric)) not valid;
-
-alter table "public"."exchange_rates" validate constraint "exchange_rates_rate_to_eur_check";
-
-alter table "public"."expenses" add constraint "expenses_amount_check" CHECK ((amount <> (0)::numeric)) not valid;
-
-alter table "public"."expenses" validate constraint "expenses_amount_check";
-
-alter table "public"."expenses" add constraint "expenses_category_id_fkey" FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE RESTRICT not valid;
-
-alter table "public"."expenses" validate constraint "expenses_category_id_fkey";
-
-alter table "public"."expenses" add constraint "expenses_converted_amount_check" CHECK ((converted_amount <> (0)::numeric)) not valid;
-
-alter table "public"."expenses" validate constraint "expenses_converted_amount_check";
-
-alter table "public"."expenses" add constraint "expenses_converted_currency_check" CHECK ((length(converted_currency) = 3)) not valid;
-
-alter table "public"."expenses" validate constraint "expenses_converted_currency_check";
-
-alter table "public"."expenses" add constraint "expenses_currency_check" CHECK ((length(currency) = 3)) not valid;
-
-alter table "public"."expenses" validate constraint "expenses_currency_check";
-
-alter table "public"."expenses" add constraint "expenses_exchange_rate_check" CHECK ((exchange_rate > (0)::numeric)) not valid;
-
-alter table "public"."expenses" validate constraint "expenses_exchange_rate_check";
-
-alter table "public"."expenses" add constraint "expenses_household_id_fkey" FOREIGN KEY (household_id) REFERENCES public.households(id) ON DELETE CASCADE not valid;
-
-alter table "public"."expenses" validate constraint "expenses_household_id_fkey";
-
-alter table "public"."expenses" add constraint "expenses_logged_by_user_id_fkey" FOREIGN KEY (logged_by_user_id) REFERENCES public.users(id) ON DELETE CASCADE not valid;
-
-alter table "public"."expenses" validate constraint "expenses_logged_by_user_id_fkey";
-
-alter table "public"."users" add constraint "users_email_key" UNIQUE using index "users_email_key";
-
-alter table "public"."users" add constraint "users_household_id_fkey" FOREIGN KEY (household_id) REFERENCES public.households(id) ON DELETE CASCADE not valid;
-
-alter table "public"."users" validate constraint "users_household_id_fkey";
-
-alter table "public"."users" add constraint "users_id_fkey" FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
-
-alter table "public"."users" validate constraint "users_id_fkey";
-
-set check_function_bodies = off;
-
-create or replace view "public"."budget_summary" as  WITH category_months AS (
-         SELECT budget_allocations.household_id,
-            budget_allocations.category_id,
-            budget_allocations.budget_month
-           FROM public.budget_allocations
-        UNION
-         SELECT expenses.household_id,
-            expenses.category_id,
-            (date_trunc('month'::text, (expenses.expense_date)::timestamp with time zone))::date AS budget_month
-           FROM public.expenses
-          WHERE (expenses.category_id IS NOT NULL)
-        )
- SELECT ba.id,
-    cm.household_id,
-    cm.budget_month,
-    cm.category_id,
-    c.name AS category_name,
-    c.icon AS category_icon,
-    c.color AS category_color,
-    c.exclude_from_budget_total,
-    COALESCE(ba.allocated_amount, (0)::numeric) AS allocated_amount,
-    COALESCE(ba.currency, 'EUR'::text) AS currency,
-    COALESCE(sum(e.converted_amount), (0)::numeric) AS spent_amount,
-    (COALESCE(ba.allocated_amount, (0)::numeric) - COALESCE(sum(e.converted_amount), (0)::numeric)) AS remaining_amount,
-        CASE
-            WHEN (COALESCE(ba.allocated_amount, (0)::numeric) > (0)::numeric) THEN ((COALESCE(sum(e.converted_amount), (0)::numeric) / ba.allocated_amount) * (100)::numeric)
-            ELSE (0)::numeric
-        END AS percent_spent
-   FROM (((category_months cm
-     JOIN public.categories c ON ((c.id = cm.category_id)))
-     LEFT JOIN public.budget_allocations ba ON (((ba.household_id = cm.household_id) AND (ba.category_id = cm.category_id) AND (ba.budget_month = cm.budget_month))))
-     LEFT JOIN public.expenses e ON (((e.category_id = cm.category_id) AND (e.household_id = cm.household_id) AND (date_trunc('month'::text, (e.expense_date)::timestamp with time zone) = cm.budget_month))))
-  GROUP BY ba.id, cm.household_id, cm.budget_month, cm.category_id, c.name, c.icon, c.color, c.exclude_from_budget_total, ba.allocated_amount, ba.currency;
-
-
-CREATE OR REPLACE FUNCTION public.get_my_household_id()
- RETURNS uuid
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
+CREATE OR REPLACE FUNCTION "public"."get_my_household_id"() RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
   SELECT household_id FROM users WHERE id = auth.uid() LIMIT 1;
-$function$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION public.handle_new_user()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+
+ALTER FUNCTION "public"."get_my_household_id"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
 DECLARE
   new_household_id UUID;
 BEGIN
@@ -282,14 +86,21 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION public.rebalance_budget(p_household_id uuid, p_budget_month date, p_source_category_id uuid, p_dest_category_id uuid, p_amount numeric)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
+
+ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+-- Auth trigger (not captured by pg_dump since it's on auth.users)
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
+CREATE OR REPLACE FUNCTION "public"."rebalance_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_source_category_id" "uuid", "p_dest_category_id" "uuid", "p_amount" numeric) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
 DECLARE
   v_source_allocated DECIMAL(12, 2);
 BEGIN
@@ -339,14 +150,48 @@ BEGIN
   ON CONFLICT (household_id, category_id, budget_month)
   DO UPDATE SET allocated_amount = budget_allocations.allocated_amount + p_amount;
 END;
-$function$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION public.save_budget(p_household_id uuid, p_budget_month date, p_allocations jsonb)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
+
+ALTER FUNCTION "public"."rebalance_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_source_category_id" "uuid", "p_dest_category_id" "uuid", "p_amount" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."rls_auto_enable"() RETURNS "event_trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog'
+    AS $$
+DECLARE
+  cmd record;
+BEGIN
+  FOR cmd IN
+    SELECT *
+    FROM pg_event_trigger_ddl_commands()
+    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+      AND object_type IN ('table','partitioned table')
+  LOOP
+     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN
+      BEGIN
+        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);
+        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
+      EXCEPTION
+        WHEN OTHERS THEN
+          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;
+      END;
+     ELSE
+        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
+     END IF;
+  END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."rls_auto_enable"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."save_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_allocations" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
 DECLARE
   v_alloc JSONB;
   v_category_id UUID;
@@ -397,15 +242,16 @@ BEGIN
       WHERE (elem->>'amount')::DECIMAL <= 0
     );
 END;
-$function$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION public.top_categories_by_usage(p_household_id uuid, p_limit integer DEFAULT 5)
- RETURNS TABLE(category_id uuid, expense_count bigint)
- LANGUAGE sql
- STABLE
- SET search_path TO 'public'
-AS $function$
+
+ALTER FUNCTION "public"."save_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_allocations" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."top_categories_by_usage"("p_household_id" "uuid", "p_limit" integer DEFAULT 5) RETURNS TABLE("category_id" "uuid", "expense_count" bigint)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO 'public'
+    AS $$
   SELECT e.category_id, COUNT(*) AS expense_count
   FROM expenses e
   JOIN categories c ON c.id = e.category_id AND c.is_active = TRUE
@@ -415,465 +261,761 @@ AS $function$
   GROUP BY e.category_id
   ORDER BY expense_count DESC
   LIMIT p_limit;
-$function$
-;
+$$;
 
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
+
+ALTER FUNCTION "public"."top_categories_by_usage"("p_household_id" "uuid", "p_limit" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$function$
-;
+$$;
+
+
+ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
+
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."budget_allocations" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "household_id" "uuid" NOT NULL,
+    "category_id" "uuid" NOT NULL,
+    "budget_month" "date" NOT NULL,
+    "allocated_amount" numeric(12,2) NOT NULL,
+    "currency" "text" DEFAULT 'EUR'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "budget_allocations_allocated_amount_check" CHECK (("allocated_amount" <> (0)::numeric)),
+    CONSTRAINT "budget_allocations_currency_check" CHECK (("length"("currency") = 3))
+);
+
+ALTER TABLE ONLY "public"."budget_allocations" REPLICA IDENTITY FULL;
+
+
+ALTER TABLE "public"."budget_allocations" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."categories" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "household_id" "uuid" NOT NULL,
+    "name" "text" NOT NULL,
+    "exclude_from_budget_total" boolean DEFAULT false NOT NULL,
+    "icon" "text",
+    "color" "text",
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+ALTER TABLE ONLY "public"."categories" REPLICA IDENTITY FULL;
+
+
+ALTER TABLE "public"."categories" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."expenses" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "logged_by_user_id" "uuid" NOT NULL,
+    "household_id" "uuid" NOT NULL,
+    "category_id" "uuid",
+    "is_cash" boolean DEFAULT false NOT NULL,
+    "amount" numeric(12,2) NOT NULL,
+    "currency" "text" DEFAULT 'EUR'::"text" NOT NULL,
+    "converted_amount" numeric(12,2) NOT NULL,
+    "converted_currency" "text" DEFAULT 'EUR'::"text" NOT NULL,
+    "exchange_rate" numeric(12,6) DEFAULT 1.0 NOT NULL,
+    "expense_date" "date" DEFAULT CURRENT_DATE NOT NULL,
+    "description" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "expenses_amount_check" CHECK (("amount" <> (0)::numeric)),
+    CONSTRAINT "expenses_converted_amount_check" CHECK (("converted_amount" <> (0)::numeric)),
+    CONSTRAINT "expenses_converted_currency_check" CHECK (("length"("converted_currency") = 3)),
+    CONSTRAINT "expenses_currency_check" CHECK (("length"("currency") = 3)),
+    CONSTRAINT "expenses_exchange_rate_check" CHECK (("exchange_rate" > (0)::numeric))
+);
 
-grant delete on table "public"."budget_allocations" to "anon";
+ALTER TABLE ONLY "public"."expenses" REPLICA IDENTITY FULL;
 
-grant insert on table "public"."budget_allocations" to "anon";
 
-grant references on table "public"."budget_allocations" to "anon";
+ALTER TABLE "public"."expenses" OWNER TO "postgres";
 
-grant select on table "public"."budget_allocations" to "anon";
 
-grant trigger on table "public"."budget_allocations" to "anon";
+CREATE OR REPLACE VIEW "public"."budget_summary" WITH ("security_invoker"='true') AS
+ WITH "category_months" AS (
+         SELECT "budget_allocations"."household_id",
+            "budget_allocations"."category_id",
+            "budget_allocations"."budget_month"
+           FROM "public"."budget_allocations"
+        UNION
+         SELECT "expenses"."household_id",
+            "expenses"."category_id",
+            ("date_trunc"('month'::"text", ("expenses"."expense_date")::timestamp with time zone))::"date" AS "budget_month"
+           FROM "public"."expenses"
+          WHERE ("expenses"."category_id" IS NOT NULL)
+        )
+ SELECT "ba"."id",
+    "cm"."household_id",
+    "cm"."budget_month",
+    "cm"."category_id",
+    "c"."name" AS "category_name",
+    "c"."icon" AS "category_icon",
+    "c"."color" AS "category_color",
+    "c"."exclude_from_budget_total",
+    COALESCE("ba"."allocated_amount", (0)::numeric) AS "allocated_amount",
+    COALESCE("ba"."currency", 'EUR'::"text") AS "currency",
+    COALESCE("sum"("e"."converted_amount"), (0)::numeric) AS "spent_amount",
+    (COALESCE("ba"."allocated_amount", (0)::numeric) - COALESCE("sum"("e"."converted_amount"), (0)::numeric)) AS "remaining_amount",
+        CASE
+            WHEN (COALESCE("ba"."allocated_amount", (0)::numeric) > (0)::numeric) THEN ((COALESCE("sum"("e"."converted_amount"), (0)::numeric) / "ba"."allocated_amount") * (100)::numeric)
+            ELSE (0)::numeric
+        END AS "percent_spent"
+   FROM ((("category_months" "cm"
+     JOIN "public"."categories" "c" ON (("c"."id" = "cm"."category_id")))
+     LEFT JOIN "public"."budget_allocations" "ba" ON ((("ba"."household_id" = "cm"."household_id") AND ("ba"."category_id" = "cm"."category_id") AND ("ba"."budget_month" = "cm"."budget_month"))))
+     LEFT JOIN "public"."expenses" "e" ON ((("e"."category_id" = "cm"."category_id") AND ("e"."household_id" = "cm"."household_id") AND ("date_trunc"('month'::"text", ("e"."expense_date")::timestamp with time zone) = "cm"."budget_month"))))
+  GROUP BY "ba"."id", "cm"."household_id", "cm"."budget_month", "cm"."category_id", "c"."name", "c"."icon", "c"."color", "c"."exclude_from_budget_total", "ba"."allocated_amount", "ba"."currency";
 
-grant truncate on table "public"."budget_allocations" to "anon";
 
-grant update on table "public"."budget_allocations" to "anon";
+ALTER VIEW "public"."budget_summary" OWNER TO "postgres";
 
-grant delete on table "public"."budget_allocations" to "authenticated";
 
-grant insert on table "public"."budget_allocations" to "authenticated";
+CREATE TABLE IF NOT EXISTS "public"."exchange_rates" (
+    "currency" "text" NOT NULL,
+    "rate_date" "date" NOT NULL,
+    "rate_to_eur" numeric(12,6) NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "exchange_rates_currency_check" CHECK (("length"("currency") = 3)),
+    CONSTRAINT "exchange_rates_rate_to_eur_check" CHECK (("rate_to_eur" > (0)::numeric))
+);
 
-grant references on table "public"."budget_allocations" to "authenticated";
 
-grant select on table "public"."budget_allocations" to "authenticated";
+ALTER TABLE "public"."exchange_rates" OWNER TO "postgres";
 
-grant trigger on table "public"."budget_allocations" to "authenticated";
 
-grant truncate on table "public"."budget_allocations" to "authenticated";
+CREATE TABLE IF NOT EXISTS "public"."households" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
 
-grant update on table "public"."budget_allocations" to "authenticated";
 
-grant delete on table "public"."budget_allocations" to "service_role";
+ALTER TABLE "public"."households" OWNER TO "postgres";
 
-grant insert on table "public"."budget_allocations" to "service_role";
 
-grant references on table "public"."budget_allocations" to "service_role";
+CREATE TABLE IF NOT EXISTS "public"."users" (
+    "id" "uuid" NOT NULL,
+    "email" "text" NOT NULL,
+    "full_name" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "household_id" "uuid" NOT NULL
+);
 
-grant select on table "public"."budget_allocations" to "service_role";
 
-grant trigger on table "public"."budget_allocations" to "service_role";
+ALTER TABLE "public"."users" OWNER TO "postgres";
 
-grant truncate on table "public"."budget_allocations" to "service_role";
 
-grant update on table "public"."budget_allocations" to "service_role";
+ALTER TABLE ONLY "public"."budget_allocations"
+    ADD CONSTRAINT "budget_allocations_household_id_category_id_budget_month_key" UNIQUE ("household_id", "category_id", "budget_month");
 
-grant delete on table "public"."categories" to "anon";
 
-grant insert on table "public"."categories" to "anon";
 
-grant references on table "public"."categories" to "anon";
+ALTER TABLE ONLY "public"."budget_allocations"
+    ADD CONSTRAINT "budget_allocations_pkey" PRIMARY KEY ("id");
 
-grant select on table "public"."categories" to "anon";
 
-grant trigger on table "public"."categories" to "anon";
 
-grant truncate on table "public"."categories" to "anon";
+ALTER TABLE ONLY "public"."categories"
+    ADD CONSTRAINT "categories_pkey" PRIMARY KEY ("id");
 
-grant update on table "public"."categories" to "anon";
 
-grant delete on table "public"."categories" to "authenticated";
 
-grant insert on table "public"."categories" to "authenticated";
+ALTER TABLE ONLY "public"."exchange_rates"
+    ADD CONSTRAINT "exchange_rates_pkey" PRIMARY KEY ("currency", "rate_date");
 
-grant references on table "public"."categories" to "authenticated";
 
-grant select on table "public"."categories" to "authenticated";
 
-grant trigger on table "public"."categories" to "authenticated";
+ALTER TABLE ONLY "public"."expenses"
+    ADD CONSTRAINT "expenses_pkey" PRIMARY KEY ("id");
 
-grant truncate on table "public"."categories" to "authenticated";
 
-grant update on table "public"."categories" to "authenticated";
 
-grant delete on table "public"."categories" to "service_role";
+ALTER TABLE ONLY "public"."households"
+    ADD CONSTRAINT "households_pkey" PRIMARY KEY ("id");
 
-grant insert on table "public"."categories" to "service_role";
 
-grant references on table "public"."categories" to "service_role";
 
-grant select on table "public"."categories" to "service_role";
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_email_key" UNIQUE ("email");
 
-grant trigger on table "public"."categories" to "service_role";
 
-grant truncate on table "public"."categories" to "service_role";
 
-grant update on table "public"."categories" to "service_role";
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_pkey" PRIMARY KEY ("id");
 
-grant delete on table "public"."exchange_rates" to "anon";
 
-grant insert on table "public"."exchange_rates" to "anon";
 
-grant references on table "public"."exchange_rates" to "anon";
+CREATE INDEX "idx_budget_allocations_category" ON "public"."budget_allocations" USING "btree" ("category_id");
 
-grant select on table "public"."exchange_rates" to "anon";
 
-grant trigger on table "public"."exchange_rates" to "anon";
 
-grant truncate on table "public"."exchange_rates" to "anon";
+CREATE INDEX "idx_budget_allocations_household" ON "public"."budget_allocations" USING "btree" ("household_id");
 
-grant update on table "public"."exchange_rates" to "anon";
 
-grant delete on table "public"."exchange_rates" to "authenticated";
 
-grant insert on table "public"."exchange_rates" to "authenticated";
+CREATE INDEX "idx_budget_allocations_household_month" ON "public"."budget_allocations" USING "btree" ("household_id", "budget_month" DESC);
 
-grant references on table "public"."exchange_rates" to "authenticated";
 
-grant select on table "public"."exchange_rates" to "authenticated";
 
-grant trigger on table "public"."exchange_rates" to "authenticated";
+CREATE INDEX "idx_categories_household" ON "public"."categories" USING "btree" ("household_id");
 
-grant truncate on table "public"."exchange_rates" to "authenticated";
 
-grant update on table "public"."exchange_rates" to "authenticated";
 
-grant delete on table "public"."exchange_rates" to "service_role";
+CREATE INDEX "idx_categories_household_active" ON "public"."categories" USING "btree" ("household_id", "is_active") WHERE ("is_active" = true);
 
-grant insert on table "public"."exchange_rates" to "service_role";
 
-grant references on table "public"."exchange_rates" to "service_role";
 
-grant select on table "public"."exchange_rates" to "service_role";
+CREATE INDEX "idx_exchange_rates_currency_date" ON "public"."exchange_rates" USING "btree" ("currency", "rate_date" DESC);
 
-grant trigger on table "public"."exchange_rates" to "service_role";
 
-grant truncate on table "public"."exchange_rates" to "service_role";
 
-grant update on table "public"."exchange_rates" to "service_role";
+CREATE INDEX "idx_expenses_category" ON "public"."expenses" USING "btree" ("category_id");
 
-grant delete on table "public"."expenses" to "anon";
 
-grant insert on table "public"."expenses" to "anon";
 
-grant references on table "public"."expenses" to "anon";
+CREATE INDEX "idx_expenses_date" ON "public"."expenses" USING "btree" ("expense_date" DESC);
 
-grant select on table "public"."expenses" to "anon";
 
-grant trigger on table "public"."expenses" to "anon";
 
-grant truncate on table "public"."expenses" to "anon";
+CREATE INDEX "idx_expenses_household" ON "public"."expenses" USING "btree" ("household_id");
 
-grant update on table "public"."expenses" to "anon";
 
-grant delete on table "public"."expenses" to "authenticated";
 
-grant insert on table "public"."expenses" to "authenticated";
+CREATE INDEX "idx_expenses_household_date" ON "public"."expenses" USING "btree" ("household_id", "expense_date" DESC);
 
-grant references on table "public"."expenses" to "authenticated";
 
-grant select on table "public"."expenses" to "authenticated";
 
-grant trigger on table "public"."expenses" to "authenticated";
+CREATE INDEX "idx_expenses_logged_by" ON "public"."expenses" USING "btree" ("logged_by_user_id");
 
-grant truncate on table "public"."expenses" to "authenticated";
 
-grant update on table "public"."expenses" to "authenticated";
 
-grant delete on table "public"."expenses" to "service_role";
+CREATE INDEX "idx_users_household" ON "public"."users" USING "btree" ("household_id");
 
-grant insert on table "public"."expenses" to "service_role";
 
-grant references on table "public"."expenses" to "service_role";
 
-grant select on table "public"."expenses" to "service_role";
+CREATE OR REPLACE TRIGGER "update_budget_allocations_updated_at" BEFORE UPDATE ON "public"."budget_allocations" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
-grant trigger on table "public"."expenses" to "service_role";
 
-grant truncate on table "public"."expenses" to "service_role";
 
-grant update on table "public"."expenses" to "service_role";
+CREATE OR REPLACE TRIGGER "update_categories_updated_at" BEFORE UPDATE ON "public"."categories" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
-grant delete on table "public"."households" to "anon";
 
-grant insert on table "public"."households" to "anon";
 
-grant references on table "public"."households" to "anon";
+CREATE OR REPLACE TRIGGER "update_exchange_rates_updated_at" BEFORE UPDATE ON "public"."exchange_rates" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
-grant select on table "public"."households" to "anon";
 
-grant trigger on table "public"."households" to "anon";
 
-grant truncate on table "public"."households" to "anon";
+CREATE OR REPLACE TRIGGER "update_expenses_updated_at" BEFORE UPDATE ON "public"."expenses" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
-grant update on table "public"."households" to "anon";
 
-grant delete on table "public"."households" to "authenticated";
 
-grant insert on table "public"."households" to "authenticated";
+CREATE OR REPLACE TRIGGER "update_households_updated_at" BEFORE UPDATE ON "public"."households" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
-grant references on table "public"."households" to "authenticated";
 
-grant select on table "public"."households" to "authenticated";
 
-grant trigger on table "public"."households" to "authenticated";
+CREATE OR REPLACE TRIGGER "update_users_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
-grant truncate on table "public"."households" to "authenticated";
 
-grant update on table "public"."households" to "authenticated";
 
-grant delete on table "public"."households" to "service_role";
+ALTER TABLE ONLY "public"."budget_allocations"
+    ADD CONSTRAINT "budget_allocations_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE CASCADE;
 
-grant insert on table "public"."households" to "service_role";
 
-grant references on table "public"."households" to "service_role";
 
-grant select on table "public"."households" to "service_role";
+ALTER TABLE ONLY "public"."budget_allocations"
+    ADD CONSTRAINT "budget_allocations_household_id_fkey" FOREIGN KEY ("household_id") REFERENCES "public"."households"("id") ON DELETE CASCADE;
 
-grant trigger on table "public"."households" to "service_role";
 
-grant truncate on table "public"."households" to "service_role";
 
-grant update on table "public"."households" to "service_role";
+ALTER TABLE ONLY "public"."categories"
+    ADD CONSTRAINT "categories_household_id_fkey" FOREIGN KEY ("household_id") REFERENCES "public"."households"("id") ON DELETE CASCADE;
 
-grant delete on table "public"."users" to "anon";
 
-grant insert on table "public"."users" to "anon";
 
-grant references on table "public"."users" to "anon";
+ALTER TABLE ONLY "public"."expenses"
+    ADD CONSTRAINT "expenses_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE RESTRICT;
 
-grant select on table "public"."users" to "anon";
 
-grant trigger on table "public"."users" to "anon";
 
-grant truncate on table "public"."users" to "anon";
+ALTER TABLE ONLY "public"."expenses"
+    ADD CONSTRAINT "expenses_household_id_fkey" FOREIGN KEY ("household_id") REFERENCES "public"."households"("id") ON DELETE CASCADE;
 
-grant update on table "public"."users" to "anon";
 
-grant delete on table "public"."users" to "authenticated";
 
-grant insert on table "public"."users" to "authenticated";
+ALTER TABLE ONLY "public"."expenses"
+    ADD CONSTRAINT "expenses_logged_by_user_id_fkey" FOREIGN KEY ("logged_by_user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
-grant references on table "public"."users" to "authenticated";
 
-grant select on table "public"."users" to "authenticated";
 
-grant trigger on table "public"."users" to "authenticated";
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_household_id_fkey" FOREIGN KEY ("household_id") REFERENCES "public"."households"("id") ON DELETE CASCADE;
 
-grant truncate on table "public"."users" to "authenticated";
 
-grant update on table "public"."users" to "authenticated";
 
-grant delete on table "public"."users" to "service_role";
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-grant insert on table "public"."users" to "service_role";
 
-grant references on table "public"."users" to "service_role";
 
-grant select on table "public"."users" to "service_role";
+CREATE POLICY "Authenticated users can insert exchange rates" ON "public"."exchange_rates" FOR INSERT WITH CHECK (("auth"."uid"() IS NOT NULL));
 
-grant trigger on table "public"."users" to "service_role";
 
-grant truncate on table "public"."users" to "service_role";
 
-grant update on table "public"."users" to "service_role";
+CREATE POLICY "Authenticated users can view exchange rates" ON "public"."exchange_rates" FOR SELECT USING (("auth"."uid"() IS NOT NULL));
 
 
-  create policy "Household members can delete budget allocations"
-  on "public"."budget_allocations"
-  as permissive
-  for delete
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can delete budget allocations" ON "public"."budget_allocations" FOR DELETE USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can insert budget allocations"
-  on "public"."budget_allocations"
-  as permissive
-  for insert
-  to public
-with check ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can delete categories" ON "public"."categories" FOR DELETE USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can update budget allocations"
-  on "public"."budget_allocations"
-  as permissive
-  for update
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can delete expenses" ON "public"."expenses" FOR DELETE USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can view budget allocations"
-  on "public"."budget_allocations"
-  as permissive
-  for select
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can insert budget allocations" ON "public"."budget_allocations" FOR INSERT WITH CHECK (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can delete categories"
-  on "public"."categories"
-  as permissive
-  for delete
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can insert categories" ON "public"."categories" FOR INSERT WITH CHECK (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can insert categories"
-  on "public"."categories"
-  as permissive
-  for insert
-  to public
-with check ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can insert expenses" ON "public"."expenses" FOR INSERT WITH CHECK ((("household_id" = "public"."get_my_household_id"()) AND ("logged_by_user_id" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
-  create policy "Household members can update categories"
-  on "public"."categories"
-  as permissive
-  for update
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can update budget allocations" ON "public"."budget_allocations" FOR UPDATE USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can view categories"
-  on "public"."categories"
-  as permissive
-  for select
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Household members can update categories" ON "public"."categories" FOR UPDATE USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Authenticated users can insert exchange rates"
-  on "public"."exchange_rates"
-  as permissive
-  for insert
-  to public
-with check ((auth.uid() IS NOT NULL));
 
+CREATE POLICY "Household members can update expenses" ON "public"."expenses" FOR UPDATE USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Authenticated users can view exchange rates"
-  on "public"."exchange_rates"
-  as permissive
-  for select
-  to public
-using ((auth.uid() IS NOT NULL));
 
+CREATE POLICY "Household members can view budget allocations" ON "public"."budget_allocations" FOR SELECT USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "No one can delete exchange rates"
-  on "public"."exchange_rates"
-  as permissive
-  for delete
-  to public
-using (false);
 
+CREATE POLICY "Household members can view categories" ON "public"."categories" FOR SELECT USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "No one can update exchange rates"
-  on "public"."exchange_rates"
-  as permissive
-  for update
-  to public
-using (false);
 
+CREATE POLICY "Household members can view expenses" ON "public"."expenses" FOR SELECT USING (("household_id" = "public"."get_my_household_id"()));
 
 
-  create policy "Household members can delete expenses"
-  on "public"."expenses"
-  as permissive
-  for delete
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "No one can delete exchange rates" ON "public"."exchange_rates" FOR DELETE USING (false);
 
 
-  create policy "Household members can insert expenses"
-  on "public"."expenses"
-  as permissive
-  for insert
-  to public
-with check (((household_id = public.get_my_household_id()) AND (logged_by_user_id = ( SELECT auth.uid() AS uid))));
 
+CREATE POLICY "No one can update exchange rates" ON "public"."exchange_rates" FOR UPDATE USING (false);
 
 
-  create policy "Household members can update expenses"
-  on "public"."expenses"
-  as permissive
-  for update
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Users can delete own profile" ON "public"."users" FOR DELETE USING (("id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
-  create policy "Household members can view expenses"
-  on "public"."expenses"
-  as permissive
-  for select
-  to public
-using ((household_id = public.get_my_household_id()));
 
+CREATE POLICY "Users can update own profile" ON "public"."users" FOR UPDATE USING (("id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
-  create policy "Users can view own household"
-  on "public"."households"
-  as permissive
-  for select
-  to public
-using ((id = public.get_my_household_id()));
 
+CREATE POLICY "Users can view household members" ON "public"."users" FOR SELECT USING ((("id" = ( SELECT "auth"."uid"() AS "uid")) OR ("household_id" = "public"."get_my_household_id"())));
 
 
-  create policy "Users can delete own profile"
-  on "public"."users"
-  as permissive
-  for delete
-  to public
-using ((id = ( SELECT auth.uid() AS uid)));
 
+CREATE POLICY "Users can view own household" ON "public"."households" FOR SELECT USING (("id" = "public"."get_my_household_id"()));
 
 
-  create policy "Users can update own profile"
-  on "public"."users"
-  as permissive
-  for update
-  to public
-using ((id = ( SELECT auth.uid() AS uid)));
 
+ALTER TABLE "public"."budget_allocations" ENABLE ROW LEVEL SECURITY;
 
 
-  create policy "Users can view household members"
-  on "public"."users"
-  as permissive
-  for select
-  to public
-using (((id = ( SELECT auth.uid() AS uid)) OR (household_id = public.get_my_household_id())));
+ALTER TABLE "public"."categories" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON public.budget_allocations FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+ALTER TABLE "public"."exchange_rates" ENABLE ROW LEVEL SECURITY;
 
-CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TRIGGER update_exchange_rates_updated_at BEFORE UPDATE ON public.exchange_rates FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+ALTER TABLE "public"."expenses" ENABLE ROW LEVEL SECURITY;
 
-CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TRIGGER update_households_updated_at BEFORE UPDATE ON public.households FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+ALTER TABLE "public"."households" ENABLE ROW LEVEL SECURITY;
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
+
+
+
+
+ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
+
+
+
+
+
+
+ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."budget_allocations";
+
+
+
+ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."categories";
+
+
+
+ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."expenses";
+
+
+
+GRANT USAGE ON SCHEMA "public" TO "postgres";
+GRANT USAGE ON SCHEMA "public" TO "anon";
+GRANT USAGE ON SCHEMA "public" TO "authenticated";
+GRANT USAGE ON SCHEMA "public" TO "service_role";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+GRANT ALL ON FUNCTION "public"."get_my_household_id"() TO "anon";
+GRANT ALL ON FUNCTION "public"."get_my_household_id"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_my_household_id"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."rebalance_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_source_category_id" "uuid", "p_dest_category_id" "uuid", "p_amount" numeric) TO "anon";
+GRANT ALL ON FUNCTION "public"."rebalance_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_source_category_id" "uuid", "p_dest_category_id" "uuid", "p_amount" numeric) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."rebalance_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_source_category_id" "uuid", "p_dest_category_id" "uuid", "p_amount" numeric) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."rls_auto_enable"() TO "anon";
+GRANT ALL ON FUNCTION "public"."rls_auto_enable"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."rls_auto_enable"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."save_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_allocations" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."save_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_allocations" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."save_budget"("p_household_id" "uuid", "p_budget_month" "date", "p_allocations" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."top_categories_by_usage"("p_household_id" "uuid", "p_limit" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."top_categories_by_usage"("p_household_id" "uuid", "p_limit" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."top_categories_by_usage"("p_household_id" "uuid", "p_limit" integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+GRANT ALL ON TABLE "public"."budget_allocations" TO "anon";
+GRANT ALL ON TABLE "public"."budget_allocations" TO "authenticated";
+GRANT ALL ON TABLE "public"."budget_allocations" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."categories" TO "anon";
+GRANT ALL ON TABLE "public"."categories" TO "authenticated";
+GRANT ALL ON TABLE "public"."categories" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."expenses" TO "anon";
+GRANT ALL ON TABLE "public"."expenses" TO "authenticated";
+GRANT ALL ON TABLE "public"."expenses" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."budget_summary" TO "anon";
+GRANT ALL ON TABLE "public"."budget_summary" TO "authenticated";
+GRANT ALL ON TABLE "public"."budget_summary" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."exchange_rates" TO "anon";
+GRANT ALL ON TABLE "public"."exchange_rates" TO "authenticated";
+GRANT ALL ON TABLE "public"."exchange_rates" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."households" TO "anon";
+GRANT ALL ON TABLE "public"."households" TO "authenticated";
+GRANT ALL ON TABLE "public"."households" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."users" TO "anon";
+GRANT ALL ON TABLE "public"."users" TO "authenticated";
+GRANT ALL ON TABLE "public"."users" TO "service_role";
+
+
+
+
+
+
+
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
+
+
+
+
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
+
+
+
+
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
