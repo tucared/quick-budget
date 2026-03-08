@@ -69,10 +69,10 @@ CREATE POLICY "Household members can delete expenses" ON expenses
 ALTER TABLE exchange_rates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Authenticated users can view exchange rates" ON exchange_rates
-  FOR SELECT USING (auth.uid() IS NOT NULL);
+  FOR SELECT USING ((SELECT auth.uid()) IS NOT NULL);
 
 CREATE POLICY "Authenticated users can insert exchange rates" ON exchange_rates
-  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
 
 CREATE POLICY "No one can update exchange rates" ON exchange_rates
   FOR UPDATE USING (FALSE);
