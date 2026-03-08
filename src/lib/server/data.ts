@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, parseISO, startOfMonth } from "date-fns"
 import type {
@@ -9,11 +10,19 @@ import type {
 } from "@/lib/types"
 
 /**
- * Server-side function to get authenticated user and their household
- * Must be called from Server Components or Server Actions
+ * Request-scoped cached Supabase client.
+ * React.cache ensures one client per server request, avoiding redundant
+ * cookie reads and client instantiation across layout + page + data functions.
  */
-export async function getServerUser(): Promise<UserData | null> {
-  const supabase = await createServerSupabaseClient()
+const getSupabase = cache(() => createServerSupabaseClient())
+
+/**
+ * Server-side function to get authenticated user and their household.
+ * Cached per request — safe to call from both layout and page without
+ * triggering duplicate auth round-trips.
+ */
+export const getServerUser = cache(async (): Promise<UserData | null> => {
+  const supabase = await getSupabase()
 
   const {
     data: { user: authUser },
@@ -39,7 +48,7 @@ export async function getServerUser(): Promise<UserData | null> {
     fullName: userData.full_name || authUser.email?.split("@")[0] || "User",
     householdId: userData.household_id,
   }
-}
+})
 
 /**
  * Server-side function to fetch budget summary for a given month
@@ -48,7 +57,7 @@ export async function getBudgetSummary(
   householdId: string,
   budgetMonth?: string
 ): Promise<BudgetSummary[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await getSupabase()
   const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
   const { data, error } = await supabase
@@ -75,7 +84,7 @@ export async function getAllowanceSummary(
   householdId: string,
   budgetMonth?: string
 ): Promise<BudgetSummary[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await getSupabase()
   const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
   const { data, error } = await supabase
@@ -101,7 +110,7 @@ export async function getMonthlyExpenses(
   householdId: string,
   budgetMonth: string
 ): Promise<Expense[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await getSupabase()
 
   // Calculate next month for range query
   const currentDate = parseISO(budgetMonth)
@@ -135,7 +144,7 @@ export async function getRecentExpenses(
   householdId: string,
   limit: number = 20
 ): Promise<ExpenseWithDetails[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await getSupabase()
 
   const { data, error } = await supabase
     .from("expenses")
@@ -157,7 +166,7 @@ export async function getRecentExpenses(
  * Server-side function to fetch categories for a household
  */
 export async function getCategories(householdId: string): Promise<Category[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await getSupabase()
 
   const { data, error } = await supabase
     .from("categories")
