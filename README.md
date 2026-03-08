@@ -89,9 +89,7 @@ supabase/
 │   ├── 04_rpcs.sql       # rebalance_budget, save_budget, top_categories
 │   └── 05_realtime.sql   # Realtime publication + replica identity
 ├── migrations/            # Applied migrations (baseline + auto-generated)
-├── seeds/
-│   ├── dev/              # User creation + household setup (idempotent)
-│   └── prod/             # Shared seeds (categories, historical data)
+├── seeds/                # Committed seeds with fake dev data
 └── config.toml           # Supabase config
 ```
 
@@ -163,32 +161,21 @@ Application-specific types in `src/lib/types.ts` can extend or compose these gen
 
 ## Database Seeding
 
-Seeds are split into dev-only (user credentials) and shared (categories, data):
+Seeds are committed with fake data for local and cloud dev environments:
 
 ```
 supabase/seeds/
-  dev/
-    00_create_users.sql            — Idempotent user + household setup (git-ignored)
-    .template/00_create_users.sql  — Template with example values
-  prod/
-    01_seed_categories.sql         — Categories (git-ignored)
-    02_import_normalized.sql       — Historical data (auto-generated)
-    03_import_exchange_rates.sql   — Exchange rates (auto-generated)
-    .template/                     — Committed templates
+  01_create_users.sql        — Two test users + shared household
+  02_seed_categories.sql     — Spending + allowance categories
+  03_seed_data.sql           — ~3 months of budget allocations & expenses
+  04_seed_exchange_rates.sql — EUR/BRL exchange rates (Jan-Mar 2025)
 ```
-
-`supabase db reset` runs: `dev/00_create_users.sql` → `prod/01_*` → `prod/02_*` → `prod/03_*`
 
 ```bash
-# Full workflow: Transform CSVs → SQL, then reset DB
-npm run seed:full
-
-# Or run steps individually:
-npm run seed:transform  # Regenerate 02_import_normalized.sql from raw CSVs
-npm run seed:reset      # Reset database with migrations and seeds
+supabase db reset    # Reset database + apply migrations + run seeds
 ```
 
-> **Important:** After modifying categories in `01_seed_categories.sql`, always re-run `npm run seed:transform` because the generated file references categories by name. If a category is renamed or removed, the generated SQL will fail with a NULL constraint violation.
+Default credentials: `user1@example.com` / `password1`
 
 ## Other Documentation
 
