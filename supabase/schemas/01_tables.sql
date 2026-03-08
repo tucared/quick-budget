@@ -130,6 +130,7 @@ CREATE TABLE budget_allocations (
 );
 
 CREATE INDEX idx_budget_allocations_household_month ON budget_allocations(household_id, budget_month DESC);
+CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
