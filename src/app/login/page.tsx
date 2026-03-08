@@ -35,7 +35,8 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        setError("Invalid email or password")
+        const isNetwork = signInError.message?.toLowerCase().includes("fetch")
+        setError(isNetwork ? "Unable to reach the server. Check your connection." : "Invalid email or password")
         setLoading(false)
         return
       }
