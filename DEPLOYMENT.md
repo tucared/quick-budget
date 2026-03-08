@@ -6,13 +6,44 @@ Guide for deploying Quick Budget using Vercel + Supabase Cloud.
 
 ## Environments
 
-| Environment | Database | Frontend | Purpose |
+| Environment | Frontend | Database | Branch |
 |---|---|---|---|
-| **Local** | `supabase start` (Docker) | `npm run dev` (localhost:3000) | Development |
-| **Dev** | Supabase Cloud (dev project) | Vercel preview | Testing with cloud infra |
-| **Prod** | Supabase Cloud (prod project) | Vercel production | Live app |
+| **Local** | `npm run dev` (localhost:3000) | `supabase start` (Docker) | any |
+| **Dev** | Vercel preview deployment | Supabase Cloud (dev project) | PR branches |
+| **Prod** | Vercel production (`quick-budget-xi.vercel.app`) | Supabase Cloud (prod project) | `main` |
 
-## Initial Setup (New Supabase Project)
+## Vercel Setup
+
+The Vercel project `quick-budget` is connected to GitHub. Deployments are automatic:
+- Push to `main` → **production** deployment (→ Supabase prod)
+- Open a PR → **preview** deployment (→ Supabase dev)
+
+### Environment Variables
+
+Set these in Vercel → Project Settings → Environment Variables:
+
+| Variable | Production | Preview |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | prod project URL | dev project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | prod publishable key | dev publishable key |
+
+This ensures preview deployments (PRs) use the dev Supabase project while production uses prod.
+
+### Supabase Auth Configuration
+
+In each Supabase project's Dashboard → Authentication → URL Configuration:
+
+**Prod project:**
+- **Site URL**: `https://quick-budget-xi.vercel.app`
+- **Redirect URLs**: `https://quick-budget-xi.vercel.app/**`
+
+**Dev project:**
+- **Site URL**: `https://quick-budget-tucareds-projects.vercel.app`
+- **Redirect URLs**: `https://*-tucareds-projects.vercel.app/**` (wildcard covers all preview URLs)
+
+## Supabase Setup
+
+### Initial Setup (New Project)
 
 1. Go to https://app.supabase.com → "New Project"
 2. Set name, database password, and region
@@ -24,17 +55,15 @@ supabase link --project-ref <project-ref>
 supabase db push --include-seed
 ```
 
-Seeds create two test users, categories, budget allocations, expenses, and exchange rates with fake data. No manual setup needed.
+Seeds create two test users, categories, budget allocations, expenses, and exchange rates with fake data. Verify in Supabase Dashboard → Table Editor.
 
-Verify results in Supabase Dashboard → Table Editor.
-
-## Database Baseline
+### Database Baseline
 
 The baseline migration (`supabase/migrations/`) is generated from prod via `supabase db dump`. It captures the full schema as the starting point for new environments.
 
 **Limitation:** `pg_dump` doesn't capture cross-schema triggers (e.g., the `on_auth_user_created` trigger on `auth.users`). These are added manually to the baseline.
 
-### Regenerating the baseline from prod
+#### Regenerating the baseline from prod
 
 ```bash
 supabase link --project-ref <prod-project-ref>
@@ -48,7 +77,7 @@ supabase db reset  # Verify locally
 1. Edit declarative schema files in `supabase/schemas/`
 2. Generate a migration: `supabase db diff -f descriptive_name`
 3. Verify locally: `supabase db reset`
-4. Push to target environment:
+4. Push to each environment:
 
 ```bash
 # Push to dev
@@ -60,7 +89,7 @@ supabase link --project-ref <prod-project-ref>
 supabase db push
 ```
 
-### Resetting a dev environment
+### Resetting the dev environment
 
 ```bash
 supabase link --project-ref <dev-project-ref>
@@ -68,34 +97,6 @@ supabase db reset --linked
 ```
 
 This drops everything, reapplies migrations, and runs seeds.
-
-## Vercel Deployment
-
-1. Push code to GitHub
-2. Go to https://vercel.com/new → Import repository
-3. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL` = Project URL
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` = Publishable key
-4. Click "Deploy"
-
-**Automatic deployments** (enabled by default with Vercel GitHub integration):
-- Push to `main` → production deployment
-- Create a PR → preview deployment with unique URL
-
-### Supabase Auth Configuration
-
-In Supabase Dashboard → Authentication → URL Configuration:
-- **Site URL**: `https://your-app.vercel.app`
-- **Redirect URLs**: `https://your-app.vercel.app/**`
-
-## Environment Variables
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_...your-publishable-key
-```
-
-Exchange rates are fetched from [Frankfurter](https://www.frankfurter.dev) — free, no API key required.
 
 ## Backups
 
@@ -127,3 +128,7 @@ Always run a manual backup before migrations or schema changes:
 # Trigger backup manually from GitHub Actions UI, or:
 pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > backup-$(date +%Y%m%d).sql
 ```
+
+## Other Notes
+
+Exchange rates are fetched from [Frankfurter](https://www.frankfurter.dev) — free, no API key required.
