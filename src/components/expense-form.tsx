@@ -239,8 +239,9 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
         return
       }
 
-      // Only show loading skeleton on initial load, not on refreshes (stale-while-revalidate)
-      if (!categoryBudget || categoryBudget.category_id !== selectedCategory) {
+      // Only show loading skeleton on initial load (no data at all).
+      // When switching categories, keep showing stale data to avoid blink.
+      if (!categoryBudget) {
         setLoadingBudget(true)
       }
 
