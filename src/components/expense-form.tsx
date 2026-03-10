@@ -526,14 +526,21 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
             {formErrors.category_id}
           </p>
         )}
-        {/* Budget status preview */}
-        {selectedCategory && (
-          <CategoryBudgetStatus
-            budget={categoryBudget}
-            additionalAmount={debouncedAmount > 0 ? debouncedAmount * previewExchangeRate : 0}
-            loading={loadingBudget}
-          />
-        )}
+        {/* Budget status preview - animated to prevent jarring layout shift */}
+        <div
+          className="grid transition-[grid-template-rows] duration-200 ease-out"
+          style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
+        >
+          <div className="overflow-hidden">
+            {selectedCategory && (
+              <CategoryBudgetStatus
+                budget={categoryBudget}
+                additionalAmount={debouncedAmount > 0 ? debouncedAmount * previewExchangeRate : 0}
+                loading={loadingBudget}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Date + Cash checkbox inline */}
