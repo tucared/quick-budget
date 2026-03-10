@@ -47,6 +47,9 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
   // Ref for the invisible input that captures keyboard events
   const amountInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Ref for the description textarea
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null)
+
   // Ref to store success state timer for cleanup
   const successTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -83,7 +86,13 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
   // because Firefox Android fires onKeyDown with e.key === "Unidentified"
   // for the virtual keyboard's backspace key.
   const handleAmountKeyDown = (e: React.KeyboardEvent) => {
-    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+    // Enter moves focus to description instead of submitting the form
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      descriptionRef.current?.focus()
+      return
+    }
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
     if (allowedKeys.includes(e.key)) return
     if (e.key >= '0' && e.key <= '9') return
     if (e.ctrlKey || e.metaKey) return
@@ -562,6 +571,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
       {/* Description (optional) */}
       <div>
         <Textarea
+          ref={descriptionRef}
           id="description"
           placeholder="Optional notes about this expense"
           rows={1}
