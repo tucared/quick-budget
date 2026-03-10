@@ -15,7 +15,7 @@ export function CategoryBudgetStatus({
 }: CategoryBudgetStatusProps) {
   if (loading) {
     return (
-      <div className="p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
+      <div className="px-2.5 py-2 bg-muted/50 rounded-md text-xs text-muted-foreground">
         Loading budget status...
       </div>
     )
@@ -23,7 +23,7 @@ export function CategoryBudgetStatus({
 
   if (!budget) {
     return (
-      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+      <div className="px-2.5 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
         No budget set for this category this month
       </div>
     )
@@ -36,20 +36,28 @@ export function CategoryBudgetStatus({
   // Calculate impact of additional amount
   const newSpent = spent + additionalAmount
   const newRemaining = remaining - additionalAmount
+  const currentPercent = allocated > 0 ? (spent / allocated) * 100 : 0
+  const additionalPercent = allocated > 0 ? (additionalAmount / allocated) * 100 : 0
   const newPercentSpent = allocated > 0 ? (newSpent / allocated) * 100 : 0
 
   const statusColor = getBudgetStatusTheme(newPercentSpent)
   const willOverspend = newRemaining < 0
 
   return (
-    <div className={`p-3 rounded-md border ${statusColor.bg} ${statusColor.border}`}>
-      {/* Progress bar with percentage */}
-      <div className="flex items-center gap-2 mb-2">
-        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+    <div className={`px-2.5 py-2 rounded-md border ${statusColor.bg} ${statusColor.border}`}>
+      {/* Progress bar: solid = current spent, lighter = this expense */}
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden flex">
           <div
             className={`h-full transition-all duration-300 ${statusColor.indicator}`}
-            style={{ width: `${Math.min(newPercentSpent, 100)}%` }}
+            style={{ width: `${Math.min(currentPercent, 100)}%` }}
           />
+          {additionalAmount > 0 && (
+            <div
+              className={`h-full transition-all duration-300 ${statusColor.indicator} opacity-50`}
+              style={{ width: `${Math.min(additionalPercent, 100 - Math.min(currentPercent, 100))}%` }}
+            />
+          )}
         </div>
         <span className={`text-xs font-semibold ${statusColor.text} flex items-center gap-1 shrink-0`}>
           <span>{"●"}</span>
@@ -57,25 +65,19 @@ export function CategoryBudgetStatus({
         </span>
       </div>
 
-      {/* Budget details */}
-      <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-        <div>
-          <div className="text-muted-foreground">Allocated</div>
-          <div className="font-semibold">{formatCurrency(allocated, 0)}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">Spent</div>
-          <div className="font-semibold">{formatCurrency(spent)}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">Left</div>
-          <div className="font-semibold">{formatCurrency(remaining)}</div>
-        </div>
+      {/* Budget details - single compact row */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">
+          {formatCurrency(spent)} <span className="mx-0.5">/</span> {formatCurrency(allocated, 0)}
+        </span>
+        <span className="font-semibold">
+          {formatCurrency(remaining)} left
+        </span>
       </div>
 
       {/* Impact preview (only show if there's an amount) */}
       {additionalAmount > 0 && (
-        <div className={`pt-2 border-t ${statusColor.border}`}>
+        <div className={`mt-1.5 pt-1.5 border-t ${statusColor.border}`}>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">After this expense:</span>
             <span className={`font-bold ${willOverspend ? 'text-red-600' : statusColor.text}`}>
@@ -83,11 +85,6 @@ export function CategoryBudgetStatus({
               {willOverspend && " ⚠️"}
             </span>
           </div>
-          {willOverspend && (
-            <div className="mt-1 text-xs text-red-600 font-medium">
-              This will exceed your budget by {formatCurrency(Math.abs(newRemaining))}
-            </div>
-          )}
         </div>
       )}
     </div>
