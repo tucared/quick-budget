@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -51,12 +50,9 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Quick Budget</CardTitle>
-          <CardDescription>
-            Enter your email and password to access your account
-          </CardDescription>
+      <Card className="w-full max-w-md border-0 shadow-none">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Quick Budget</CardTitle>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
@@ -75,6 +71,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
+                autoFocus
               />
             </div>
             <div className="space-y-2">
