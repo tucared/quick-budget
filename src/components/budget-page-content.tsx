@@ -321,7 +321,7 @@ function CategoryRow({ budget, isCurrentMonth, onClick, onAddFunds }: CategoryRo
         <span className="text-base shrink-0 w-5 text-center">{budget.category_icon}</span>
       )}
       <span className="text-sm font-medium flex-1 min-w-0 truncate">{budget.category_name}</span>
-      <div className="w-24 shrink-0 hidden sm:block">
+      <div className="w-16 sm:w-24 shrink-0">
         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-300 ${getBudgetProgressBarColor(percentSpent)}`}
