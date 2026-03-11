@@ -70,15 +70,17 @@ export function CategoryExpenseDialog({
     const monthStart = startOfMonth(parseISO(budgetMonth))
     const monthEnd = endOfMonth(parseISO(budgetMonth))
 
-    return allExpenses.filter((expense) => {
-      const expenseDate = new Date(expense.expense_date + "T00:00:00")
-      return (
-        !deletedIds.has(expense.id) &&
-        expense.category_id === budget.category_id &&
-        expenseDate >= monthStart &&
-        expenseDate <= monthEnd
-      )
-    })
+    return allExpenses
+      .filter((expense) => {
+        const expenseDate = new Date(expense.expense_date + "T00:00:00")
+        return (
+          !deletedIds.has(expense.id) &&
+          expense.category_id === budget.category_id &&
+          expenseDate >= monthStart &&
+          expenseDate <= monthEnd
+        )
+      })
+      .sort((a, b) => b.expense_date.localeCompare(a.expense_date))
   }, [budget, budgetMonth, allExpenses, deletedIds])
 
   if (!budget) return null
