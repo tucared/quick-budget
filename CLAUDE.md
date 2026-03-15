@@ -9,8 +9,8 @@
 
 - Use Supabase MCP instead of docker for interacting with the database
 - Use the `dogfood` skill for exploratory UI testing (test one viewport in general, 2 for larger changes)
-   - Safari on iOS: run `agent-browser --session <s> viewport 402 714` after `open`
-   - Firefox on Android: run `agent-browser --session <s> viewport 427 804` after `open`
+   - Safari on iOS: run `agent-browser set viewport 402 714` after `open`
+   - Firefox on Android: run `agent-browser set viewport 427 804` after `open`
 
 ## Cloud environment (Claude Code web)
 
@@ -20,8 +20,8 @@
   ```
 - To test mobile viewports after opening, run:
   ```bash
-  npx agent-browser --session <s> viewport 402 714   # Safari on iOS
-  npx agent-browser --session <s> viewport 427 804   # Firefox on Android
+  npx agent-browser set viewport 402 714   # Safari on iOS
+  npx agent-browser set viewport 427 804   # Firefox on Android
   ```
 - `src/instrumentation.ts` configures Node.js to route server-side fetch through the proxy (via undici `EnvHttpProxyAgent`)
 - The dev server is started with `NODE_TLS_REJECT_UNAUTHORIZED=0` to accept the proxy's TLS certificates
