@@ -1,8 +1,34 @@
 # Quick Budget
 
-Fast expense tracking and flexible budgeting for partners.
+Fast expense tracking and flexible budgeting for partners. Used daily by a two-person household splitting expenses across EUR and BRL.
 
-## Local Development Setup
+<p align="center">
+  <img src="screenshot-expenses.png" alt="Expense logging with category tiles and recent expenses" width="250">
+  &nbsp;&nbsp;
+  <img src="screenshot-budget.png" alt="Budget dashboard with burndown chart and progress bar" width="250">
+</p>
+
+- Log expenses in seconds, including in foreign currency with automatic conversion
+- Shared budget dashboard with real-time sync between partners
+- Mid-month rebalancing — move money between categories when priorities shift
+- Budget vs actuals history to set more realistic targets each month
+- Personal allowances tracked separately from shared spending
+
+## Background
+
+This is the third iteration of a personal finance tool:
+
+1. **[personal-expense-tracker](https://github.com/tucared/personal-expense-tracker)** — Notion + Google Sheets + GCP data pipeline. Overengineered: logging and viewing were split across tools, so keeping up with expenses never became a habit.
+2. **[expense-tracker](https://github.com/tucared/expense-tracker)** — Observable Framework dashboard. More of a proof of concept — clunky to deploy and mixing JS with Markdown felt like a step down.
+3. **Quick Budget** — Decided to try fully vibecoding a complete app with [Claude Code](https://claude.ai/claude-code). Every line of React, SQL, and infra config was AI-generated. We switched to it from day one — both of us — without keeping the old system around. Light touches and iterations done via Claude Code web.
+
+## Stack
+
+- **Frontend**: Next.js 16 + TypeScript + Tailwind CSS v4 + shadcn/ui
+- **Backend**: Supabase (PostgreSQL + Auth + Real-time)
+- **Deployment**: Vercel + Supabase Cloud
+
+## Local Development
 
 ### Prerequisites
 
@@ -13,172 +39,57 @@ Fast expense tracking and flexible budgeting for partners.
 ### Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Start Supabase (first run takes ~3 min to download images)
-supabase start
-
-# Start dev server
+supabase start        # First run takes ~3 min to download images
 npm run dev
 ```
 
-Visit http://localhost:3000
+Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 
-Default credentials are configured in `supabase/seeds/prod/scripts/config.local.js`.
+### Useful URLs
 
-### Development URLs
+| URL | What |
+|-----|------|
+| http://localhost:3000 | App |
+| http://localhost:54323 | Supabase Studio (DB UI) |
+| http://localhost:54324 | Mailpit (email testing) |
 
-- **App**: http://localhost:3000
-- **Database UI**: http://localhost:54323 (Supabase Studio)
-- **Email Testing**: http://localhost:54324 (Mailpit)
-- **API**: http://localhost:54321/rest/v1
-
-## Key Commands
+### Key Commands
 
 ```bash
-# Supabase
 supabase start              # Start all services
 supabase stop               # Stop all services
-supabase status             # View connection info
-supabase db reset           # Reset database + reapply migrations + seed
-
-# Database
-supabase migration new name # Create new migration
-open http://localhost:54323 # Open Supabase Studio
-
-# Development
-npm run dev                 # Start Next.js dev server (port 3000)
-npm run build               # Build for production
+supabase db reset           # Reset DB + reapply migrations + seeds
+npm run dev                 # Start Next.js dev server
+npm run build               # Production build
 npm run lint                # Run ESLint
-npm run types:generate      # Generate TypeScript types from database schema
+npm run types:generate      # Regenerate TypeScript types from DB schema
 ```
 
-## Project Structure
+## Database
 
-```
-src/
-├── app/                    # Next.js pages (App Router)
-│   ├── expenses/          # Expense tracking page
-│   ├── login/             # Login page
-│   └── page.tsx           # Landing page
-├── components/
-│   ├── ui/                # shadcn/ui components
-│   ├── expense-form.tsx   # Expense entry form
-│   └── expense-list.tsx   # Recent expenses list
-├── lib/
-│   ├── supabase.ts        # Supabase client (browser + server variants)
-│   ├── types.ts           # Application types + localStorage helpers
-│   ├── database.types.ts  # Generated Supabase database types
-│   ├── validations.ts     # Zod schemas
-│   ├── currency.ts        # Currency formatting + fetchExchangeRateFromAPI()
-│   ├── exchange-rate-api.ts # Frankfurter API client (server-side)
-│   ├── utils.ts           # Utilities
-│   ├── contexts/
-│   │   └── user-context.tsx # UserProvider + useUser() hook (client auth)
-│   ├── hooks/             # Custom React hooks (e.g. useExpenseSubscription)
-│   └── server/
-│       └── data.ts        # Server-side data fetching utilities
-
-supabase/
-├── schemas/               # Declarative schema files (desired DB state)
-│   ├── 00_functions.sql  # Utility functions (handle_new_user, updated_at)
-│   ├── 01_tables.sql     # All tables, indexes, triggers
-│   ├── 02_rls.sql        # RLS enable + policies
-│   ├── 03_views.sql      # budget_summary view
-│   ├── 04_rpcs.sql       # rebalance_budget, save_budget, top_categories
-│   └── 05_realtime.sql   # Realtime publication + replica identity
-├── migrations/            # Applied migrations (baseline + auto-generated)
-├── seeds/                # Committed seeds with fake dev data
-└── config.toml           # Supabase config
-```
-
-## Stack
-
-- **Frontend**: Next.js 16 + TypeScript + Tailwind CSS v4
-- **Backend**: Supabase (PostgreSQL + Auth + Real-time)
-- **UI**: shadcn/ui (Radix UI + Tailwind v4)
-- **Forms**: React Hook Form + Zod
-- **Deployment**: Vercel (see [DEPLOYMENT.md](./DEPLOYMENT.md))
-
-### Tailwind CSS v4 Configuration
-
-This project uses Tailwind CSS v4 with CSS-first configuration:
-- Configuration is in `src/app/globals.css` via `@theme inline` directive
-- No JavaScript config file needed (`tailwind.config.ts` has been removed)
-- Uses `tw-animate-css` for animations (replaces `tailwindcss-animate`)
-
-### ESLint Configuration
-
-This project uses ESLint v9 with the flat config format:
-- Configuration is in `eslint.config.js` (Next.js 16+ removed the `next lint` command)
-- Run `npm run lint` to check for linting issues
-- The configuration extends Next.js core-web-vitals rules with TypeScript support
-
-## Database Schema (Declarative)
-
-Schema is defined declaratively in `supabase/schemas/`. Edit these files to change the desired database state, then generate a migration:
+Schema is defined declaratively in `supabase/schemas/`. To make changes:
 
 ```bash
 # 1. Edit schema files in supabase/schemas/
 # 2. Generate a migration from the diff
 supabase db diff -f descriptive_name
-
 # 3. Verify locally
 supabase db reset
-
-# 4. Push to production (see DEPLOYMENT.md)
+# 4. Push to production
 supabase db push
 ```
 
-The existing migration in `supabase/migrations/` is the applied baseline. New migrations are auto-generated by `supabase db diff`.
+Seeds in `supabase/seeds/` provide ~3 months of fake data (two users, shared household, budget allocations, expenses, exchange rates).
 
-**Limitations (migra):** DML (INSERT/UPDATE/DELETE) is not captured — seeds remain separate. RLS policy alterations and realtime publication changes may need manual migrations.
+After schema changes, always regenerate types: `npm run types:generate`
 
-## TypeScript Type Generation
+## Documentation
 
-The project uses auto-generated TypeScript types from the Supabase schema to ensure type safety and prevent drift between the database and application code.
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Production deployment guide
+- **[DATA_MODEL.md](./DATA_MODEL.md)** — Database schema and design decisions
+- **[PROGRESS.md](./PROGRESS.md)** — Feature roadmap
 
-```bash
-# Generate types from local database
-npm run types:generate
-```
+## License
 
-**Important:** After modifying the database schema (editing migrations or running `supabase db reset`), always regenerate types to keep them in sync:
-
-```bash
-supabase db reset           # Apply schema changes
-npm run types:generate      # Regenerate types
-```
-
-The generated types are stored in `src/lib/database.types.ts` and provide:
-- Row types for SELECT queries
-- Insert types for INSERT operations
-- Update types for UPDATE operations
-- Relationship metadata for joins
-
-Application-specific types in `src/lib/types.ts` can extend or compose these generated types as needed.
-
-## Database Seeding
-
-Seeds are committed with fake data for local and cloud dev environments:
-
-```
-supabase/seeds/
-  01_create_users.sql        — Two test users + shared household
-  02_seed_categories.sql     — Spending + allowance categories
-  03_seed_data.sql           — ~3 months of budget allocations & expenses
-  04_seed_exchange_rates.sql — EUR/BRL exchange rates (Jan-Mar 2025)
-```
-
-```bash
-supabase db reset    # Reset database + apply migrations + run seeds
-```
-
-Default credentials: `user1@example.com` / `password1`
-
-## Other Documentation
-
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide
-- **[DATA_MODEL.md](./DATA_MODEL.md)** - Database schema and design
-- **[PROGRESS.md](./PROGRESS.md)** - Development roadmap and JTBDs
+MIT
