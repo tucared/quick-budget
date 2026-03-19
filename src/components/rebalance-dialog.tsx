@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import type { BudgetSummary } from "@/lib/types"
+import { Plus } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { CentsInput } from "@/components/ui/cents-input"
+
+const NEW_MONEY_SENTINEL = "__new_money__"
 
 interface RebalanceDialogProps {
   open: boolean
@@ -45,7 +48,8 @@ export function RebalanceDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
-  const sourceBudget = budgets.find((b) => b.category_id === sourceId)
+  const isNewMoney = sourceId === NEW_MONEY_SENTINEL
+  const sourceBudget = isNewMoney ? null : budgets.find((b) => b.category_id === sourceId)
   const destBudget = budgets.find((b) => b.category_id === destId)
   const transferAmount = amountCents / 100
 
@@ -81,51 +85,68 @@ export function RebalanceDialog({
   }
 
   function confirmAmount() {
-    if (!sourceBudget) return
-    const maxAmount = Number(sourceBudget.remaining_amount)
     if (amountCents <= 0) {
       setError("Amount must be greater than 0")
       return
     }
-    if (transferAmount > maxAmount) {
-      setError(`Maximum available: ${formatCurrency(maxAmount)}`)
-      return
+    if (!isNewMoney && sourceBudget) {
+      const maxAmount = Number(sourceBudget.remaining_amount)
+      if (transferAmount > maxAmount) {
+        setError(`Maximum available: ${formatCurrency(maxAmount)}`)
+        return
+      }
     }
     setError("")
     if (effectiveDestId) {
       setDestId(effectiveDestId)
-      setStep("confirm")
-    } else {
-      setStep("confirm")
     }
+    setStep("confirm")
   }
 
-  // When no initialDestId, we need a dest selection step — handled inline below
-
   async function handleConfirm() {
-    if (!sourceId || !destId || !sourceBudget || !destBudget) return
+    if (!destId) return
     setSaving(true)
     setError("")
 
     const supabase = createClient()
 
-    const { error: rpcError } = await supabase.rpc("rebalance_budget", {
-      p_household_id: householdId,
-      p_budget_month: budgetMonth,
-      p_source_category_id: sourceId,
-      p_dest_category_id: destId,
-      p_amount: transferAmount,
-    })
+    if (isNewMoney) {
+      const { error: rpcError } = await supabase.rpc("top_up_budget", {
+        p_household_id: householdId,
+        p_budget_month: budgetMonth,
+        p_category_id: destId,
+        p_amount: transferAmount,
+      })
 
-    if (rpcError) {
-      setError(getErrorMessage(rpcError))
-      setSaving(false)
-      return
+      if (rpcError) {
+        setError(getErrorMessage(rpcError))
+        setSaving(false)
+        return
+      }
+    } else {
+      if (!sourceId || !sourceBudget || !destBudget) return
+
+      const { error: rpcError } = await supabase.rpc("rebalance_budget", {
+        p_household_id: householdId,
+        p_budget_month: budgetMonth,
+        p_source_category_id: sourceId,
+        p_dest_category_id: destId,
+        p_amount: transferAmount,
+      })
+
+      if (rpcError) {
+        setError(getErrorMessage(rpcError))
+        setSaving(false)
+        return
+      }
     }
 
     handleOpenChange(false)
     onSuccess?.()
   }
+
+  const destRemaining = destBudgetForTitle ? Number(destBudgetForTitle.remaining_amount) : 0
+  const destBannerNeutral = destBudgetForTitle && destRemaining >= 0
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -138,21 +159,23 @@ export function RebalanceDialog({
           </DialogTitle>
           <DialogDescription>
             {step === "source" && (effectiveDestId
-              ? "Pick a category with budget left to transfer from."
-              : "Select a category to take money from.")}
-            {step === "amount" && `How much to move from ${sourceBudget?.category_name}?`}
+              ? "Pick a source to transfer from, or add new money."
+              : "Select a category to take money from, or add new money.")}
+            {step === "amount" && (isNewMoney
+              ? "How much new money to add?"
+              : `How much to move from ${sourceBudget?.category_name}?`)}
             {step === "confirm" && "Review the transfer."}
           </DialogDescription>
         </DialogHeader>
 
         {effectiveDestId && destBudgetForTitle && (
-          <div className="flex items-center justify-between rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm">
-            <span className="flex items-center gap-1.5 text-red-700">
+          <div className={`flex items-center justify-between rounded-md px-3 py-2 text-sm border ${destBannerNeutral ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+            <span className={`flex items-center gap-1.5 ${destBannerNeutral ? "text-blue-700" : "text-red-700"}`}>
               {destBudgetForTitle.category_icon && <span>{destBudgetForTitle.category_icon}</span>}
               <span className="font-medium">{destBudgetForTitle.category_name}</span>
             </span>
-            <span className="font-semibold text-red-700">
-              {formatCurrency(Number(destBudgetForTitle.remaining_amount))}
+            <span className={`font-semibold ${destBannerNeutral ? "text-blue-700" : "text-red-700"}`}>
+              {formatCurrency(destRemaining)}
             </span>
           </div>
         )}
@@ -166,6 +189,20 @@ export function RebalanceDialog({
         {/* Step 1: Pick source */}
         {step === "source" && (
           <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+            {/* New money option */}
+            <button
+              onClick={() => selectSource(NEW_MONEY_SENTINEL)}
+              className="w-full flex items-center justify-between p-3 rounded-md hover:bg-accent text-left border border-dashed border-muted-foreground/30"
+            >
+              <div className="flex items-center gap-2">
+                <Plus className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <span className="text-sm font-medium">New money</span>
+                  <span className="block text-xs text-muted-foreground">Increases total budget</span>
+                </div>
+              </div>
+            </button>
+
             {sourceCandidates.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 No categories with remaining budget to transfer from.
@@ -191,11 +228,13 @@ export function RebalanceDialog({
         )}
 
         {/* Step 2: Enter amount (+ pick destination if no initialDestId) */}
-        {step === "amount" && sourceBudget && (
+        {step === "amount" && (isNewMoney || sourceBudget) && (
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              Available from {sourceBudget.category_name}: {formatCurrency(Number(sourceBudget.remaining_amount))}
-            </div>
+            {!isNewMoney && sourceBudget && (
+              <div className="text-sm text-muted-foreground">
+                Available from {sourceBudget.category_name}: {formatCurrency(Number(sourceBudget.remaining_amount))}
+              </div>
+            )}
             <CentsInput
               value={amountCents}
               onChange={(cents) => { setAmountCents(cents); setError("") }}
@@ -240,16 +279,16 @@ export function RebalanceDialog({
         )}
 
         {/* Step 3: Confirm */}
-        {step === "confirm" && sourceBudget && destBudget && (
+        {step === "confirm" && (isNewMoney || sourceBudget) && (destBudget || destBudgetForTitle) && (
           <div className="space-y-4">
             <div className="rounded-md border p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">From</span>
-                <span className="font-medium">{sourceBudget.category_name}</span>
+                <span className="font-medium">{isNewMoney ? "New money" : sourceBudget!.category_name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">To</span>
-                <span className="font-medium">{destBudget.category_name}</span>
+                <span className="font-medium">{(destBudget ?? destBudgetForTitle)!.category_name}</span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="text-muted-foreground">Amount</span>
@@ -262,7 +301,7 @@ export function RebalanceDialog({
                 Back
               </Button>
               <Button onClick={handleConfirm} disabled={saving}>
-                {saving ? "Transferring..." : "Confirm Transfer"}
+                {saving ? (isNewMoney ? "Adding..." : "Transferring...") : (isNewMoney ? "Confirm Top-up" : "Confirm Transfer")}
               </Button>
             </DialogFooter>
           </div>

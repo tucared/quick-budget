@@ -160,3 +160,33 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.top_categories_by_usage(UUID, INT) TO authenticated;
+
+-- ============================================================================
+-- TOP UP BUDGET
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.top_up_budget(
+  p_household_id UUID,
+  p_budget_month DATE,
+  p_category_id UUID,
+  p_amount DECIMAL(12, 2)
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  -- Validate amount
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Top-up amount must be positive';
+  END IF;
+
+  -- Upsert: create or increase allocation
+  INSERT INTO budget_allocations (household_id, category_id, budget_month, allocated_amount, currency)
+  VALUES (p_household_id, p_category_id, p_budget_month, p_amount, 'EUR')
+  ON CONFLICT (household_id, category_id, budget_month)
+  DO UPDATE SET allocated_amount = budget_allocations.allocated_amount + p_amount;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.top_up_budget(UUID, DATE, UUID, DECIMAL) TO authenticated;
