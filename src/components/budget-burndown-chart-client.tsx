@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { format, getDaysInMonth, parseISO } from "date-fns"
 import { formatCurrency } from "@/lib/currency"
 import {
@@ -14,13 +14,6 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from "recharts"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BudgetSummary, Expense } from "@/lib/types"
 
@@ -47,8 +40,6 @@ export function BudgetBurndownChartClient({
   currentMonth,
   initialExpenses,
 }: BudgetBurndownChartClientProps) {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all")
-
   // expenses come from parent (kept live via parent's subscription)
   const expenses = initialExpenses
 
@@ -58,18 +49,11 @@ export function BudgetBurndownChartClient({
     // Get set of category IDs from budgets prop (these are the categories we're tracking)
     const budgetCategoryIds = new Set(budgets.map((b) => b.category_id))
 
-    // Calculate total allocated amount for selected category
-    const totalAllocated =
-      selectedCategoryId === "all"
-        ? budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
-        : budgets.find((b) => b.category_id === selectedCategoryId)
-            ?.allocated_amount ?? 0
+    // Calculate total allocated amount
+    const totalAllocated = budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
 
-    // Filter expenses by selected category AND only include expenses from budgeted categories
-    const filteredExpenses =
-      selectedCategoryId === "all"
-        ? expenses.filter((e) => e.category_id && budgetCategoryIds.has(e.category_id))
-        : expenses.filter((e) => e.category_id === selectedCategoryId)
+    // Filter expenses to only include expenses from budgeted categories
+    const filteredExpenses = expenses.filter((e) => e.category_id && budgetCategoryIds.has(e.category_id))
 
     // Get number of days in the month and today's date
     const currentDate = parseISO(currentMonth)
@@ -145,17 +129,7 @@ export function BudgetBurndownChartClient({
     }
 
     return { data, weekends }
-  }, [budgets, expenses, selectedCategoryId, currentMonth])
-
-  // Prepare category options for the filter
-  const categoryOptions = useMemo(() => {
-    return [
-      { id: "all", name: "All Categories" },
-      ...budgets
-        .filter((b) => b.category_id && b.category_name)
-        .map((b) => ({ id: b.category_id!, name: b.category_name! })),
-    ]
-  }, [budgets])
+  }, [budgets, expenses, currentMonth])
 
   if (budgets.length === 0) {
     return null
@@ -174,21 +148,7 @@ export function BudgetBurndownChartClient({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <CardTitle>Budget Burndown</CardTitle>
-          <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categoryOptions.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <CardTitle>Budget Burndown</CardTitle>
       </CardHeader>
       <CardContent className="pt-0 pb-4">
         <div className="w-full h-[300px]">
