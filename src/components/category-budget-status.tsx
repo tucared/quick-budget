@@ -1,3 +1,4 @@
+import { getDaysInMonth } from "date-fns"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
 import { getBudgetStatusTheme } from "@/lib/budget-utils"
@@ -40,7 +41,8 @@ export function CategoryBudgetStatus({
   const additionalPercent = allocated > 0 ? (additionalAmount / allocated) * 100 : 0
   const newPercentSpent = allocated > 0 ? (newSpent / allocated) * 100 : 0
 
-  const statusColor = getBudgetStatusTheme(newPercentSpent)
+  const now = new Date()
+  const statusColor = getBudgetStatusTheme(newPercentSpent, now.getDate(), getDaysInMonth(now))
   const willOverspend = newRemaining < 0
 
   return (

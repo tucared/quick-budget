@@ -5,14 +5,16 @@ import { getBudgetProgressBarColor, getBudgetStatusLabel, getBudgetStatusColor, 
 
 interface BudgetSummaryCardProps {
   budgets: BudgetSummary[]
+  dayOfMonth?: number
+  daysInMonth?: number
 }
 
-export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
+export function BudgetSummaryCard({ budgets, dayOfMonth, daysInMonth }: BudgetSummaryCardProps) {
   const totalAllocated = budgets.reduce((sum, b) => sum + Number(b.allocated_amount), 0)
   const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spent_amount), 0)
   const totalRemaining = totalAllocated - totalSpent
   const percentSpent = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0
-  const theme = getBudgetStatusTheme(percentSpent)
+  const theme = getBudgetStatusTheme(percentSpent, dayOfMonth, daysInMonth)
 
   return (
     <Card className={`border-l-4 ${theme.border} ${theme.bg}`}>
@@ -20,7 +22,7 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
         {/* Hero: remaining amount */}
         <div className="mb-3">
           <div className="text-xs text-muted-foreground mb-0.5 uppercase tracking-wide font-medium">Remaining this month</div>
-          <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent)}`}>
+          <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth)}`}>
             {formatCurrency(totalRemaining, 0)}
           </div>
         </div>
@@ -28,7 +30,7 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
         {/* Progress bar */}
         <div className="h-1.5 bg-black/10 rounded-full overflow-hidden mb-2">
           <div
-            className={`h-full transition-all duration-300 ${getBudgetProgressBarColor(percentSpent)}`}
+            className={`h-full transition-all duration-300 ${getBudgetProgressBarColor(percentSpent, dayOfMonth, daysInMonth)}`}
             style={{ width: `${Math.min(percentSpent, 100)}%` }}
           />
         </div>
@@ -38,8 +40,8 @@ export function BudgetSummaryCard({ budgets }: BudgetSummaryCardProps) {
           <span className="text-muted-foreground">
             {formatCurrency(totalSpent, 0)} of {formatCurrency(totalAllocated, 0)} spent · {formatNumber(percentSpent, 0)}%
           </span>
-          <span className={`${getBudgetStatusColor(percentSpent)} font-medium`}>
-            {getBudgetStatusLabel(percentSpent)}
+          <span className={`${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth)} font-medium`}>
+            {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth)}
           </span>
         </div>
       </CardContent>
