@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { format, startOfMonth, getDaysInMonth } from "date-fns"
-import { Pencil, Plus } from "lucide-react"
+import { Pencil } from "lucide-react"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import dynamic from "next/dynamic"
@@ -12,8 +12,7 @@ const BudgetBurndownChartClient = dynamic(
   () => import("@/components/budget-burndown-chart-client").then((mod) => mod.BudgetBurndownChartClient),
   { ssr: false }
 )
-import { formatCurrency } from "@/lib/currency"
-import { getBudgetProgressBarColor, getBudgetStatusColor } from "@/lib/budget-utils"
+import { CategoryBudgetCard } from "@/components/category-budget-card"
 import { MonthNavigator } from "@/components/month-navigator"
 import { BudgetEditDialog } from "@/components/budget-edit-dialog"
 import { RebalanceDialog } from "@/components/rebalance-dialog"
@@ -234,16 +233,17 @@ export function BudgetPageContent({
           {/* Category Budgets */}
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Categories</h3>
-            <div className="divide-y rounded-lg border">
+            <div className="space-y-2">
               {budgets.map((budget) => (
-                <CategoryRow
+                <CategoryBudgetCard
                   key={budget.id}
                   budget={budget}
+                  showHeader
                   isCurrentMonth={isCurrentMonth}
                   dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
                   daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
-                  onClick={handleCategoryClick}
-                  onAddFunds={handleAddFunds}
+                  onClick={() => handleCategoryClick(budget)}
+                  onAddFunds={(e) => handleAddFunds(e, budget)}
                 />
               ))}
             </div>
@@ -253,16 +253,17 @@ export function BudgetPageContent({
           {allowances.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Allowances</h3>
-              <div className="divide-y rounded-lg border">
+              <div className="space-y-2">
                 {allowances.map((allowance) => (
-                  <CategoryRow
+                  <CategoryBudgetCard
                     key={allowance.id}
                     budget={allowance}
+                    showHeader
                     isCurrentMonth={isCurrentMonth}
                     dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
                     daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
-                    onClick={handleCategoryClick}
-                    onAddFunds={handleAddFunds}
+                    onClick={() => handleCategoryClick(allowance)}
+                    onAddFunds={(e) => handleAddFunds(e, allowance)}
                   />
                 ))}
               </div>
@@ -286,7 +287,7 @@ export function BudgetPageContent({
         open={rebalanceOpen}
         onOpenChange={(v) => { setRebalanceOpen(v); if (!v) setRebalanceDestId(null) }}
         onSuccess={reloadBudgets}
-        budgets={budgets}
+        budgets={[...budgets, ...allowances]}
         householdId={householdId}
         budgetMonth={budgetMonth}
         initialDestId={rebalanceDestId}
@@ -305,53 +306,3 @@ export function BudgetPageContent({
   )
 }
 
-interface CategoryRowProps {
-  budget: BudgetSummary
-  isCurrentMonth: boolean
-  dayOfMonth?: number
-  daysInMonth?: number
-  onClick: (budget: BudgetSummary) => void
-  onAddFunds: (e: React.MouseEvent, budget: BudgetSummary) => void
-}
-
-function CategoryRow({ budget, isCurrentMonth, dayOfMonth, daysInMonth, onClick, onAddFunds }: CategoryRowProps) {
-  const percentSpent = Number(budget.percent_spent)
-  const remaining = Number(budget.remaining_amount)
-  const isOver = remaining < 0
-
-  return (
-    <div
-      className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors first:rounded-t-lg last:rounded-b-lg"
-      onClick={() => onClick(budget)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(budget) } }}
-    >
-      {budget.category_icon && (
-        <span className="text-base shrink-0 w-5 text-center">{budget.category_icon}</span>
-      )}
-      <span className="text-sm font-medium flex-1 min-w-0 truncate">{budget.category_name}</span>
-      <div className="w-16 sm:w-24 shrink-0">
-        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all duration-300 ${getBudgetProgressBarColor(percentSpent, dayOfMonth, daysInMonth)}`}
-            style={{ width: `${Math.min(percentSpent, 100)}%` }}
-          />
-        </div>
-      </div>
-      {isCurrentMonth && isOver && (
-        <button
-          onClick={(e) => onAddFunds(e, budget)}
-          className="shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors"
-          title="Add funds from another category"
-        >
-          <Plus className="h-3 w-3" />
-          Add funds
-        </button>
-      )}
-      <span className={`text-sm font-medium shrink-0 w-20 text-right ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth)}`}>
-        {formatCurrency(remaining, 0)}
-      </span>
-    </div>
-  )
-}

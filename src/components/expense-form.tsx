@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Check } from "lucide-react"
-import { format, startOfMonth } from "date-fns"
+import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
@@ -11,7 +11,7 @@ import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
-import { CategoryBudgetStatus } from "@/components/category-budget-status"
+import { CategoryBudgetCard } from "@/components/category-budget-card"
 import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
@@ -534,8 +534,11 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
         >
           <div className="overflow-hidden">
             {selectedCategory && (
-              <CategoryBudgetStatus
+              <CategoryBudgetCard
                 budget={categoryBudget}
+                isCurrentMonth
+                dayOfMonth={new Date().getDate()}
+                daysInMonth={getDaysInMonth(new Date())}
                 additionalAmount={debouncedAmount > 0 ? debouncedAmount * previewExchangeRate : 0}
                 loading={loadingBudget}
               />
