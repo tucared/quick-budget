@@ -20,14 +20,19 @@ const getSupabase = cache(() => createServerSupabaseClient())
  * Server-side function to get authenticated user and their household.
  * Cached per request — safe to call from both layout and page without
  * triggering duplicate auth round-trips.
+ *
+ * Uses getSession() instead of getUser() because middleware already validates
+ * the JWT server-side via getUser() on every request. Reading the session from
+ * cookies here avoids a redundant network roundtrip to Supabase Auth.
  */
 export const getServerUser = cache(async (): Promise<UserData | null> => {
   const supabase = await getSupabase()
 
   const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
 
+  const authUser = session?.user
   if (!authUser) {
     return null
   }
