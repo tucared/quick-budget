@@ -20,21 +20,23 @@ import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface ExpenseFormProps {
   onExpenseSaved?: (expense: Expense) => void
+  initialCategories?: Category[]
+  initialTopCategoryIds?: string[]
 }
 
-export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
+export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds }: ExpenseFormProps) {
   const { user } = useUser()
   const storageKeys = useMemo(
     () => (user?.householdId ? getStorageKeys(user.householdId) : null),
     [user?.householdId]
   )
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<Category[]>(initialCategories ?? [])
   const [loading, setLoading] = useState(false)
-  const [loadingData, setLoadingData] = useState(true)
+  const [loadingData, setLoadingData] = useState(initialCategories === undefined)
   const [loadError, setLoadError] = useState("")
   const [error, setError] = useState("")
   const [showSuccess, setShowSuccess] = useState(false)
-  const [topCategoryIds, setTopCategoryIds] = useState<string[]>([])
+  const [topCategoryIds, setTopCategoryIds] = useState<string[]>(initialTopCategoryIds ?? [])
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
@@ -142,7 +144,9 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
     }))
   }
 
-  // Load categories on mount
+  // Load form data on mount. When initialCategories + initialTopCategoryIds are
+  // provided by the server, skip the Supabase fetches entirely — only apply
+  // localStorage defaults (synchronous, no network).
   useEffect(() => {
     const loadData = async () => {
       if (!user?.householdId) {
@@ -150,52 +154,49 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
         return
       }
 
+      const householdId = user.householdId
+
       try {
-        const supabase = createClient()
-        const householdId = user.householdId
+        if (initialCategories === undefined) {
+          // Fallback: fetch categories client-side (standalone usage without server props)
+          const supabase = createClient()
 
-        // Load categories with explicit household filter
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from("categories")
-          .select("*")
-          .eq("household_id", householdId)
-          .eq("is_active", true)
-          .order("name")
+          const { data: categoriesData, error: categoriesError } = await supabase
+            .from("categories")
+            .select("*")
+            .eq("household_id", householdId)
+            .eq("is_active", true)
+            .order("name")
 
-        if (categoriesError) {
-          setLoadError(getErrorMessage(categoriesError))
-          setLoadingData(false)
-          return
-        }
-
-        if (categoriesData) {
-          setCategories(categoriesData)
-        }
-
-        // Fetch top 5 categories by expense count in the last 30 days (server-side aggregation)
-        if (categoriesData) {
-          const { data: topCategories } = await supabase.rpc(
-            "top_categories_by_usage",
-            { p_household_id: householdId, p_limit: 5 }
-          )
-
-          const ranked = topCategories
-            ? topCategories.map(
-                (r: { category_id: string }) => r.category_id
-              )
-            : []
-
-          // If fewer than 5, fill with remaining active categories alphabetically
-          if (ranked.length < 7) {
-            const rankedSet = new Set(ranked)
-            const fillers = categoriesData
-              .filter((c) => !rankedSet.has(c.id))
-              .map((c) => c.id)
-              .slice(0, 7 - ranked.length)
-            ranked.push(...fillers)
+          if (categoriesError) {
+            setLoadError(getErrorMessage(categoriesError))
+            setLoadingData(false)
+            return
           }
 
-          setTopCategoryIds(ranked)
+          if (categoriesData) {
+            setCategories(categoriesData)
+
+            const { data: topCategories } = await supabase.rpc(
+              "top_categories_by_usage",
+              { p_household_id: householdId, p_limit: 5 }
+            )
+
+            const ranked = topCategories
+              ? topCategories.map((r: { category_id: string }) => r.category_id)
+              : []
+
+            if (ranked.length < 7) {
+              const rankedSet = new Set(ranked)
+              const fillers = categoriesData
+                .filter((c) => !rankedSet.has(c.id))
+                .map((c) => c.id)
+                .slice(0, 7 - ranked.length)
+              ranked.push(...fillers)
+            }
+
+            setTopCategoryIds(ranked)
+          }
         }
 
         // Load smart defaults from localStorage (namespaced by household)
@@ -223,6 +224,7 @@ export function ExpenseForm({ onExpenseSaved }: ExpenseFormProps) {
     }
 
     loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   // Load budget status when category is selected

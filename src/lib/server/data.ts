@@ -182,3 +182,21 @@ export async function getCategories(householdId: string): Promise<Category[]> {
   return data || []
 }
 
+/**
+ * Server-side function to fetch the most-used category IDs for a household.
+ * Returns an ordered list of category IDs ranked by recent usage.
+ */
+export async function getTopCategoryIds(
+  householdId: string,
+  limit = 7
+): Promise<string[]> {
+  const supabase = await getSupabase()
+
+  const { data } = await supabase.rpc("top_categories_by_usage", {
+    p_household_id: householdId,
+    p_limit: limit,
+  })
+
+  return (data ?? []).map((r: { category_id: string }) => r.category_id)
+}
+

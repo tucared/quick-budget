@@ -9,11 +9,13 @@ import { ExpenseListClient } from "@/components/expense-list-client"
 interface ExpensesPageClientProps {
   initialExpenses: ExpenseWithDetails[]
   initialCategories: Category[]
+  initialTopCategoryIds: string[]
 }
 
 export function ExpensesPageClient({
   initialExpenses,
   initialCategories,
+  initialTopCategoryIds,
 }: ExpensesPageClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
 
@@ -56,7 +58,11 @@ export function ExpensesPageClient({
     <>
       {/* Expense Form */}
       <div className="bg-card border rounded-lg p-4 shadow-xs mb-6">
-        <ExpenseForm onExpenseSaved={handleExpenseSaved} />
+        <ExpenseForm
+          onExpenseSaved={handleExpenseSaved}
+          initialCategories={initialCategories}
+          initialTopCategoryIds={initialTopCategoryIds}
+        />
       </div>
 
       {/* Divider */}

@@ -3,6 +3,7 @@ import {
   getServerUser,
   getRecentExpenses,
   getCategories,
+  getTopCategoryIds,
 } from "@/lib/server/data"
 import { ExpensesPageClient } from "@/components/expenses-page-client"
 
@@ -14,9 +15,10 @@ export default async function ExpensesPage() {
   }
 
   // Fetch all data in parallel
-  const [expenses, categories] = await Promise.all([
+  const [expenses, categories, topCategoryIds] = await Promise.all([
     getRecentExpenses(user.householdId, 50),
     getCategories(user.householdId),
+    getTopCategoryIds(user.householdId),
   ])
 
   return (
@@ -24,6 +26,7 @@ export default async function ExpensesPage() {
       <ExpensesPageClient
         initialExpenses={expenses}
         initialCategories={categories}
+        initialTopCategoryIds={topCategoryIds}
       />
     </main>
   )
