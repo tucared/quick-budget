@@ -1,47 +1,13 @@
--- Row Level Security: enable + policies for all tables
-
--- ============================================================================
--- AUTO-ENABLE RLS ON NEW PUBLIC TABLES
--- ============================================================================
--- Safety net: any table created in the public schema automatically gets
--- ROW LEVEL SECURITY enabled. This catches the case where a new migration
--- forgets the explicit `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` below.
--- Lives here (rather than 00_functions.sql) because it is part of the RLS
--- enforcement story.
-CREATE OR REPLACE FUNCTION public.rls_auto_enable()
-RETURNS event_trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = 'pg_catalog'
-AS $$
-DECLARE
-  cmd record;
-BEGIN
-  FOR cmd IN
-    SELECT *
-    FROM pg_event_trigger_ddl_commands()
-    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
-      AND object_type IN ('table','partitioned table')
-  LOOP
-     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN
-      BEGIN
-        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);
-        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
-      EXCEPTION
-        WHEN OTHERS THEN
-          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;
-      END;
-     ELSE
-        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
-     END IF;
-  END LOOP;
-END;
-$$;
-
-DROP EVENT TRIGGER IF EXISTS ensure_rls;
-CREATE EVENT TRIGGER ensure_rls ON ddl_command_end
-  WHEN TAG IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
-  EXECUTE FUNCTION public.rls_auto_enable();
+-- Row Level Security: enable + policies for all tables.
+--
+-- Each public table gets an explicit `ALTER TABLE ... ENABLE ROW LEVEL
+-- SECURITY` below. This is the only mechanism enforcing RLS — there is no
+-- event-trigger safety net. Per Supabase's docs
+-- (https://supabase.com/docs/guides/database/postgres/row-level-security),
+-- explicit enablement is the recommended approach. The CI gate in
+-- `.github/workflows/migrate.yml` runs after every prod push and fails if
+-- any `public` table has `relrowsecurity = false`, so a new table missing
+-- its RLS line cannot ship.
 
 -- ============================================================================
 -- USERS

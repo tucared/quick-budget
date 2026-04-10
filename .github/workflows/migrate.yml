@@ -28,3 +28,14 @@ jobs:
         run: |
           supabase link --project-ref "${{ secrets.SUPABASE_PROD_PROJECT_REF }}"
           supabase db push
+
+      - name: Run security advisors (fails on missing RLS)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase db advisors \
+            --linked \
+            --type security \
+            --level error \
+            --fail-on error
