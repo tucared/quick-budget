@@ -249,7 +249,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
       try {
         const supabase = createClient()
-        const budgetMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+        const budgetMonth = format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd')
 
         const { data, error } = await supabase
           .from("budget_summary")
@@ -275,7 +275,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
     loadCategoryBudget()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- categoryBudget intentionally excluded to avoid refetch loop
-  }, [selectedCategory, user, categories, debouncedBudgetRefreshTick])
+  }, [selectedCategory, user, categories, debouncedBudgetRefreshTick, expenseDate])
 
   // Fetch exchange rate for budget preview when currency or date changes
   useEffect(() => {
@@ -538,9 +538,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             {selectedCategory && (
               <CategoryBudgetCard
                 budget={categoryBudget}
-                isCurrentMonth
-                dayOfMonth={new Date().getDate()}
-                daysInMonth={getDaysInMonth(new Date())}
+                isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
+                dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
+                daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
                 additionalAmount={debouncedAmount > 0 ? debouncedAmount * previewExchangeRate : 0}
                 loading={loadingBudget}
               />
