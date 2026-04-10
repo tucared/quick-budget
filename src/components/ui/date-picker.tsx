@@ -67,6 +67,7 @@ export function DatePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant={"outline"}
           className={cn(
             "w-full justify-start text-left font-normal",
@@ -82,6 +83,7 @@ export function DatePicker({
         {/* Quick picks section */}
         <div className="p-3 space-y-1 border-b">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="w-full justify-start font-normal"
@@ -90,6 +92,7 @@ export function DatePicker({
             Today
           </Button>
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="w-full justify-start font-normal"
@@ -98,6 +101,7 @@ export function DatePicker({
             Yesterday
           </Button>
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="w-full justify-start font-normal"
