@@ -21,6 +21,7 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
   if ! grep -q 'runtime:' src/middleware.ts; then
     sed -i 's/export const config = {/export const config = {\n  runtime: "nodejs",/' src/middleware.ts
   fi
+  git update-index --assume-unchanged src/middleware.ts
 
   # Start Next.js dev server in background
   echo "Starting Next.js dev server..."

@@ -16,7 +16,7 @@
 
 - The cloud security proxy requires special browser launch flags for agent-browser:
   ```bash
-  npx agent-browser --proxy "$HTTP_PROXY" --proxy-bypass "localhost,127.0.0.1" open http://localhost:3000 --ignore-https-errors
+  npx agent-browser --proxy "$HTTP_PROXY" --proxy-bypass "localhost,127.0.0.1" --executable-path "$(find /opt/pw-browsers/chromium-*/chrome-linux -name chrome -type f 2>/dev/null | head -1)" open http://localhost:3000 --ignore-https-errors
   ```
 - To test mobile viewports after opening, run:
   ```bash
