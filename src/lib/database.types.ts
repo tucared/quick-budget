@@ -320,12 +320,14 @@ export type Database = {
         }
         Returns: undefined
       }
-      top_categories_by_usage: {
-        Args: { p_household_id: string; p_limit?: number }
-        Returns: {
-          category_id: string
-          expense_count: number
-        }[]
+      top_up_budget: {
+        Args: {
+          p_amount: number
+          p_budget_month: string
+          p_category_id: string
+          p_household_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
