@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: ["192.168.1.*"],
+  serverExternalPackages: ['undici'],
 
   async headers() {
     // Build connect-src to include the configured Supabase URL
