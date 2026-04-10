@@ -159,33 +159,93 @@ BEGIN
     (u2, hh, cat_allow2, 30.00, 'EUR', 30.00, 'EUR', 1, month1 + 23, 'Yoga workshop');
 
   -- ========================================================================
-  -- Expenses — Current month (some in BRL, partial month)
+  -- Expenses — Current month (conditional: only insert if day has passed)
   -- ========================================================================
-  INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
-    -- Groceries
-    (u1, hh, cat_groceries, 88.70, 'EUR', 88.70, 'EUR', 1, month0, 'Weekly groceries'),
-    (u2, hh, cat_groceries, 31.20, 'EUR', 31.20, 'EUR', 1, month0 + 2, 'Fresh bread and cheese'),
-    (u1, hh, cat_groceries, 102.50, 'EUR', 102.50, 'EUR', 1, month0 + 6, 'Big weekly shop'),
-    -- BRL expenses (trip to Brazil)
-    (u1, hh, cat_groceries, 185.00, 'BRL', 30.16, 'EUR', 0.163027, month0 + 4, 'Supermercado'),
-    (u1, hh, cat_dining, 120.00, 'BRL', 19.56, 'EUR', 0.163027, month0 + 3, 'Restaurante churrasco'),
-    (u1, hh, cat_dining, 85.00, 'BRL', 13.86, 'EUR', 0.163027, month0 + 5, 'Café da manhã'),
-    (u1, hh, cat_transport, 45.00, 'BRL', 7.34, 'EUR', 0.163027, month0 + 3, 'Uber aeroporto'),
-    (u1, hh, cat_transport, 32.00, 'BRL', 5.22, 'EUR', 0.163027, month0 + 5, 'Uber centro'),
-    -- EUR expenses continuing
-    (u2, hh, cat_dining, 28.00, 'EUR', 28.00, 'EUR', 1, month0 + 1, 'Sunday brunch'),
-    (u2, hh, cat_dining, 41.50, 'EUR', 41.50, 'EUR', 1, month0 + 7, 'Sushi night'),
-    (u1, hh, cat_transport, 50.00, 'EUR', 50.00, 'EUR', 1, month0, 'Monthly metro pass'),
-    (u2, hh, cat_entertainment, 14.99, 'EUR', 14.99, 'EUR', 1, month0, 'Streaming subscription'),
-    (u1, hh, cat_entertainment, 35.00, 'EUR', 35.00, 'EUR', 1, month0 + 6, 'Bowling'),
-    (u2, hh, cat_shopping, 89.00, 'EUR', 89.00, 'EUR', 1, month0 + 2, 'Spring wardrobe'),
-    (u1, hh, cat_bills, 88.00, 'EUR', 88.00, 'EUR', 1, month0, 'Electricity'),
-    (u1, hh, cat_bills, 45.00, 'EUR', 45.00, 'EUR', 1, month0, 'Internet'),
-    (u1, hh, cat_bills, 120.00, 'EUR', 120.00, 'EUR', 1, month0 + 4, 'Health insurance'),
-    (u2, hh, cat_bills, 39.99, 'EUR', 39.99, 'EUR', 1, month0 + 6, 'Phone plan'),
-    -- Allowances
-    (u1, hh, cat_allow1, 28.00, 'EUR', 28.00, 'EUR', 1, month0 + 1, 'Novel'),
-    (u2, hh, cat_allow2, 40.00, 'EUR', 40.00, 'EUR', 1, month0 + 4, 'Pottery class');
+
+  -- Day 0: Bills and subscriptions (start of month)
+  IF month0 + 0 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_groceries,     88.70, 'EUR',  88.70, 'EUR', 1, month0 + 0, 'Weekly groceries'),
+      (u1, hh, cat_transport,     50.00, 'EUR',  50.00, 'EUR', 1, month0 + 0, 'Monthly metro pass'),
+      (u2, hh, cat_entertainment, 14.99, 'EUR',  14.99, 'EUR', 1, month0 + 0, 'Streaming subscription'),
+      (u1, hh, cat_bills,         88.00, 'EUR',  88.00, 'EUR', 1, month0 + 0, 'Electricity'),
+      (u1, hh, cat_bills,         45.00, 'EUR',  45.00, 'EUR', 1, month0 + 0, 'Internet');
+  END IF;
+
+  -- Day 2: Weekend brunch
+  IF month0 + 2 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u2, hh, cat_dining, 28.00, 'EUR', 28.00, 'EUR', 1, month0 + 2, 'Sunday brunch');
+  END IF;
+
+  -- Day 4: Health insurance
+  IF month0 + 4 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_bills, 120.00, 'EUR', 120.00, 'EUR', 1, month0 + 4, 'Health insurance');
+  END IF;
+
+  -- Day 6: Grocery top-up
+  IF month0 + 6 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u2, hh, cat_groceries, 31.20, 'EUR', 31.20, 'EUR', 1, month0 + 6, 'Fresh bread and cheese');
+  END IF;
+
+  -- Day 8: Weekly groceries
+  IF month0 + 8 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_groceries, 102.50, 'EUR', 102.50, 'EUR', 1, month0 + 8, 'Big weekly shop');
+  END IF;
+
+  -- Day 10: Allowance spend
+  IF month0 + 10 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_allow1, 28.00, 'EUR', 28.00, 'EUR', 1, month0 + 10, 'Novel');
+  END IF;
+
+  -- Day 12: Shopping
+  IF month0 + 12 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u2, hh, cat_shopping, 89.00, 'EUR', 89.00, 'EUR', 1, month0 + 12, 'Spring wardrobe');
+  END IF;
+
+  -- Day 14: Phone plan
+  IF month0 + 14 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u2, hh, cat_bills, 39.99, 'EUR', 39.99, 'EUR', 1, month0 + 14, 'Phone plan');
+  END IF;
+
+  -- Day 16: Brazil trip day 1
+  IF month0 + 16 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_dining,    120.00, 'BRL', 19.56, 'EUR', 0.163027, month0 + 16, 'Restaurante churrasco'),
+      (u1, hh, cat_transport,  45.00, 'BRL',  7.34, 'EUR', 0.163027, month0 + 16, 'Uber aeroporto');
+  END IF;
+
+  -- Day 17: Brazil trip day 2
+  IF month0 + 17 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_groceries, 185.00, 'BRL', 30.16, 'EUR', 0.163027, month0 + 17, 'Supermercado'),
+      (u1, hh, cat_dining,     85.00, 'BRL', 13.86, 'EUR', 0.163027, month0 + 17, 'Café da manhã'),
+      (u1, hh, cat_transport,  32.00, 'BRL',  5.22, 'EUR', 0.163027, month0 + 17, 'Uber centro');
+  END IF;
+
+  -- Day 20: Allowance spend
+  IF month0 + 20 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u2, hh, cat_allow2, 40.00, 'EUR', 40.00, 'EUR', 1, month0 + 20, 'Pottery class');
+  END IF;
+
+  -- Day 22: Dining out
+  IF month0 + 22 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u2, hh, cat_dining, 41.50, 'EUR', 41.50, 'EUR', 1, month0 + 22, 'Sushi night');
+  END IF;
+
+  -- Day 25: Entertainment
+  IF month0 + 25 <= CURRENT_DATE THEN
+    INSERT INTO public.expenses (logged_by_user_id, household_id, category_id, amount, currency, converted_amount, converted_currency, exchange_rate, expense_date, description) VALUES
+      (u1, hh, cat_entertainment, 35.00, 'EUR', 35.00, 'EUR', 1, month0 + 25, 'Bowling');
+  END IF;
 
   RAISE NOTICE '  ✓ Seeded budget allocations and expenses';
 END $$;
