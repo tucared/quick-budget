@@ -11,12 +11,10 @@ export async function register() {
     (process.env.HTTPS_PROXY || process.env.HTTP_PROXY)
   ) {
     try {
-      // Use Function constructor to prevent Turbopack from statically analyzing
-      // and bundling undici for the edge runtime.
-      const mod = await (new Function('return import("undici")'))()
-      mod.setGlobalDispatcher(new mod.EnvHttpProxyAgent())
+      const { EnvHttpProxyAgent, setGlobalDispatcher } = await import("undici")
+      setGlobalDispatcher(new EnvHttpProxyAgent())
     } catch {
-      // Silently fail if undici is unavailable (e.g. edge runtime)
+      // Silently fail if undici is unavailable
     }
   }
 }
