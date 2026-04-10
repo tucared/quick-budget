@@ -24,7 +24,11 @@
   npx agent-browser set viewport 427 804   # Firefox on Android
   ```
 - `src/instrumentation.ts` configures Node.js to route server-side fetch through the proxy (via undici `EnvHttpProxyAgent`)
-- The dev server is started with `NODE_TLS_REJECT_UNAUTHORIZED=0` to accept the proxy's TLS certificates
+- The app runs in **production mode** (`next build && next start`) to avoid HMR/Fast Refresh, which causes form skeleton flicker via component remounts in the cloud environment
+- After editing source files, rebuild and restart the server:
+  ```bash
+  NODE_TLS_REJECT_UNAUTHORIZED=0 npm run build && kill $(lsof -t -i:3000 2>/dev/null); NODE_TLS_REJECT_UNAUTHORIZED=0 npm start > /tmp/nextjs.log 2>&1 &
+  ```
 - Seeds are committed directly in `supabase/seeds/` with fake data
 - Database schema is declarative: edit files in `supabase/schemas/`, then run `supabase db diff -f migration_name` to generate a migration
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
