@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+export const config = {
+  runtime: "nodejs",
+  matcher: [
+    // Run on all routes except static files and Next.js internals
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -31,11 +39,4 @@ export async function middleware(request: NextRequest) {
   await supabase.auth.getUser()
 
   return supabaseResponse
-}
-
-export const config = {
-  matcher: [
-    // Run on all routes except static files and Next.js internals
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
 }
