@@ -56,8 +56,10 @@ export class RealtimeSubscriptionManager<TCallback extends (...args: never[]) =>
     const client = this.getClient()
     const { data: { session } } = await client.auth.getSession()
 
-    // Check if we were cleaned up while awaiting, or if auth is invalid
+    // Check if we were cleaned up while awaiting, if another creation already
+    // won the race (React strict mode / HMR), or if auth is invalid
     if (!this.householdSubscribers.get(householdId)?.size) return
+    if (this.channels.has(householdId)) return
     if (!session) {
       console.warn(`${this.config.table} subscription skipped: no valid auth session`)
       return
