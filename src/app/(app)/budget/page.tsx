@@ -14,12 +14,6 @@ interface BudgetPageProps {
 }
 
 export default async function BudgetPage({ searchParams }: BudgetPageProps) {
-  const user = await getServerUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
   const { month } = await searchParams
 
   // Parse month from searchParams (format: yyyy-MM) or default to current month
@@ -30,13 +24,21 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
     budgetMonth = format(startOfMonth(new Date()), "yyyy-MM-dd")
   }
 
-  // Fetch all data in parallel
-  const [budgets, allowances, expenses, categories] = await Promise.all([
-    getBudgetSummary(user.householdId, budgetMonth),
-    getAllowanceSummary(user.householdId, budgetMonth),
-    getMonthlyExpenses(user.householdId, budgetMonth),
-    getCategories(user.householdId),
+  // Run the user fetch in parallel with the data queries. The data queries
+  // rely on RLS (not an explicit household_id filter), so they don't need to
+  // wait for getServerUser to resolve. This cuts one full round-trip off the
+  // critical path.
+  const [user, budgets, allowances, expenses, categories] = await Promise.all([
+    getServerUser(),
+    getBudgetSummary(budgetMonth),
+    getAllowanceSummary(budgetMonth),
+    getMonthlyExpenses(budgetMonth),
+    getCategories(),
   ])
+
+  if (!user) {
+    redirect("/login")
+  }
 
   return (
     <main className="container mx-auto px-4 py-6 max-w-6xl">

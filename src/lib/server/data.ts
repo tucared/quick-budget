@@ -1,6 +1,6 @@
 import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
-import { format, parseISO, startOfMonth } from "date-fns"
+import { format, parseISO, startOfMonth, subDays } from "date-fns"
 import type {
   BudgetSummary,
   Category,
@@ -24,6 +24,11 @@ const getSupabase = cache(() => createServerSupabaseClient())
  * Uses getSession() instead of getUser() because middleware already validates
  * the JWT server-side via getUser() on every request. Reading the session from
  * cookies here avoids a redundant network roundtrip to Supabase Auth.
+ *
+ * This function is intentionally designed to run in parallel (via Promise.all)
+ * with the data-fetching functions below, which rely on RLS rather than an
+ * explicit household_id filter. See expenses/page.tsx and budget/page.tsx for
+ * the pattern.
  */
 export const getServerUser = cache(async (): Promise<UserData | null> => {
   const supabase = await getSupabase()
@@ -56,10 +61,10 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
 })
 
 /**
- * Server-side function to fetch budget summary for a given month
+ * Server-side function to fetch budget summary for a given month.
+ * RLS filters by the caller's household — no explicit household_id needed.
  */
 export async function getBudgetSummary(
-  householdId: string,
   budgetMonth?: string
 ): Promise<BudgetSummary[]> {
   const supabase = await getSupabase()
@@ -68,7 +73,6 @@ export async function getBudgetSummary(
   const { data, error } = await supabase
     .from("budget_summary")
     .select("*")
-    .eq("household_id", householdId)
     .eq("budget_month", month)
     .eq("exclude_from_budget_total", false)
     .order("category_name", { ascending: true })
@@ -83,10 +87,10 @@ export async function getBudgetSummary(
 
 /**
  * Server-side function to fetch allowance summary for a given month
- * (categories with exclude_from_budget_total = true)
+ * (categories with exclude_from_budget_total = true).
+ * RLS filters by the caller's household — no explicit household_id needed.
  */
 export async function getAllowanceSummary(
-  householdId: string,
   budgetMonth?: string
 ): Promise<BudgetSummary[]> {
   const supabase = await getSupabase()
@@ -95,7 +99,6 @@ export async function getAllowanceSummary(
   const { data, error } = await supabase
     .from("budget_summary")
     .select("*")
-    .eq("household_id", householdId)
     .eq("budget_month", month)
     .eq("exclude_from_budget_total", true)
     .order("category_name", { ascending: true })
@@ -109,10 +112,10 @@ export async function getAllowanceSummary(
 }
 
 /**
- * Server-side function to fetch expenses for current month
+ * Server-side function to fetch expenses for a given month.
+ * RLS filters by the caller's household — no explicit household_id needed.
  */
 export async function getMonthlyExpenses(
-  householdId: string,
   budgetMonth: string
 ): Promise<Expense[]> {
   const supabase = await getSupabase()
@@ -129,7 +132,6 @@ export async function getMonthlyExpenses(
   const { data, error } = await supabase
     .from("expenses")
     .select("*")
-    .eq("household_id", householdId)
     .gte("expense_date", budgetMonth)
     .lt("expense_date", nextMonthStr)
     .order("expense_date", { ascending: true })
@@ -143,10 +145,10 @@ export async function getMonthlyExpenses(
 }
 
 /**
- * Server-side function to fetch recent expenses
+ * Server-side function to fetch recent expenses.
+ * RLS filters by the caller's household — no explicit household_id needed.
  */
 export async function getRecentExpenses(
-  householdId: string,
   limit: number = 20
 ): Promise<ExpenseWithDetails[]> {
   const supabase = await getSupabase()
@@ -154,7 +156,6 @@ export async function getRecentExpenses(
   const { data, error } = await supabase
     .from("expenses")
     .select("*")
-    .eq("household_id", householdId)
     .order("expense_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit)
@@ -168,15 +169,15 @@ export async function getRecentExpenses(
 }
 
 /**
- * Server-side function to fetch categories for a household
+ * Server-side function to fetch active categories.
+ * RLS filters by the caller's household — no explicit household_id needed.
  */
-export async function getCategories(householdId: string): Promise<Category[]> {
+export async function getCategories(): Promise<Category[]> {
   const supabase = await getSupabase()
 
   const { data, error } = await supabase
     .from("categories")
     .select("*")
-    .eq("household_id", householdId)
     .eq("is_active", true)
 
   if (error) {
@@ -188,20 +189,34 @@ export async function getCategories(householdId: string): Promise<Category[]> {
 }
 
 /**
- * Server-side function to fetch the most-used category IDs for a household.
- * Returns an ordered list of category IDs ranked by recent usage.
+ * Compute the most-used category IDs from a set of recent expenses.
+ * Matches the semantics of the top_categories_by_usage RPC (active categories,
+ * last 30 days) but runs in TypeScript on data we've already fetched — no extra
+ * database round-trip.
+ *
+ * Note: if the caller passes fewer than 30 days' worth of expenses, the result
+ * is based on whatever window those expenses cover. For the expenses page,
+ * getRecentExpenses(50) typically spans well over 30 days in a 2-person
+ * household, so the result matches the RPC in practice.
  */
-export async function getTopCategoryIds(
-  householdId: string,
+export function computeTopCategoryIds(
+  expenses: ExpenseWithDetails[],
+  activeCategories: Category[],
   limit = 7
-): Promise<string[]> {
-  const supabase = await getSupabase()
+): string[] {
+  const activeIds = new Set(activeCategories.map((c) => c.id))
+  const cutoff = format(subDays(new Date(), 30), "yyyy-MM-dd")
 
-  const { data } = await supabase.rpc("top_categories_by_usage", {
-    p_household_id: householdId,
-    p_limit: limit,
-  })
+  const counts = new Map<string, number>()
+  for (const e of expenses) {
+    if (!e.category_id) continue
+    if (!activeIds.has(e.category_id)) continue
+    if (e.expense_date < cutoff) continue
+    counts.set(e.category_id, (counts.get(e.category_id) ?? 0) + 1)
+  }
 
-  return (data ?? []).map((r: { category_id: string }) => r.category_id)
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id)
 }
-
