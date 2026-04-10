@@ -40,8 +40,7 @@ export default function LoginPage() {
         return
       }
 
-      router.push("/expenses")
-      router.refresh()
+      router.replace("/expenses")
     } catch (_err) {
       setError("An unexpected error occurred")
       setLoading(false)

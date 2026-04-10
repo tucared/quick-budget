@@ -32,6 +32,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // Skip auth refresh on login page — there's no session to validate
+  const { pathname } = request.nextUrl
+  if (pathname === "/login") {
+    return supabaseResponse
+  }
+
   // Refresh the session — this is the key call that prevents stale tokens.
   // Do NOT use getSession() here: getUser() validates the token server-side
   // while getSession() only reads from cookies (which may be stale).
