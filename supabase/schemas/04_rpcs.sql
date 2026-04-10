@@ -136,32 +136,6 @@ $$;
 GRANT EXECUTE ON FUNCTION public.save_budget(UUID, DATE, JSONB) TO authenticated;
 
 -- ============================================================================
--- TOP CATEGORIES BY USAGE
--- ============================================================================
-CREATE OR REPLACE FUNCTION public.top_categories_by_usage(
-  p_household_id UUID,
-  p_limit INT DEFAULT 5
-)
-RETURNS TABLE (category_id UUID, expense_count BIGINT)
-LANGUAGE sql
-SECURITY INVOKER
-STABLE
-SET search_path = public
-AS $$
-  SELECT e.category_id, COUNT(*) AS expense_count
-  FROM expenses e
-  JOIN categories c ON c.id = e.category_id AND c.is_active = TRUE
-  WHERE e.household_id = p_household_id
-    AND e.category_id IS NOT NULL
-    AND e.expense_date >= CURRENT_DATE - INTERVAL '30 days'
-  GROUP BY e.category_id
-  ORDER BY expense_count DESC
-  LIMIT p_limit;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.top_categories_by_usage(UUID, INT) TO authenticated;
-
--- ============================================================================
 -- TOP UP BUDGET
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.top_up_budget(

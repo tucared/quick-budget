@@ -176,26 +176,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
           if (categoriesData) {
             setCategories(categoriesData)
-
-            const { data: topCategories } = await supabase.rpc(
-              "top_categories_by_usage",
-              { p_household_id: householdId, p_limit: 5 }
-            )
-
-            const ranked = topCategories
-              ? topCategories.map((r: { category_id: string }) => r.category_id)
-              : []
-
-            if (ranked.length < 7) {
-              const rankedSet = new Set(ranked)
-              const fillers = categoriesData
-                .filter((c) => !rankedSet.has(c.id))
-                .map((c) => c.id)
-                .slice(0, 7 - ranked.length)
-              ranked.push(...fillers)
-            }
-
-            setTopCategoryIds(ranked)
+            // Fallback ordering when no server-provided top category IDs are
+            // available — just take the first 7. Callers that care about
+            // recency-ranked ordering should pass initialTopCategoryIds.
+            setTopCategoryIds(categoriesData.slice(0, 7).map((c) => c.id))
           }
         }
 
