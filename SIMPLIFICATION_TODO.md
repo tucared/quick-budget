@@ -1,10 +1,10 @@
 # Simplification TODO
 
-Remaining items from the performance & simplicity audit. Tasks 1-3 are done.
+Remaining items from the performance & simplicity audit. Tasks 1-4 are done.
 
 ---
 
-## 4. Consolidate CentsInput usage across forms
+## ~~4. Consolidate CentsInput usage across forms~~ ✅
 
 **Files:** `src/components/expense-form.tsx`, `src/components/edit-expense-dialog.tsx`, `src/components/ui/cents-input.tsx`
 
@@ -17,16 +17,15 @@ Remaining items from the performance & simplicity audit. Tasks 1-3 are done.
 
 ---
 
-## 5. Consolidate ExpenseForm state
+## ~~5. Consolidate ExpenseForm state~~ ✅
 
 **File:** `src/components/expense-form.tsx`
 
 **Problem:** 12 useState hooks, 4 useEffect. The `budgetRefreshTick` + `debouncedBudgetRefreshTick` double-debounce pattern (lines 42-44) is confusing.
 
-**What to do:**
-- Lower priority after task #4. The double-debounce is only 3 lines and actually works correctly (debounces rapid realtime events before triggering a budget refetch).
-- Could merge `loadingData` + `loadError` into a single `loadState: { status: 'idle' | 'loading' | 'error', error?: string }`, but marginal benefit.
-- **Verdict:** Skip unless you're already in this file for task #4. The form is long but each piece of state serves a real purpose.
+**What was done:**
+- Merged `loadingData` + `loadError` into a single discriminated union `loadState: { status: 'idle' } | { status: 'loading' } | { status: 'error'; error: string }` — eliminates impossible states (e.g. loading=true + error set).
+- The double-debounce pattern was left as-is — it works correctly and is only 3 lines.
 
 ---
 
