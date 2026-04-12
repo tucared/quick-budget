@@ -1,6 +1,6 @@
 # Simplification TODO
 
-Remaining items from the performance & simplicity audit. Tasks 1-6 are done.
+Remaining items from the performance & simplicity audit. Tasks 1-7 are done.
 
 ---
 
@@ -62,7 +62,7 @@ Remaining items from the performance & simplicity audit. Tasks 1-6 are done.
 
 ---
 
-## 7. Split CategoryBudgetCard into focused components
+## ~~7. Split CategoryBudgetCard into focused components~~ ✅ (skipped)
 
 **File:** `src/components/category-budget-card.tsx`
 
