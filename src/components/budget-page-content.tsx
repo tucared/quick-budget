@@ -64,7 +64,7 @@ export function BudgetPageContent({
   useEffect(() => { setTarget(initialTarget) }, [initialTarget])
   useEffect(() => { setExpenses(initialExpenses) }, [initialExpenses])
 
-  function reloadBudgets() {
+  function reloadData() {
     const supabase = createClient()
     Promise.all([
       supabase
@@ -87,100 +87,27 @@ export function BudgetPageContent({
         .eq("household_id", householdId)
         .eq("budget_month", budgetMonth)
         .maybeSingle(),
-    ]).then(([budgetResult, allowanceResult, targetResult]) => {
+      supabase
+        .from("expenses")
+        .select("*")
+        .eq("household_id", householdId)
+        .gte("expense_date", budgetMonth)
+        .lt("expense_date", format(new Date(new Date(budgetMonth).getFullYear(), new Date(budgetMonth).getMonth() + 1, 1), "yyyy-MM-dd"))
+        .order("expense_date", { ascending: true }),
+    ]).then(([budgetResult, allowanceResult, targetResult, expensesResult]) => {
       if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
       else if (budgetResult.data) setBudgets(budgetResult.data)
       if (allowanceResult.error) setError(getErrorMessage(allowanceResult.error))
       else if (allowanceResult.data) setAllowances(allowanceResult.data)
       if (targetResult.error) setError(getErrorMessage(targetResult.error))
       else setTarget(targetResult.data)
+      if (expensesResult.error) setError(getErrorMessage(expensesResult.error))
+      else if (expensesResult.data) setExpenses(expensesResult.data)
     })
   }
 
-  // Apply expense changes optimistically so there's no reload flash
-  useExpenseSubscription((event) => {
-    // Helper: recompute derived budget fields after mutating spent_amount
-    function recompute(b: BudgetSummary): BudgetSummary {
-      const remaining = Number(b.allocated_amount) - Number(b.spent_amount)
-      const percent =
-        Number(b.allocated_amount) > 0
-          ? (Number(b.spent_amount) / Number(b.allocated_amount)) * 100
-          : 0
-      return { ...b, remaining_amount: remaining, percent_spent: percent }
-    }
-
-    // Helper: apply a delta to the matching category row
-    function applyDelta(
-      list: BudgetSummary[],
-      categoryId: string | null | undefined,
-      delta: number
-    ): BudgetSummary[] {
-      if (!categoryId) return list
-      return list.map((b) =>
-        b.category_id === categoryId
-          ? recompute({ ...b, spent_amount: Number(b.spent_amount) + delta })
-          : b
-      )
-    }
-
-    // With RLS enabled, DELETE events only contain the primary key in `old`.
-    // Look up the full expense from local state to get amount/category.
-    if (event.type === "DELETE") {
-      const oldId = (event.old as { id: string }).id
-      // Capture the deleted expense before removing it from state.
-      // setBudgets/setAllowances must be called OUTSIDE the setExpenses
-      // updater — React StrictMode double-invokes updater functions, which
-      // would apply the delta twice if nested inside.
-      let deleted: Expense | undefined
-      setExpenses((prev) => {
-        deleted = prev.find((e) => e.id === oldId)
-        return prev.filter((e) => e.id !== oldId)
-      })
-      if (deleted) {
-        const delta = -Number(deleted.converted_amount)
-        setBudgets((b) => applyDelta(b, deleted!.category_id, delta))
-        setAllowances((a) => applyDelta(a, deleted!.category_id, delta))
-      }
-      return
-    }
-
-    const expense = event.new as Expense | undefined
-    if (!expense) return
-
-    // Only apply changes for the current budget month
-    if (!expense.expense_date) return
-    const expenseMonth = format(startOfMonth(new Date(expense.expense_date + "T00:00:00")), "yyyy-MM-dd")
-    if (expenseMonth !== budgetMonth) return
-
-    if (event.type === "INSERT") {
-      const newExpense = event.new as Expense
-      setExpenses((prev) => {
-        if (prev.some((e) => e.id === newExpense.id)) return prev
-        return [...prev, newExpense]
-      })
-      const delta = Number(newExpense.converted_amount)
-      setBudgets((prev) => applyDelta(prev, newExpense.category_id, delta))
-      setAllowances((prev) => applyDelta(prev, newExpense.category_id, delta))
-    } else if (event.type === "UPDATE") {
-      const oldExpense = event.old as Expense
-      const newExpense = event.new as Expense
-      setExpenses((prev) => prev.map((e) => (e.id === newExpense.id ? newExpense : e)))
-      const delta = Number(newExpense.converted_amount) - Number(oldExpense.converted_amount)
-      // Also handle category reassignment
-      if (oldExpense.category_id !== newExpense.category_id) {
-        setBudgets((prev) =>
-          applyDelta(applyDelta(prev, oldExpense.category_id, -Number(oldExpense.converted_amount)), newExpense.category_id, Number(newExpense.converted_amount))
-        )
-        setAllowances((prev) =>
-          applyDelta(applyDelta(prev, oldExpense.category_id, -Number(oldExpense.converted_amount)), newExpense.category_id, Number(newExpense.converted_amount))
-        )
-      } else {
-        setBudgets((prev) => applyDelta(prev, newExpense.category_id, delta))
-        setAllowances((prev) => applyDelta(prev, newExpense.category_id, delta))
-      }
-    }
-  }, true)
-  useBudgetAllocationSubscription(reloadBudgets, true)
+  useExpenseSubscription(reloadData, true)
+  useBudgetAllocationSubscription(reloadData, true)
 
   const handleCategoryClick = (budget: BudgetSummary) => {
     setSelectedCategoryId(budget.category_id)
@@ -298,7 +225,7 @@ export function BudgetPageContent({
       <BudgetEditDialog
         open={editOpen}
         onOpenChange={setEditOpen}
-        onSuccess={reloadBudgets}
+        onSuccess={reloadData}
         categories={categories}
         householdId={householdId}
         budgetMonth={budgetMonth}
@@ -308,7 +235,7 @@ export function BudgetPageContent({
       <RebalanceDialog
         open={rebalanceOpen}
         onOpenChange={(v) => { setRebalanceOpen(v); if (!v) setRebalanceDestId(null) }}
-        onSuccess={reloadBudgets}
+        onSuccess={reloadData}
         budgets={[...budgets, ...allowances]}
         householdId={householdId}
         budgetMonth={budgetMonth}

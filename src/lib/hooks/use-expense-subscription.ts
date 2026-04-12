@@ -1,44 +1,20 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { createClient } from "@/lib/supabase"
 import { useUser } from "@/lib/contexts/user-context"
-import { RealtimeSubscriptionManager } from "./realtime-subscription-manager"
 
-// Expense change event types
 export type ExpenseChangeEvent = {
   type: "INSERT" | "UPDATE" | "DELETE"
   new?: unknown
   old?: unknown
 }
 
-// Callback type for expense changes
 export type ExpenseChangeCallback = (event: ExpenseChangeEvent) => void
 
-// Singleton instance
-const subscriptionManager = new RealtimeSubscriptionManager<ExpenseChangeCallback>({
-  table: "expenses",
-  channelPrefix: "expenses_household",
-  buildCallbackArgs: (payload) => [{
-    type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
-    new: payload.new,
-    old: payload.old,
-  }],
-})
-
 /**
- * Hook to subscribe to real-time expense changes for the current user's household.
- * Uses a household-scoped subscription that's created when the first component subscribes
- * and cleaned up when the last component unsubscribes.
- *
- * @param callback - Function to call when an expense changes (insert/update/delete)
- * @param enabled - Whether to enable the subscription (default: true)
- *
- * @example
- * useExpenseSubscription((event) => {
- *   if (event.type === "INSERT") {
- *     console.log("New expense:", event.new)
- *   }
- * })
+ * Subscribe to real-time expense changes for the current user's household.
+ * Creates a household-scoped Supabase Realtime channel.
  */
 export function useExpenseSubscription(
   callback: ExpenseChangeCallback,
@@ -47,23 +23,36 @@ export function useExpenseSubscription(
   const { user, loading } = useUser()
   const callbackRef = useRef(callback)
 
-  // Keep callback ref up to date
   useEffect(() => {
     callbackRef.current = callback
   }, [callback])
 
   useEffect(() => {
-    // Don't subscribe if disabled, still loading, or no user
     if (!enabled || loading || !user?.householdId) return
 
-    // Subscribe with a stable wrapper that uses the ref
-    const unsubscribe = subscriptionManager.subscribe(
-      user.householdId,
-      ((event: ExpenseChangeEvent) => {
-        callbackRef.current(event)
-      }) as ExpenseChangeCallback
-    )
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`expenses_household_${user.householdId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+          filter: `household_id=eq.${user.householdId}`,
+        },
+        (payload) => {
+          callbackRef.current({
+            type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
+            new: payload.new,
+            old: payload.old,
+          })
+        }
+      )
+      .subscribe()
 
-    return unsubscribe
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [enabled, loading, user?.householdId])
 }

@@ -1,17 +1,10 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { createClient } from "@/lib/supabase"
 import { useUser } from "@/lib/contexts/user-context"
-import { RealtimeSubscriptionManager } from "./realtime-subscription-manager"
 
 export type BudgetAllocationChangeCallback = () => void
-
-// Singleton instance
-const subscriptionManager = new RealtimeSubscriptionManager<BudgetAllocationChangeCallback>({
-  table: "budget_allocations",
-  channelPrefix: "budget_allocations_household",
-  buildCallbackArgs: () => [] as [],
-})
 
 /**
  * Subscribe to real-time budget_allocations changes for the current household.
@@ -31,10 +24,25 @@ export function useBudgetAllocationSubscription(
   useEffect(() => {
     if (!enabled || loading || !user?.householdId) return
 
-    const unsubscribe = subscriptionManager.subscribe(user.householdId, (() => {
-      callbackRef.current()
-    }) as BudgetAllocationChangeCallback)
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`budget_allocations_household_${user.householdId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "budget_allocations",
+          filter: `household_id=eq.${user.householdId}`,
+        },
+        () => {
+          callbackRef.current()
+        }
+      )
+      .subscribe()
 
-    return unsubscribe
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [enabled, loading, user?.householdId])
 }
