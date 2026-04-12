@@ -33,6 +33,9 @@ export function adjustToWorkingDay(dateStr: string): string {
  * Fetch exchange rate from EUR to target currency for a specific date.
  * Uses Frankfurter API (ECB data, real historical rates, no API key needed).
  *
+ * @internal Server-side only — used by the /api/exchange-rates route.
+ * Client code should use {@link fetchExchangeRateFromAPI} from `@/lib/currency`.
+ *
  * @param currency - Target currency code (e.g., 'BRL', 'USD')
  * @param date - Date in YYYY-MM-DD format (defaults to today)
  * @returns rate_to_eur: how many EUR per 1 unit of currency

@@ -1,6 +1,6 @@
 # Simplification TODO
 
-Remaining items from the performance & simplicity audit. Tasks 1-7 are done.
+All items from the performance & simplicity audit are complete (tasks 1-8).
 
 ---
 
@@ -70,7 +70,7 @@ Remaining items from the performance & simplicity audit. Tasks 1-7 are done.
 
 ---
 
-## 8. Clarify exchange rate paths
+## ~~8. Clarify exchange rate paths~~ ✅
 
 **Files:** `src/lib/exchange-rate-api.ts`, `src/lib/currency.ts`
 

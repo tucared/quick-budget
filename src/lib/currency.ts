@@ -20,7 +20,9 @@ interface ExchangeRateResponse {
 
 /**
  * Fetch exchange rate from API (with database caching)
- * This is the recommended way to get exchange rates
+ *
+ * Client-side function that goes through the /api/exchange-rates Next.js route,
+ * which provides database caching and rate limiting on top of the Frankfurter API.
  */
 export async function fetchExchangeRateFromAPI(
   currency: string,
