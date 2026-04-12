@@ -134,3 +134,27 @@ CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- MONTHLY_BUDGET_TARGETS
+-- ============================================================================
+-- Optional per-month total budget target for a household. Covers the sum of
+-- regular categories only (categories with exclude_from_budget_total = false);
+-- allowances live outside the target. When a row exists for a given month,
+-- the UI exposes an "unallocated" pool (target - sum of regular allocations)
+-- that can be assigned mid-month via allocate_from_unallocated.
+CREATE TABLE monthly_budget_targets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  budget_month DATE NOT NULL,
+  target_amount DECIMAL(12, 2) NOT NULL CHECK (target_amount > 0),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(household_id, budget_month)
+);
+
+CREATE INDEX idx_monthly_budget_targets_household_month ON monthly_budget_targets(household_id, budget_month DESC);
+
+CREATE TRIGGER update_monthly_budget_targets_updated_at BEFORE UPDATE ON monthly_budget_targets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -6,6 +6,7 @@ import type {
   Category,
   Expense,
   ExpenseWithDetails,
+  MonthlyBudgetTarget,
   UserData,
 } from "@/lib/types"
 
@@ -109,6 +110,31 @@ export async function getAllowanceSummary(
   }
 
   return data || []
+}
+
+/**
+ * Server-side function to fetch the monthly budget target for a given month.
+ * Returns null when no target has been set for the month.
+ * RLS filters by the caller's household — no explicit household_id needed.
+ */
+export async function getMonthlyBudgetTarget(
+  budgetMonth?: string
+): Promise<MonthlyBudgetTarget | null> {
+  const supabase = await getSupabase()
+  const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
+
+  const { data, error } = await supabase
+    .from("monthly_budget_targets")
+    .select("*")
+    .eq("budget_month", month)
+    .maybeSingle()
+
+  if (error) {
+    console.error("Failed to fetch monthly budget target:", error)
+    return null
+  }
+
+  return data
 }
 
 /**

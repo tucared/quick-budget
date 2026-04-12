@@ -12,6 +12,7 @@ export type User = Tables['users']['Row']
 export type Category = Tables['categories']['Row']
 export type Expense = Tables['expenses']['Row']
 export type BudgetAllocation = Tables['budget_allocations']['Row']
+export type MonthlyBudgetTarget = Tables['monthly_budget_targets']['Row']
 export type BudgetSummary = Views['budget_summary']['Row']
 
 // Authenticated user data used across client and server

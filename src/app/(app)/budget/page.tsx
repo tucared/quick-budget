@@ -4,6 +4,7 @@ import {
   getServerUser,
   getBudgetSummary,
   getAllowanceSummary,
+  getMonthlyBudgetTarget,
   getMonthlyExpenses,
   getCategories,
 } from "@/lib/server/data"
@@ -28,10 +29,11 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   // rely on RLS (not an explicit household_id filter), so they don't need to
   // wait for getServerUser to resolve. This cuts one full round-trip off the
   // critical path.
-  const [user, budgets, allowances, expenses, categories] = await Promise.all([
+  const [user, budgets, allowances, target, expenses, categories] = await Promise.all([
     getServerUser(),
     getBudgetSummary(budgetMonth),
     getAllowanceSummary(budgetMonth),
+    getMonthlyBudgetTarget(budgetMonth),
     getMonthlyExpenses(budgetMonth),
     getCategories(),
   ])
@@ -45,6 +47,7 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
       <BudgetPageContent
         initialBudgets={budgets}
         initialAllowances={allowances}
+        initialTarget={target}
         initialExpenses={expenses}
         categories={categories}
         householdId={user.householdId}

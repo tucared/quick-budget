@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { Pencil } from "lucide-react"
-import type { BudgetSummary, Expense, Category } from "@/lib/types"
+import type { BudgetSummary, Expense, Category, MonthlyBudgetTarget } from "@/lib/types"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import dynamic from "next/dynamic"
 
@@ -25,6 +25,7 @@ import { getErrorMessage } from "@/lib/error-handler"
 interface BudgetPageContentProps {
   initialBudgets: BudgetSummary[]
   initialAllowances: BudgetSummary[]
+  initialTarget: MonthlyBudgetTarget | null
   initialExpenses: Expense[]
   categories: Category[]
   householdId: string
@@ -34,6 +35,7 @@ interface BudgetPageContentProps {
 export function BudgetPageContent({
   initialBudgets,
   initialAllowances,
+  initialTarget,
   initialExpenses,
   categories,
   householdId,
@@ -41,6 +43,7 @@ export function BudgetPageContent({
 }: BudgetPageContentProps) {
   const [budgets, setBudgets] = useState<BudgetSummary[]>(initialBudgets)
   const [allowances, setAllowances] = useState<BudgetSummary[]>(initialAllowances)
+  const [target, setTarget] = useState<MonthlyBudgetTarget | null>(initialTarget)
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [error, setError] = useState("")
   const [editOpen, setEditOpen] = useState(false)
@@ -58,6 +61,7 @@ export function BudgetPageContent({
   // Update state when initial data changes (e.g. month navigation via server)
   useEffect(() => { setBudgets(initialBudgets) }, [initialBudgets])
   useEffect(() => { setAllowances(initialAllowances) }, [initialAllowances])
+  useEffect(() => { setTarget(initialTarget) }, [initialTarget])
   useEffect(() => { setExpenses(initialExpenses) }, [initialExpenses])
 
   function reloadBudgets() {
@@ -77,11 +81,19 @@ export function BudgetPageContent({
         .eq("budget_month", budgetMonth)
         .eq("exclude_from_budget_total", true)
         .order("category_name", { ascending: true }),
-    ]).then(([budgetResult, allowanceResult]) => {
+      supabase
+        .from("monthly_budget_targets")
+        .select("*")
+        .eq("household_id", householdId)
+        .eq("budget_month", budgetMonth)
+        .maybeSingle(),
+    ]).then(([budgetResult, allowanceResult, targetResult]) => {
       if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
       else if (budgetResult.data) setBudgets(budgetResult.data)
       if (allowanceResult.error) setError(getErrorMessage(allowanceResult.error))
       else if (allowanceResult.data) setAllowances(allowanceResult.data)
+      if (targetResult.error) setError(getErrorMessage(targetResult.error))
+      else setTarget(targetResult.data)
     })
   }
 
@@ -181,7 +193,16 @@ export function BudgetPageContent({
     setRebalanceOpen(true)
   }
 
-  const isEmpty = budgets.length === 0
+  const isEmpty = budgets.length === 0 && !target
+
+  // Unallocated pool: target − sum of regular (non-allowance) allocations.
+  const regularAllocatedTotal = budgets.reduce(
+    (sum, b) => sum + Number(b.allocated_amount),
+    0
+  )
+  const targetAmount = target ? Number(target.target_amount) : 0
+  const unallocated = target ? targetAmount - regularAllocatedTotal : 0
+  const hasTarget = target !== null
 
   return (
     <>
@@ -219,6 +240,7 @@ export function BudgetPageContent({
           {/* Total Budget Summary */}
           <BudgetSummaryCard
             budgets={budgets}
+            target={hasTarget ? { amount: targetAmount, unallocated } : undefined}
             dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
             daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
           />
@@ -291,6 +313,8 @@ export function BudgetPageContent({
         householdId={householdId}
         budgetMonth={budgetMonth}
         initialDestId={rebalanceDestId}
+        hasTarget={hasTarget}
+        unallocated={unallocated}
       />
 
       {/* Category Expense Detail Dialog */}

@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { format, subMonths, parseISO } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
-import type { Category, BudgetSummary, BudgetAllocation } from "@/lib/types"
-import { BudgetHistoryMini } from "@/components/budget-history-mini"
+import type { Category, BudgetAllocation, MonthlyBudgetTarget } from "@/lib/types"
 import {
   Dialog,
   DialogContent,
@@ -42,7 +41,8 @@ export function BudgetEditDialog({
   budgetMonth,
 }: BudgetEditDialogProps) {
   const [entries, setEntries] = useState<CategoryAmountEntry[]>([])
-  const [history, setHistory] = useState<BudgetSummary[]>([])
+  const [targetCents, setTargetCents] = useState(0)
+  const [initialTargetExists, setInitialTargetExists] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -58,21 +58,18 @@ export function BudgetEditDialog({
 
     const supabase = createClient()
 
-    const prevMonths = [1, 2, 3].map((n) =>
-      format(subMonths(parseISO(budgetMonth), n), "yyyy-MM-dd")
-    )
-
-    const [allocationsRes, historyRes] = await Promise.all([
+    const [allocationsRes, targetRes] = await Promise.all([
       supabase
         .from("budget_allocations")
         .select("*")
         .eq("household_id", householdId)
         .eq("budget_month", budgetMonth),
       supabase
-        .from("budget_summary")
+        .from("monthly_budget_targets")
         .select("*")
         .eq("household_id", householdId)
-        .in("budget_month", prevMonths),
+        .eq("budget_month", budgetMonth)
+        .maybeSingle(),
     ])
 
     if (allocationsRes.error) {
@@ -81,12 +78,17 @@ export function BudgetEditDialog({
       return
     }
 
-    if (historyRes.error) {
-      console.error("Failed to fetch history:", historyRes.error)
+    if (targetRes.error) {
+      setError(getErrorMessage(targetRes.error))
+      setLoading(false)
+      return
     }
 
     const allocations = (allocationsRes.data || []) as BudgetAllocation[]
-    setHistory((historyRes.data || []) as BudgetSummary[])
+    const target = targetRes.data as MonthlyBudgetTarget | null
+
+    setTargetCents(target ? Math.round(Number(target.target_amount) * 100) : 0)
+    setInitialTargetExists(target !== null)
 
     const newEntries = activeCategories.map((cat) => {
       const existing = allocations.find((a) => a.category_id === cat.id)
@@ -110,38 +112,6 @@ export function BudgetEditDialog({
     )
   }
 
-  async function copyFromPreviousMonth() {
-    setError("")
-    const supabase = createClient()
-    const prevMonth = format(subMonths(parseISO(budgetMonth), 1), "yyyy-MM-dd")
-
-    const { data, error: fetchError } = await supabase
-      .from("budget_allocations")
-      .select("*")
-      .eq("household_id", householdId)
-      .eq("budget_month", prevMonth)
-
-    if (fetchError) {
-      setError(getErrorMessage(fetchError))
-      return
-    }
-
-    const prevAllocations = (data || []) as BudgetAllocation[]
-    if (prevAllocations.length === 0) {
-      setError("No allocations found for previous month")
-      return
-    }
-
-    setEntries((prev) =>
-      prev.map((entry) => {
-        const prevAlloc = prevAllocations.find((a) => a.category_id === entry.categoryId)
-        return prevAlloc
-          ? { ...entry, cents: Math.round(Number(prevAlloc.allocated_amount) * 100) }
-          : entry
-      })
-    )
-  }
-
   async function handleSave() {
     setSaving(true)
     setError("")
@@ -153,11 +123,16 @@ export function BudgetEditDialog({
       amount: e.cents / 100,
     }))
 
+    const hasTarget = targetCents > 0
+    const clearTarget = initialTargetExists && !hasTarget
+
     try {
       const { error: rpcError } = await supabase.rpc("save_budget", {
         p_household_id: householdId,
         p_budget_month: budgetMonth,
         p_allocations: allocations,
+        p_target_amount: hasTarget ? targetCents / 100 : undefined,
+        p_clear_target: clearTarget,
       })
 
       if (rpcError) {
@@ -175,10 +150,14 @@ export function BudgetEditDialog({
     }
   }
 
-  const regularTotal =
-    entries
-      .filter((e) => regularCategories.some((c) => c.id === e.categoryId))
-      .reduce((sum, e) => sum + e.cents, 0) / 100
+  const regularAllocatedCents = entries
+    .filter((e) => regularCategories.some((c) => c.id === e.categoryId))
+    .reduce((sum, e) => sum + e.cents, 0)
+  const regularAllocated = regularAllocatedCents / 100
+  const target = targetCents / 100
+  const unallocated = target - regularAllocated
+  const overBy = regularAllocated - target
+  const hasTarget = targetCents > 0
 
   function renderCategoryRow(cat: Category) {
     const entry = entries.find((e) => e.categoryId === cat.id)
@@ -189,11 +168,10 @@ export function BudgetEditDialog({
           {cat.icon && <span className="text-base sm:text-lg shrink-0">{cat.icon}</span>}
           <span className="text-sm font-medium truncate">{cat.name}</span>
         </div>
-        <BudgetHistoryMini categoryId={cat.id} history={history} />
         <CentsInput
           value={entry.cents}
           onChange={(cents) => updateCents(cat.id, cents)}
-          className="w-20 sm:w-28 shrink-0 h-8"
+          className="w-24 sm:w-32 shrink-0 h-8"
         />
       </div>
     )
@@ -207,7 +185,7 @@ export function BudgetEditDialog({
             Edit Budget - {format(parseISO(budgetMonth), "MMMM yyyy")}
           </DialogTitle>
           <DialogDescription>
-            Set monthly allocations for each category.
+            Set a monthly target, then split it across categories.
           </DialogDescription>
         </DialogHeader>
 
@@ -221,21 +199,42 @@ export function BudgetEditDialog({
           <div className="py-8 text-center text-muted-foreground">Loading...</div>
         ) : (
           <>
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={copyFromPreviousMonth}>
-                Copy from previous month
-              </Button>
-            </div>
-
             {regularCategories.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                <div className="flex items-center justify-between pb-2 border-b">
+                  <span className="text-sm font-semibold">Target</span>
+                  <CentsInput
+                    value={targetCents}
+                    onChange={setTargetCents}
+                    className="w-24 sm:w-32 shrink-0 h-8"
+                  />
+                </div>
+
+                <h4 className="text-sm font-semibold text-muted-foreground mt-3 mb-1">
                   Categories
                 </h4>
                 <div className="divide-y">{regularCategories.map(renderCategoryRow)}</div>
-                <div className="flex justify-between items-center pt-2 text-sm font-semibold">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(regularTotal, 0)}</span>
+
+                <div className="mt-2 space-y-1 border-t pt-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Allocated</span>
+                    <span className="font-medium">{formatCurrency(regularAllocated, 0)}</span>
+                  </div>
+                  {hasTarget && (
+                    overBy > 0 ? (
+                      <div className="flex justify-between text-red-600 font-medium">
+                        <span>Over by</span>
+                        <span>{formatCurrency(overBy, 0)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Unallocated</span>
+                        <span className={unallocated > 0 ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                          {formatCurrency(unallocated, 0)}
+                        </span>
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
             )}

@@ -71,10 +71,16 @@ GRANT EXECUTE ON FUNCTION public.rebalance_budget(UUID, DATE, UUID, UUID, DECIMA
 -- ============================================================================
 -- SAVE BUDGET
 -- ============================================================================
+-- Drop the legacy 3-arg signature so PostgREST resolves unambiguously to the
+-- new extended form below.
+DROP FUNCTION IF EXISTS public.save_budget(UUID, DATE, JSONB);
+
 CREATE OR REPLACE FUNCTION public.save_budget(
   p_household_id UUID,
   p_budget_month DATE,
-  p_allocations JSONB  -- array of {"category_id": uuid, "amount": decimal}
+  p_allocations JSONB,  -- array of {"category_id": uuid, "amount": decimal}
+  p_target_amount DECIMAL(12, 2) DEFAULT NULL,
+  p_clear_target BOOLEAN DEFAULT FALSE
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -87,9 +93,10 @@ DECLARE
   v_amount DECIMAL(12, 2);
   v_upserted_category_ids UUID[] := '{}';
 BEGIN
-  -- Validate input
-  IF p_allocations IS NULL OR jsonb_array_length(p_allocations) = 0 THEN
-    RAISE EXCEPTION 'Allocations array must not be empty';
+  -- Validate input: allocations array must exist (may be empty when only
+  -- touching the target).
+  IF p_allocations IS NULL THEN
+    RAISE EXCEPTION 'Allocations array must not be null';
   END IF;
 
   -- Lock existing rows for this household/month to prevent concurrent edits
@@ -130,10 +137,85 @@ BEGIN
       FROM jsonb_array_elements(p_allocations) AS elem
       WHERE (elem->>'amount')::DECIMAL <= 0
     );
+
+  -- Monthly target: clear, upsert, or leave untouched.
+  IF p_clear_target THEN
+    DELETE FROM monthly_budget_targets
+    WHERE household_id = p_household_id
+      AND budget_month = p_budget_month;
+  ELSIF p_target_amount IS NOT NULL THEN
+    IF p_target_amount <= 0 THEN
+      RAISE EXCEPTION 'Target amount must be positive';
+    END IF;
+
+    INSERT INTO monthly_budget_targets (household_id, budget_month, target_amount, currency)
+    VALUES (p_household_id, p_budget_month, p_target_amount, 'EUR')
+    ON CONFLICT (household_id, budget_month)
+    DO UPDATE SET target_amount = EXCLUDED.target_amount, updated_at = NOW();
+  END IF;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.save_budget(UUID, DATE, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.save_budget(UUID, DATE, JSONB, DECIMAL, BOOLEAN) TO authenticated;
+
+-- ============================================================================
+-- ALLOCATE FROM UNALLOCATED
+-- ============================================================================
+-- Moves money from the monthly unallocated pool (target - sum of regular
+-- allocations) into a single category. Re-validates the constraint
+-- server-side under a row lock on the target row to prevent races.
+CREATE OR REPLACE FUNCTION public.allocate_from_unallocated(
+  p_household_id UUID,
+  p_budget_month DATE,
+  p_category_id UUID,
+  p_amount DECIMAL(12, 2)
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_target DECIMAL(12, 2);
+  v_sum_regular DECIMAL(12, 2);
+BEGIN
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Amount must be positive';
+  END IF;
+
+  -- Lock the target row to serialise concurrent allocations.
+  SELECT target_amount INTO v_target
+  FROM monthly_budget_targets
+  WHERE household_id = p_household_id
+    AND budget_month = p_budget_month
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No monthly target set for this household/month';
+  END IF;
+
+  -- Sum current regular allocations (exclude allowances).
+  SELECT COALESCE(SUM(ba.allocated_amount), 0)
+  INTO v_sum_regular
+  FROM budget_allocations ba
+  JOIN categories c ON c.id = ba.category_id
+  WHERE ba.household_id = p_household_id
+    AND ba.budget_month = p_budget_month
+    AND c.exclude_from_budget_total = FALSE;
+
+  IF v_sum_regular + p_amount > v_target THEN
+    RAISE EXCEPTION 'Amount exceeds unallocated pool (available: %)', v_target - v_sum_regular;
+  END IF;
+
+  -- Upsert: create or increase allocation for the destination category.
+  INSERT INTO budget_allocations (household_id, category_id, budget_month, allocated_amount, currency)
+  VALUES (p_household_id, p_category_id, p_budget_month, p_amount, 'EUR')
+  ON CONFLICT (household_id, category_id, budget_month)
+  DO UPDATE SET allocated_amount = budget_allocations.allocated_amount + p_amount;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.allocate_from_unallocated(UUID, DATE, UUID, DECIMAL) TO authenticated;
 
 -- ============================================================================
 -- TOP UP BUDGET

@@ -105,3 +105,20 @@ CREATE POLICY "Household members can update budget allocations" ON budget_alloca
 
 CREATE POLICY "Household members can delete budget allocations" ON budget_allocations
   FOR DELETE USING (household_id = public.get_my_household_id());
+
+-- ============================================================================
+-- MONTHLY_BUDGET_TARGETS
+-- ============================================================================
+ALTER TABLE monthly_budget_targets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Household members can view monthly budget targets" ON monthly_budget_targets
+  FOR SELECT USING (household_id = public.get_my_household_id());
+
+CREATE POLICY "Household members can insert monthly budget targets" ON monthly_budget_targets
+  FOR INSERT WITH CHECK (household_id = public.get_my_household_id());
+
+CREATE POLICY "Household members can update monthly budget targets" ON monthly_budget_targets
+  FOR UPDATE USING (household_id = public.get_my_household_id());
+
+CREATE POLICY "Household members can delete monthly budget targets" ON monthly_budget_targets
+  FOR DELETE USING (household_id = public.get_my_household_id());

@@ -5,16 +5,18 @@ import { getBudgetProgressBarColor, getBudgetStatusLabel, getBudgetStatusColor, 
 
 interface BudgetSummaryCardProps {
   budgets: BudgetSummary[]
+  target?: { amount: number; unallocated: number }
   dayOfMonth?: number
   daysInMonth?: number
 }
 
-export function BudgetSummaryCard({ budgets, dayOfMonth, daysInMonth }: BudgetSummaryCardProps) {
+export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: BudgetSummaryCardProps) {
   const totalAllocated = budgets.reduce((sum, b) => sum + Number(b.allocated_amount), 0)
   const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spent_amount), 0)
   const totalRemaining = totalAllocated - totalSpent
   const percentSpent = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0
   const theme = getBudgetStatusTheme(percentSpent, dayOfMonth, daysInMonth, totalRemaining)
+  const overTarget = target ? target.unallocated < 0 : false
 
   return (
     <Card className={`border-l-4 ${theme.border} ${theme.bg}`}>
@@ -44,6 +46,19 @@ export function BudgetSummaryCard({ budgets, dayOfMonth, daysInMonth }: BudgetSu
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}
           </span>
         </div>
+
+        {target && (
+          <div className="mt-2 pt-2 border-t border-black/10 flex justify-between items-center text-xs">
+            <span className={overTarget ? "text-red-600 font-medium" : "text-muted-foreground"}>
+              {overTarget
+                ? `Over target by ${formatCurrency(-target.unallocated, 0)}`
+                : `Unallocated ${formatCurrency(target.unallocated, 0)}`}
+            </span>
+            <span className="text-muted-foreground">
+              Target {formatCurrency(target.amount, 0)}
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

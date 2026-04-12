@@ -28,6 +28,8 @@ interface RebalanceDialogProps {
   householdId: string
   budgetMonth: string
   initialDestId?: string | null
+  hasTarget?: boolean
+  unallocated?: number
 }
 
 type Step = "source" | "amount" | "confirm"
@@ -40,6 +42,8 @@ export function RebalanceDialog({
   householdId,
   budgetMonth,
   initialDestId,
+  hasTarget = false,
+  unallocated = 0,
 }: RebalanceDialogProps) {
   const [step, setStep] = useState<Step>("source")
   const [sourceId, setSourceId] = useState<string | null>(null)
@@ -48,10 +52,14 @@ export function RebalanceDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
-  const isNewMoney = sourceId === NEW_MONEY_SENTINEL
-  const sourceBudget = isNewMoney ? null : budgets.find((b) => b.category_id === sourceId)
+  const isPoolSource = sourceId === NEW_MONEY_SENTINEL
+  const sourceBudget = isPoolSource ? null : budgets.find((b) => b.category_id === sourceId)
   const destBudget = budgets.find((b) => b.category_id === destId)
   const transferAmount = amountCents / 100
+  // When a target exists, the non-category source represents the unallocated
+  // pool (bounded by `unallocated`). Otherwise it's "New money" which simply
+  // increases the total budget.
+  const showPoolEntry = !hasTarget || unallocated > 0
 
   // When opened with a pre-selected destination, initialize state
   const effectiveDestId = initialDestId ?? null
@@ -89,10 +97,16 @@ export function RebalanceDialog({
       setError("Amount must be greater than 0")
       return
     }
-    if (!isNewMoney && sourceBudget) {
+    if (!isPoolSource && sourceBudget) {
       const maxAmount = Number(sourceBudget.remaining_amount)
       if (transferAmount > maxAmount) {
         setError(`Maximum available: ${formatCurrency(maxAmount)}`)
+        return
+      }
+    }
+    if (isPoolSource && hasTarget) {
+      if (transferAmount > unallocated) {
+        setError(`Maximum available: ${formatCurrency(unallocated)}`)
         return
       }
     }
@@ -110,13 +124,20 @@ export function RebalanceDialog({
 
     const supabase = createClient()
 
-    if (isNewMoney) {
-      const { error: rpcError } = await supabase.rpc("top_up_budget", {
-        p_household_id: householdId,
-        p_budget_month: budgetMonth,
-        p_category_id: destId,
-        p_amount: transferAmount,
-      })
+    if (isPoolSource) {
+      const { error: rpcError } = hasTarget
+        ? await supabase.rpc("allocate_from_unallocated", {
+            p_household_id: householdId,
+            p_budget_month: budgetMonth,
+            p_category_id: destId,
+            p_amount: transferAmount,
+          })
+        : await supabase.rpc("top_up_budget", {
+            p_household_id: householdId,
+            p_budget_month: budgetMonth,
+            p_category_id: destId,
+            p_amount: transferAmount,
+          })
 
       if (rpcError) {
         setError(getErrorMessage(rpcError))
@@ -159,10 +180,14 @@ export function RebalanceDialog({
           </DialogTitle>
           <DialogDescription>
             {step === "source" && (effectiveDestId
-              ? "Pick a source to transfer from, or add new money."
-              : "Select a category to take money from, or add new money.")}
-            {step === "amount" && (isNewMoney
-              ? "How much new money to add?"
+              ? (hasTarget
+                ? "Pick a source to transfer from, or use the unallocated pool."
+                : "Pick a source to transfer from, or add new money.")
+              : (hasTarget
+                ? "Select a category to take money from, or use the unallocated pool."
+                : "Select a category to take money from, or add new money."))}
+            {step === "amount" && (isPoolSource
+              ? (hasTarget ? "How much to take from the unallocated pool?" : "How much new money to add?")
               : `How much to move from ${sourceBudget?.category_name}?`)}
             {step === "confirm" && "Review the transfer."}
           </DialogDescription>
@@ -189,19 +214,30 @@ export function RebalanceDialog({
         {/* Step 1: Pick source */}
         {step === "source" && (
           <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-            {/* New money option */}
-            <button
-              onClick={() => selectSource(NEW_MONEY_SENTINEL)}
-              className="w-full flex items-center justify-between p-3 rounded-md hover:bg-accent text-left border border-dashed border-muted-foreground/30"
-            >
-              <div className="flex items-center gap-2">
-                <Plus className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <span className="text-sm font-medium">New money</span>
-                  <span className="block text-xs text-muted-foreground">Increases total budget</span>
+            {/* Unallocated pool / New money option */}
+            {showPoolEntry && (
+              <button
+                onClick={() => selectSource(NEW_MONEY_SENTINEL)}
+                className="w-full flex items-center justify-between p-3 rounded-md hover:bg-accent text-left border border-dashed border-muted-foreground/30"
+              >
+                <div className="flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <span className="text-sm font-medium">
+                      {hasTarget ? "Unallocated pool" : "New money"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {hasTarget ? "Consumes the monthly target reserve" : "Increases total budget"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </button>
+                {hasTarget && (
+                  <span className="text-sm text-green-600 font-medium">
+                    {formatCurrency(unallocated, 0)} left
+                  </span>
+                )}
+              </button>
+            )}
 
             {sourceCandidates.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -228,11 +264,16 @@ export function RebalanceDialog({
         )}
 
         {/* Step 2: Enter amount (+ pick destination if no initialDestId) */}
-        {step === "amount" && (isNewMoney || sourceBudget) && (
+        {step === "amount" && (isPoolSource || sourceBudget) && (
           <div className="space-y-4">
-            {!isNewMoney && sourceBudget && (
+            {!isPoolSource && sourceBudget && (
               <div className="text-sm text-muted-foreground">
                 Available from {sourceBudget.category_name}: {formatCurrency(Number(sourceBudget.remaining_amount))}
+              </div>
+            )}
+            {isPoolSource && hasTarget && (
+              <div className="text-sm text-muted-foreground">
+                Available from unallocated pool: {formatCurrency(unallocated)}
               </div>
             )}
             <CentsInput
@@ -279,12 +320,14 @@ export function RebalanceDialog({
         )}
 
         {/* Step 3: Confirm */}
-        {step === "confirm" && (isNewMoney || sourceBudget) && (destBudget || destBudgetForTitle) && (
+        {step === "confirm" && (isPoolSource || sourceBudget) && (destBudget || destBudgetForTitle) && (
           <div className="space-y-4">
             <div className="rounded-md border p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">From</span>
-                <span className="font-medium">{isNewMoney ? "New money" : sourceBudget!.category_name}</span>
+                <span className="font-medium">
+                  {isPoolSource ? (hasTarget ? "Unallocated pool" : "New money") : sourceBudget!.category_name}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">To</span>
@@ -301,7 +344,7 @@ export function RebalanceDialog({
                 Back
               </Button>
               <Button onClick={handleConfirm} disabled={saving}>
-                {saving ? (isNewMoney ? "Adding..." : "Transferring...") : (isNewMoney ? "Confirm Top-up" : "Confirm Transfer")}
+                {saving ? (isPoolSource ? "Adding..." : "Transferring...") : (isPoolSource ? "Confirm Top-up" : "Confirm Transfer")}
               </Button>
             </DialogFooter>
           </div>

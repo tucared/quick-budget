@@ -244,6 +244,44 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_budget_targets: {
+        Row: {
+          budget_month: string
+          created_at: string
+          currency: string
+          household_id: string
+          id: string
+          target_amount: number
+          updated_at: string
+        }
+        Insert: {
+          budget_month: string
+          created_at?: string
+          currency?: string
+          household_id: string
+          id?: string
+          target_amount: number
+          updated_at?: string
+        }
+        Update: {
+          budget_month?: string
+          created_at?: string
+          currency?: string
+          household_id?: string
+          id?: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_budget_targets_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -301,6 +339,15 @@ export type Database = {
       }
     }
     Functions: {
+      allocate_from_unallocated: {
+        Args: {
+          p_amount: number
+          p_budget_month: string
+          p_category_id: string
+          p_household_id: string
+        }
+        Returns: undefined
+      }
       get_my_household_id: { Args: never; Returns: string }
       rebalance_budget: {
         Args: {
@@ -316,7 +363,9 @@ export type Database = {
         Args: {
           p_allocations: Json
           p_budget_month: string
+          p_clear_target?: boolean
           p_household_id: string
+          p_target_amount?: number
         }
         Returns: undefined
       }
