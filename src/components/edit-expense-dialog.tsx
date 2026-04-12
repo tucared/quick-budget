@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { formatCentsDisplay } from "@/components/ui/cents-input"
 
 interface EditExpenseDialogProps {
   open: boolean
@@ -96,14 +97,6 @@ function EditExpenseForm({
       })),
     [categories]
   )
-
-  const formatCentsDisplay = (cents: number): string => {
-    if (cents === 0) return "0,00"
-    const intPart = Math.floor(cents / 100)
-    const decPart = cents % 100
-    const intFormatted = intPart.toLocaleString("fr-FR")
-    return `${intFormatted},${String(decPart).padStart(2, "0")}`
-  }
 
   const handleAmountKeyDown = (e: React.KeyboardEvent) => {
     const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']

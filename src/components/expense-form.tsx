@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
 import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
+import { formatCentsDisplay } from "@/components/ui/cents-input"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -32,8 +33,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   )
   const [categories, setCategories] = useState<Category[]>(initialCategories ?? [])
   const [loading, setLoading] = useState(false)
-  const [loadingData, setLoadingData] = useState(initialCategories === undefined)
-  const [loadError, setLoadError] = useState("")
+  const [loadState, setLoadState] = useState<
+    { status: 'idle' } | { status: 'loading' } | { status: 'error'; error: string }
+  >(initialCategories === undefined ? { status: 'loading' } : { status: 'idle' })
   const [error, setError] = useState("")
   const [showSuccess, setShowSuccess] = useState(false)
   const [topCategoryIds, setTopCategoryIds] = useState<string[]>(initialTopCategoryIds ?? [])
@@ -74,15 +76,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   // Convert string date to Date object for DatePicker
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
-
-  // Format cents as "1 234,56" style display
-  const formatCentsDisplay = (cents: number): string => {
-    if (cents === 0) return "0,00"
-    const intPart = Math.floor(cents / 100)
-    const decPart = cents % 100
-    const intFormatted = intPart.toLocaleString("fr-FR")
-    return `${intFormatted},${String(decPart).padStart(2, "0")}`
-  }
 
   // Use onChange for digit/backspace handling instead of onKeyDown,
   // because Firefox Android fires onKeyDown with e.key === "Unidentified"
@@ -150,7 +143,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   useEffect(() => {
     const loadData = async () => {
       if (!user?.householdId) {
-        setLoadingData(false)
+        setLoadState({ status: 'idle' })
         return
       }
 
@@ -169,8 +162,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             .order("name")
 
           if (categoriesError) {
-            setLoadError(getErrorMessage(categoriesError))
-            setLoadingData(false)
+            setLoadState({ status: 'error', error: getErrorMessage(categoriesError) })
             return
           }
 
@@ -200,10 +192,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           // localStorage might be disabled (incognito mode, etc.)
         }
 
-        setLoadingData(false)
+        setLoadState({ status: 'idle' })
       } catch (err) {
-        setLoadError(getErrorMessage(err))
-        setLoadingData(false)
+        setLoadState({ status: 'error', error: getErrorMessage(err) })
       }
     }
 
@@ -401,7 +392,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     }
   }
 
-  if (loadingData) {
+  if (loadState.status === 'loading') {
     return (
       <div className="space-y-4">
         {/* Amount + currency toggle Skeleton */}
@@ -429,10 +420,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     )
   }
 
-  if (loadError) {
+  if (loadState.status === 'error') {
     return (
       <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-        {loadError}
+        {loadState.error}
       </div>
     )
   }
