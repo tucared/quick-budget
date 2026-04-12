@@ -1,6 +1,6 @@
 # Simplification TODO
 
-Remaining items from the performance & simplicity audit. Tasks 1-4 are done.
+Remaining items from the performance & simplicity audit. Tasks 1-6 are done.
 
 ---
 
@@ -29,7 +29,7 @@ Remaining items from the performance & simplicity audit. Tasks 1-4 are done.
 
 ---
 
-## 6. Pass initial data to BudgetEditDialog instead of re-fetching
+## ~~6. Pass initial data to BudgetEditDialog instead of re-fetching~~ ✅
 
 **Files:** `src/components/budget-edit-dialog.tsx`, `src/components/budget-page-content.tsx`
 

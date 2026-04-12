@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
-import type { Category, BudgetAllocation, MonthlyBudgetTarget } from "@/lib/types"
+import type { Category, BudgetSummary, MonthlyBudgetTarget } from "@/lib/types"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,8 @@ interface BudgetEditDialogProps {
   categories: Category[]
   householdId: string
   budgetMonth: string // yyyy-MM-dd
+  initialAllocations?: BudgetSummary[]
+  initialTarget?: MonthlyBudgetTarget | null
 }
 
 interface CategoryAmountEntry {
@@ -39,6 +41,8 @@ export function BudgetEditDialog({
   categories,
   householdId,
   budgetMonth,
+  initialAllocations,
+  initialTarget,
 }: BudgetEditDialogProps) {
   const [entries, setEntries] = useState<CategoryAmountEntry[]>([])
   const [targetCents, setTargetCents] = useState(0)
@@ -55,6 +59,24 @@ export function BudgetEditDialog({
     if (!open) return
     setLoading(true)
     setError("")
+
+    // Use parent-provided data if available, otherwise fetch from Supabase
+    if (initialAllocations && initialTarget !== undefined) {
+      setTargetCents(initialTarget ? Math.round(Number(initialTarget.target_amount) * 100) : 0)
+      setInitialTargetExists(initialTarget !== null)
+
+      const newEntries = activeCategories.map((cat) => {
+        const existing = initialAllocations.find((a) => a.category_id === cat.id)
+        return {
+          categoryId: cat.id,
+          cents: existing ? Math.round(Number(existing.allocated_amount) * 100) : 0,
+          existingAllocationId: existing?.id ?? undefined,
+        }
+      })
+      setEntries(newEntries)
+      setLoading(false)
+      return
+    }
 
     const supabase = createClient()
 
@@ -84,7 +106,7 @@ export function BudgetEditDialog({
       return
     }
 
-    const allocations = (allocationsRes.data || []) as BudgetAllocation[]
+    const allocations = allocationsRes.data || []
     const target = targetRes.data as MonthlyBudgetTarget | null
 
     setTargetCents(target ? Math.round(Number(target.target_amount) * 100) : 0)
@@ -100,7 +122,7 @@ export function BudgetEditDialog({
     })
     setEntries(newEntries)
     setLoading(false)
-  }, [open, householdId, budgetMonth, activeCategories])
+  }, [open, householdId, budgetMonth, activeCategories, initialAllocations, initialTarget])
 
   useEffect(() => {
     loadData()

@@ -229,6 +229,8 @@ export function BudgetPageContent({
         categories={categories}
         householdId={householdId}
         budgetMonth={budgetMonth}
+        initialAllocations={[...budgets, ...allowances]}
+        initialTarget={target}
       />
 
       {/* Rebalance Dialog */}
