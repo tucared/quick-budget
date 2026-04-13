@@ -23,7 +23,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
       <CardContent className="pt-4 pb-4">
         {/* Hero: remaining amount */}
         <div className="mb-3">
-          <div className="text-xs text-muted-foreground mb-0.5 uppercase tracking-wide font-medium">Remaining this month</div>
+          <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
           <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
             {formatCurrency(totalRemaining, 0)}
           </div>

@@ -111,9 +111,8 @@ export function CategoryBudgetCard({
             />
           )}
         </div>
-        <span className={`text-xs font-semibold ${statusColor.text} flex items-center gap-1 shrink-0`}>
-          <span>{"●"}</span>
-          <span>{formatNumber(newPercentSpent, 0)}%</span>
+        <span className={`text-xs font-semibold ${statusColor.text} shrink-0`}>
+          {formatNumber(newPercentSpent, 0)}%
         </span>
       </div>
 

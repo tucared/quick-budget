@@ -46,16 +46,13 @@ export function ExpensesPageClient({
   return (
     <>
       {/* Expense Form */}
-      <div className="bg-card border rounded-md p-4 mb-6">
+      <div className="mb-6">
         <ExpenseForm
           onExpenseSaved={handleExpenseSaved}
           initialCategories={initialCategories}
           initialTopCategoryIds={initialTopCategoryIds}
         />
       </div>
-
-      {/* Divider */}
-      <hr className="border-border mb-6" />
 
       {/* Recent Expenses List */}
       <ExpenseListClient

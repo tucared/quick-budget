@@ -135,7 +135,7 @@ export function CategoryExpenseDialog({
               <p className="text-sm">No expenses in this category for this month</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-border">
               {expenses.map((expense) => (
                 <ExpenseCard
                   key={expense.id}
