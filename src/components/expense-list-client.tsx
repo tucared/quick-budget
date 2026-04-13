@@ -83,7 +83,7 @@ export function ExpenseListClient({
 
   return (
     <div>
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+      <h2 className="text-xs font-medium text-muted-foreground mb-3">
         Recent Expenses
       </h2>
       {deleteError && (
@@ -96,7 +96,7 @@ export function ExpenseListClient({
           <div className="text-xs font-medium text-muted-foreground mb-2 px-1">
             {label}
           </div>
-          <div className="space-y-2">
+          <div className="divide-y divide-border">
             {group.map((expense) => (
               <ExpenseCard
                 key={expense.id}

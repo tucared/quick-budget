@@ -429,7 +429,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   }
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit() }} className="space-y-4">
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit() }} className="space-y-3">
       {error && (
         <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {error}

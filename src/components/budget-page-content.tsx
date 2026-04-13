@@ -181,7 +181,7 @@ export function BudgetPageContent({
 
           {/* Category Budgets */}
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Categories</h3>
+            <h3 className="text-xs font-medium text-muted-foreground mb-2">Categories</h3>
             <div className="space-y-2">
               {budgets.map((budget) => (
                 <CategoryBudgetCard
@@ -201,7 +201,7 @@ export function BudgetPageContent({
           {/* Allowances */}
           {allowances.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Allowances</h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-2">Allowances</h3>
               <div className="space-y-2">
                 {allowances.map((allowance) => (
                   <CategoryBudgetCard

@@ -63,8 +63,8 @@ When setting up the new system, I want to import my expense and budget data from
 
 ## Visual Design — Rams/Braun Direction
 
-### [~] Design refresh
-Functionalist design inspired by Dieter Rams / Braun industrial design. Color palette and status colors are in a good place. Typography and density need more work.
+### [x] Design refresh
+Functionalist design inspired by Dieter Rams / Braun industrial design.
 
 **Done:**
 - Warm gray palette (off-white backgrounds, warm borders replacing cold blue-grays)
@@ -73,13 +73,9 @@ Functionalist design inspired by Dieter Rams / Braun industrial design. Color pa
 - Flat surfaces — removed all shadows from cards and buttons
 - DM Sans geometric typeface
 - Dark header bar
-
-**Next — Typography:**
-- [ ] Tone down the header/top bar — tracked uppercase is too disconnected from body text; find a treatment that has personality but doesn't feel like a different app
-- [ ] Review font weights and sizes across the app for consistency; the title hierarchy feels uneven
-
-**Next — Declutter / density:**
-- [ ] Audit the expense form for visual noise — can spacing, borders, or elements be reduced?
-- [ ] Review category budget cards — see if progress bar + percentage + amounts can be simplified
-- [ ] Consider whether the expense list cards need borders or if whitespace alone can separate them
-- [ ] Look at the bottom nav bar and header for opportunities to simplify
+- Header/top bar: normal-case semibold instead of tracked uppercase — feels connected to body text
+- Bottom nav: removed uppercase and tracking, tighter vertical padding
+- Section headings: all downgraded from uppercase-tracked to quiet `text-xs font-medium` (Recent Expenses, Categories, Allowances, Remaining this month)
+- Expense form: tighter spacing (`space-y-3`), removed outer card border and divider
+- Category budget cards: removed bullet dot before percentage — colored text alone conveys status
+- Expense list: replaced bordered cards with borderless rows separated by hairline dividers
