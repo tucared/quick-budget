@@ -84,6 +84,16 @@ Seeds in `supabase/seeds/` provide ~3 months of fake data (two users, shared hou
 
 After schema changes, always regenerate types: `npm run types:generate`
 
+## Design
+
+Functionalist visual direction inspired by Dieter Rams and Braun industrial design — information-dense, zero decoration, quiet typography.
+
+- **Palette**: Warm grays (off-white backgrounds, warm borders). Single accent color: Braun orange for focus states, warnings, and active elements.
+- **Status colors**: Muted and functional — teal for on-track, orange for warning, brick red for over-budget. No decorative color.
+- **Surfaces**: Completely flat. No shadows on cards or buttons. Expense rows use hairline dividers instead of bordered cards.
+- **Typography**: DM Sans. Normal-case labels everywhere — no tracked uppercase. Section headings are small and quiet (`text-xs font-medium`). Hierarchy comes from size and weight, not decoration.
+- **Density**: Tight spacing throughout. The expense form uses `space-y-3` with no outer card border. Category budget cards show colored percentage text without bullet indicators.
+
 ## Documentation
 
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Production deployment guide
