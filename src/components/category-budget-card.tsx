@@ -36,7 +36,7 @@ export function CategoryBudgetCard({
 
   if (!budget) {
     return (
-      <div className="px-2.5 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
+      <div className="px-2.5 py-2 bg-[hsl(36,40%,94%)] border border-[hsl(36,30%,78%)] rounded-md text-xs text-[hsl(24,85%,42%)]">
         No budget set for this category this month
       </div>
     )
@@ -87,7 +87,7 @@ export function CategoryBudgetCard({
           {isCurrentMonth && onAddFunds && (
             <button
               onClick={onAddFunds}
-              className="shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors"
+              className="shrink-0 flex items-center gap-1 text-xs text-accent hover:text-accent/80 font-medium px-1.5 py-0.5 rounded hover:bg-accent/10 transition-colors"
               title="Add funds to this category"
             >
               <Plus className="h-3 w-3" />
@@ -99,7 +99,7 @@ export function CategoryBudgetCard({
 
       {/* Progress bar + percentage */}
       <div className="flex items-center gap-2 mb-1.5">
-        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden flex">
+        <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden flex">
           <div
             className={`h-full transition-all duration-300 ${statusColor.indicator}`}
             style={{ width: `${Math.min(currentPercent, 100)}%` }}
@@ -133,7 +133,7 @@ export function CategoryBudgetCard({
         <div className={`mt-1.5 pt-1.5 border-t ${statusColor.border}`}>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">After this expense:</span>
-            <span className={`font-bold ${willOverspend ? 'text-red-600' : statusColor.text}`}>
+            <span className={`font-bold ${willOverspend ? 'text-destructive' : statusColor.text}`}>
               {formatCurrency(newRemaining)} left
               {willOverspend && " ⚠️"}
             </span>

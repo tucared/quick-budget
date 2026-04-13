@@ -49,9 +49,9 @@ export default function LoginForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md border-0 shadow-none">
+      <Card className="w-full max-w-md border-0 shadow-none bg-transparent">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Quick Budget</CardTitle>
+          <CardTitle className="text-sm font-medium uppercase tracking-[0.15em]">Quick Budget</CardTitle>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">

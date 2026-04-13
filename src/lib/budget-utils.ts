@@ -13,12 +13,12 @@ function getBudgetStatus(percentSpent: number, dayOfMonth?: number, daysInMonth?
 }
 
 const statusTextColors: Record<BudgetStatus, string> = {
-  over: "text-red-600",
+  over: "text-[hsl(4,60%,44%)]",
   fully_used: "text-muted-foreground",
-  critical: "text-red-600",
-  ahead: "text-yellow-600",
-  warning: "text-yellow-600",
-  on_track: "text-green-600",
+  critical: "text-[hsl(4,60%,44%)]",
+  ahead: "text-[hsl(24,85%,42%)]",
+  warning: "text-[hsl(24,85%,42%)]",
+  on_track: "text-[hsl(160,40%,35%)]",
 }
 
 export function getBudgetStatusColor(percentSpent: number, dayOfMonth?: number, daysInMonth?: number, remainingAmount?: number): string {
@@ -26,12 +26,12 @@ export function getBudgetStatusColor(percentSpent: number, dayOfMonth?: number, 
 }
 
 const progressBarColors: Record<BudgetStatus, string> = {
-  over: "bg-red-500",
-  fully_used: "bg-gray-400",
-  critical: "bg-red-500",
-  ahead: "bg-yellow-500",
-  warning: "bg-yellow-500",
-  on_track: "bg-green-500",
+  over: "bg-[hsl(4,60%,44%)]",
+  fully_used: "bg-[hsl(30,5%,65%)]",
+  critical: "bg-[hsl(4,60%,44%)]",
+  ahead: "bg-[hsl(24,85%,42%)]",
+  warning: "bg-[hsl(24,85%,42%)]",
+  on_track: "bg-[hsl(160,40%,35%)]",
 }
 
 export function getBudgetProgressBarColor(percentSpent: number, dayOfMonth?: number, daysInMonth?: number, remainingAmount?: number): string {
@@ -59,12 +59,12 @@ export interface BudgetStatusTheme {
 }
 
 const statusThemes: Record<BudgetStatus, BudgetStatusTheme> = {
-  over: { bg: "bg-red-50", border: "border-red-200", text: "text-red-800", indicator: "bg-red-500" },
-  fully_used: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600", indicator: "bg-gray-400" },
-  critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", indicator: "bg-orange-500" },
-  ahead: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-800", indicator: "bg-yellow-500" },
-  warning: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-800", indicator: "bg-yellow-500" },
-  on_track: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", indicator: "bg-green-500" },
+  over: { bg: "bg-[hsl(4,40%,96%)]", border: "border-[hsl(4,40%,80%)]", text: "text-[hsl(4,60%,44%)]", indicator: "bg-[hsl(4,60%,44%)]" },
+  fully_used: { bg: "bg-secondary", border: "border-border", text: "text-muted-foreground", indicator: "bg-[hsl(30,5%,65%)]" },
+  critical: { bg: "bg-[hsl(20,40%,95%)]", border: "border-[hsl(20,40%,80%)]", text: "text-[hsl(4,60%,44%)]", indicator: "bg-[hsl(4,60%,44%)]" },
+  ahead: { bg: "bg-[hsl(36,40%,94%)]", border: "border-[hsl(36,30%,78%)]", text: "text-[hsl(24,85%,42%)]", indicator: "bg-[hsl(24,85%,42%)]" },
+  warning: { bg: "bg-[hsl(36,40%,94%)]", border: "border-[hsl(36,30%,78%)]", text: "text-[hsl(24,85%,42%)]", indicator: "bg-[hsl(24,85%,42%)]" },
+  on_track: { bg: "bg-[hsl(160,25%,95%)]", border: "border-[hsl(160,20%,80%)]", text: "text-[hsl(160,40%,35%)]", indicator: "bg-[hsl(160,40%,35%)]" },
 }
 
 export function getBudgetStatusTheme(percentSpent: number, dayOfMonth?: number, daysInMonth?: number, remainingAmount?: number): BudgetStatusTheme {

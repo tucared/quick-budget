@@ -30,7 +30,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
         </div>
 
         {/* Progress bar */}
-        <div className="h-1.5 bg-black/10 rounded-full overflow-hidden mb-2">
+        <div className="h-1.5 bg-foreground/10 rounded-full overflow-hidden mb-2">
           <div
             className={`h-full transition-all duration-300 ${getBudgetProgressBarColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}
             style={{ width: `${Math.min(percentSpent, 100)}%` }}
@@ -49,7 +49,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
 
         {target && (
           <div className="mt-2 pt-2 border-t border-black/10 flex justify-between items-center text-xs">
-            <span className={overTarget ? "text-red-600 font-medium" : "text-muted-foreground"}>
+            <span className={overTarget ? "text-destructive font-medium" : "text-muted-foreground"}>
               {overTarget
                 ? `Over target by ${formatCurrency(-target.unallocated, 0)}`
                 : `Unallocated ${formatCurrency(target.unallocated, 0)}`}

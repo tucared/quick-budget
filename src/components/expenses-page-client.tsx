@@ -46,7 +46,7 @@ export function ExpensesPageClient({
   return (
     <>
       {/* Expense Form */}
-      <div className="bg-card border rounded-lg p-4 shadow-xs mb-6">
+      <div className="bg-card border rounded-md p-4 mb-6">
         <ExpenseForm
           onExpenseSaved={handleExpenseSaved}
           initialCategories={initialCategories}

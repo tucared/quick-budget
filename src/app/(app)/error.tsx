@@ -21,7 +21,7 @@ export default function Error({
       <Card className="w-full max-w-md p-6">
         <div className="space-y-4 text-center">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-red-600">
+            <h1 className="text-2xl font-bold text-destructive">
               Something went wrong
             </h1>
             <p className="text-muted-foreground">
