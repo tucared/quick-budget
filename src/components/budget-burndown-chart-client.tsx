@@ -143,7 +143,7 @@ export function BudgetBurndownChartClient({
   const isOverBudget = latestActual < 0
   const actualLineColor = isOverBudget
     ? "var(--destructive)"
-    : "hsl(142.1 76.2% 36.3%)" // green-600
+    : "hsl(160 40% 35%)" // muted teal
 
   return (
     <Card>

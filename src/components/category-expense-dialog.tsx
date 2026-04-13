@@ -114,7 +114,7 @@ export function CategoryExpenseDialog({
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">Remaining</div>
             <div
-              className={`font-semibold ${remaining < 0 ? "text-destructive" : "text-green-600"}`}
+              className={`font-semibold ${remaining < 0 ? "text-destructive" : "text-[hsl(160,40%,35%)]"}`}
             >
               {formatCurrency(remaining)}
             </div>

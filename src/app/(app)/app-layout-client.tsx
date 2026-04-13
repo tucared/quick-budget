@@ -37,15 +37,15 @@ export default function AppLayoutClient({
     <UserProvider initialUser={initialUser}>
       <div className="min-h-screen bg-background">
         {/* Top bar */}
-        <header className="sticky top-0 z-10 bg-background border-b">
+        <header className="sticky top-0 z-10 bg-foreground text-primary-foreground">
           <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-            <h1 className="text-lg font-bold">Quick Budget</h1>
+            <h1 className="text-sm font-medium uppercase tracking-[0.15em]">Quick Budget</h1>
             <button
               onClick={handleLogout}
-              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              className="text-primary-foreground/60 hover:text-primary-foreground transition-colors p-1"
               aria-label="Log out"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </header>
@@ -54,7 +54,7 @@ export default function AppLayoutClient({
         <div className="pb-16">{children}</div>
 
         {/* Bottom tab bar — hidden when mobile keyboard is open */}
-        {!isKeyboardVisible && <nav className="fixed bottom-0 left-0 right-0 z-10 bg-background border-t">
+        {!isKeyboardVisible && <nav className="fixed bottom-0 left-0 right-0 z-10 bg-card border-t">
           <div className="flex">
             {tabs.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href
@@ -62,9 +62,9 @@ export default function AppLayoutClient({
                 <Link
                   key={href}
                   href={href}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-colors ${
+                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-xs uppercase tracking-wider transition-colors ${
                     isActive
-                      ? "text-foreground font-medium"
+                      ? "text-accent font-medium"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >

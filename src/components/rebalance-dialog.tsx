@@ -194,12 +194,12 @@ export function RebalanceDialog({
         </DialogHeader>
 
         {effectiveDestId && destBudgetForTitle && (
-          <div className={`flex items-center justify-between rounded-md px-3 py-2 text-sm border ${destBannerNeutral ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
-            <span className={`flex items-center gap-1.5 ${destBannerNeutral ? "text-blue-700" : "text-red-700"}`}>
+          <div className={`flex items-center justify-between rounded-md px-3 py-2 text-sm border ${destBannerNeutral ? "bg-secondary border-border" : "bg-[hsl(4,40%,96%)] border-[hsl(4,40%,80%)]"}`}>
+            <span className={`flex items-center gap-1.5 ${destBannerNeutral ? "text-foreground" : "text-destructive"}`}>
               {destBudgetForTitle.category_icon && <span>{destBudgetForTitle.category_icon}</span>}
               <span className="font-medium">{destBudgetForTitle.category_name}</span>
             </span>
-            <span className={`font-semibold ${destBannerNeutral ? "text-blue-700" : "text-red-700"}`}>
+            <span className={`font-semibold ${destBannerNeutral ? "text-foreground" : "text-destructive"}`}>
               {formatCurrency(destRemaining)}
             </span>
           </div>
@@ -232,7 +232,7 @@ export function RebalanceDialog({
                   </div>
                 </div>
                 {hasTarget && (
-                  <span className="text-sm text-green-600 font-medium">
+                  <span className="text-sm text-[hsl(160,40%,35%)] font-medium">
                     {formatCurrency(unallocated, 0)} left
                   </span>
                 )}
@@ -254,7 +254,7 @@ export function RebalanceDialog({
                     {b.category_icon && <span className="text-lg">{b.category_icon}</span>}
                     <span className="text-sm font-medium">{b.category_name}</span>
                   </div>
-                  <span className="text-sm text-green-600 font-medium">
+                  <span className="text-sm text-[hsl(160,40%,35%)] font-medium">
                     {formatCurrency(Number(b.remaining_amount), 0)} left
                   </span>
                 </button>
