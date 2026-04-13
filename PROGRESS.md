@@ -58,3 +58,28 @@ When logging an expense in BRL, I want to enter the amount I actually paid, so I
 
 ### [x] JTBD #11: Import historical data from current app
 When setting up the new system, I want to import my expense and budget data from CSV exports of my current app, so I have continuity of my financial history and can see trends without starting from zero
+
+---
+
+## Visual Design — Rams/Braun Direction
+
+### [~] Design refresh
+Functionalist design inspired by Dieter Rams / Braun industrial design. Color palette and status colors are in a good place. Typography and density need more work.
+
+**Done:**
+- Warm gray palette (off-white backgrounds, warm borders replacing cold blue-grays)
+- Braun orange as single accent color for focus, warnings, active states
+- Muted functional status colors (teal on-track, orange warning, brick red over-budget)
+- Flat surfaces — removed all shadows from cards and buttons
+- DM Sans geometric typeface
+- Dark header bar
+
+**Next — Typography:**
+- [ ] Tone down the header/top bar — tracked uppercase is too disconnected from body text; find a treatment that has personality but doesn't feel like a different app
+- [ ] Review font weights and sizes across the app for consistency; the title hierarchy feels uneven
+
+**Next — Declutter / density:**
+- [ ] Audit the expense form for visual noise — can spacing, borders, or elements be reduced?
+- [ ] Review category budget cards — see if progress bar + percentage + amounts can be simplified
+- [ ] Consider whether the expense list cards need borders or if whitespace alone can separate them
+- [ ] Look at the bottom nav bar and header for opportunities to simplify
