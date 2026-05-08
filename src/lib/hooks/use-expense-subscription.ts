@@ -42,6 +42,8 @@ export function useExpenseSubscription(
           filter: `household_id=eq.${user.householdId}`,
         },
         (payload) => {
+          // TEMP diagnostic: confirm whether realtime UPDATE/DELETE/INSERT events arrive on the deployed env.
+          console.log("[realtime expenses] event", payload.eventType, payload)
           callbackRef.current({
             type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
             new: payload.new,
@@ -49,7 +51,10 @@ export function useExpenseSubscription(
           })
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        // TEMP diagnostic: subscribe lifecycle. Expected: "SUBSCRIBED". Otherwise CHANNEL_ERROR / TIMED_OUT explains why partner-sync is broken.
+        console.log("[realtime expenses] status:", status, err)
+      })
 
     return () => {
       supabase.removeChannel(channel)

@@ -36,10 +36,15 @@ export function useBudgetAllocationSubscription(
           filter: `household_id=eq.${user.householdId}`,
         },
         () => {
+          // TEMP diagnostic: confirm budget allocation realtime events arrive.
+          console.log("[realtime budget_allocations] event")
           callbackRef.current()
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        // TEMP diagnostic: subscribe lifecycle. Expected: "SUBSCRIBED".
+        console.log("[realtime budget_allocations] status:", status, err)
+      })
 
     return () => {
       supabase.removeChannel(channel)
