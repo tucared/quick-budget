@@ -9,7 +9,7 @@ import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
+import { CategoryTileSelector, buildCategoryOptions } from "@/components/category-tile-selector"
 import { AmountInputWithCurrency } from "@/components/amount-input-with-currency"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
@@ -84,15 +84,8 @@ function EditExpenseForm({
     [categories]
   )
 
-  const categoryOptions: GroupedOption[] = useMemo(
-    () =>
-      categories.map((c) => ({
-        value: c.id,
-        label: c.name,
-        icon: c.icon || undefined,
-        group: c.exclude_from_budget_total ? "Allowances" : "Spending",
-        frequency: 0,
-      })),
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(categories),
     [categories]
   )
 

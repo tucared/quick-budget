@@ -12,6 +12,22 @@ export interface GroupedOption {
   group: string
   frequency?: number // Higher = more recently/frequently used
 }
+
+// Build the GroupedOption shape consumed by CategoryTileSelector. Pass a
+// usageMap (id -> last-used timestamp) to surface recently-used categories
+// first; omit it to leave frequency at 0.
+export function buildCategoryOptions(
+  categories: Category[],
+  usageMap: Record<string, number> = {}
+): GroupedOption[] {
+  return categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+    icon: c.icon || undefined,
+    group: c.exclude_from_budget_total ? "Allowances" : "Spending",
+    frequency: usageMap[c.id] || 0,
+  }))
+}
 import {
   Dialog,
   DialogContent,
