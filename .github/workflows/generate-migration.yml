@@ -6,20 +6,32 @@ name: Generate Migration from Schema
 # back to the PR branch — but only if the diff has real DDL. A comment-only
 # or empty diff is treated as a no-op so this is safe to run on every PR.
 #
+# If the PR carries the `apply-to-dev` label, the final step pushes the
+# resulting migration chain to the Dev Supabase project (via `supabase db
+# push`), so an agent can dogfood the schema change without an extra MCP
+# round-trip. Labeling fires the workflow even when no code changed.
+#
 # Why: lets agents (Claude Code on the web, etc.) iterate on schemas without
 # needing local Docker for `supabase start`. The CLI-generated migration is
 # guaranteed to match the declarative schema, so PRs ship without drift.
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - "supabase/schemas/**"
   workflow_dispatch:
 
 jobs:
   generate:
-    # Skip on fork PRs: GITHUB_TOKEN can't push back to a fork's branch.
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'workflow_dispatch'
+    # Skip on fork PRs (GITHUB_TOKEN can't push back) and skip `labeled`
+    # events for unrelated labels — only `apply-to-dev` should re-trigger.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (github.event.action != 'labeled' || github.event.label.name == 'apply-to-dev')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -90,3 +102,17 @@ jobs:
               issue_number: context.issue.number,
               body: `Auto-generated migration committed: \`${file}\`\n\nReview the SQL before merging — pull the bot's commit if you have local checkouts.`
             });
+
+      # Only when the PR carries the `apply-to-dev` label. `db push` is
+      # idempotent (tracks applied versions in supabase_migrations) so this
+      # safely no-ops if the migration chain already matches Dev. Multiple
+      # labeled PRs open at once will share Dev — daily reset-dev.yml at
+      # 05:00 UTC cleans up.
+      - name: Apply migrations to Dev (label-gated)
+        if: contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DEV_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref "${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
+          supabase db push
