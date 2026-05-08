@@ -14,7 +14,7 @@ export default async function ExpensesPage() {
   // critical path compared to the naive "await user, then fetch data" pattern.
   const [user, expenses, categories] = await Promise.all([
     getServerUser(),
-    getRecentExpenses(50),
+    getRecentExpenses(30),
     getCategories(),
   ])
 
