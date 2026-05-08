@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase"
 import { useUser } from "@/lib/contexts/user-context"
+import { setRealtimeStatus, bumpRealtimeEvent } from "@/lib/realtime-debug"
 
 export type ExpenseChangeEvent = {
   type: "INSERT" | "UPDATE" | "DELETE"
@@ -42,8 +43,9 @@ export function useExpenseSubscription(
           filter: `household_id=eq.${user.householdId}`,
         },
         (payload) => {
-          // TEMP diagnostic: confirm whether realtime UPDATE/DELETE/INSERT events arrive on the deployed env.
+          // TEMP diagnostic
           console.log("[realtime expenses] event", payload.eventType, payload)
+          bumpRealtimeEvent("expenses")
           callbackRef.current({
             type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
             new: payload.new,
@@ -52,8 +54,9 @@ export function useExpenseSubscription(
         }
       )
       .subscribe((status, err) => {
-        // TEMP diagnostic: subscribe lifecycle. Expected: "SUBSCRIBED". Otherwise CHANNEL_ERROR / TIMED_OUT explains why partner-sync is broken.
+        // TEMP diagnostic — surfaces in the in-page debug badge
         console.log("[realtime expenses] status:", status, err)
+        setRealtimeStatus("expenses", status, err)
       })
 
     return () => {
