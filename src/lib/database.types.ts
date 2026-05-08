@@ -84,7 +84,6 @@ export type Database = {
       }
       categories: {
         Row: {
-          color: string | null
           created_at: string
           exclude_from_budget_total: boolean
           household_id: string
@@ -95,7 +94,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          color?: string | null
           created_at?: string
           exclude_from_budget_total?: boolean
           household_id: string
@@ -106,7 +104,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          color?: string | null
           created_at?: string
           exclude_from_budget_total?: boolean
           household_id?: string
@@ -323,7 +320,6 @@ export type Database = {
         Row: {
           allocated_amount: number | null
           budget_month: string | null
-          category_color: string | null
           category_icon: string | null
           category_id: string | null
           category_name: string | null

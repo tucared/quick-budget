@@ -1,6 +1,13 @@
--- Views
+-- Drop unused categories.color column.
+-- The column was never read by the application; the budget_summary view also
+-- exposed it as category_color but no UI referenced it. Drop+recreate the view
+-- so the column dependency is removed before the column itself is dropped.
 
-CREATE OR REPLACE VIEW budget_summary AS
+DROP VIEW IF EXISTS budget_summary;
+
+ALTER TABLE categories DROP COLUMN color;
+
+CREATE VIEW budget_summary AS
 WITH category_months AS (
   SELECT household_id, category_id, budget_month
   FROM budget_allocations

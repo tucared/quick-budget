@@ -5,7 +5,12 @@ import { createClient } from "@/lib/supabase"
 import { startOfMonth, getDaysInMonth, format } from "date-fns"
 import { Pencil } from "lucide-react"
 import type { BudgetSummary, Expense, Category, MonthlyBudgetTarget } from "@/lib/types"
-import { nextMonthString } from "@/lib/date-utils"
+import {
+  fetchAllowanceSummary,
+  fetchBudgetSummary,
+  fetchMonthlyBudgetTarget,
+  fetchMonthlyExpenses,
+} from "@/lib/client/data"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import dynamic from "next/dynamic"
 
@@ -67,35 +72,11 @@ export function BudgetPageContent({
 
   function reloadData() {
     const supabase = createClient()
-    const nextMonthStr = nextMonthString(budgetMonth)
     Promise.all([
-      supabase
-        .from("budget_summary")
-        .select("*")
-        .eq("household_id", householdId)
-        .eq("budget_month", budgetMonth)
-        .eq("exclude_from_budget_total", false)
-        .order("category_name", { ascending: true }),
-      supabase
-        .from("budget_summary")
-        .select("*")
-        .eq("household_id", householdId)
-        .eq("budget_month", budgetMonth)
-        .eq("exclude_from_budget_total", true)
-        .order("category_name", { ascending: true }),
-      supabase
-        .from("monthly_budget_targets")
-        .select("*")
-        .eq("household_id", householdId)
-        .eq("budget_month", budgetMonth)
-        .maybeSingle(),
-      supabase
-        .from("expenses")
-        .select("*")
-        .eq("household_id", householdId)
-        .gte("expense_date", budgetMonth)
-        .lt("expense_date", nextMonthStr)
-        .order("expense_date", { ascending: true }),
+      fetchBudgetSummary(supabase, householdId, budgetMonth),
+      fetchAllowanceSummary(supabase, householdId, budgetMonth),
+      fetchMonthlyBudgetTarget(supabase, householdId, budgetMonth),
+      fetchMonthlyExpenses(supabase, householdId, budgetMonth),
     ]).then(([budgetResult, allowanceResult, targetResult, expensesResult]) => {
       if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
       else if (budgetResult.data) setBudgets(budgetResult.data)

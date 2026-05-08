@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
 import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
-import { formatCentsDisplay } from "@/components/ui/cents-input"
+import { AmountInputWithCurrency, type AmountInputHandle } from "@/components/amount-input-with-currency"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -48,8 +48,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
 
-  // Ref for the invisible input that captures keyboard events
-  const amountInputRef = useRef<HTMLInputElement | null>(null)
+  // Ref for the amount input — used to refocus after currency toggles
+  const amountInputRef = useRef<AmountInputHandle | null>(null)
 
   // Ref for the description textarea
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null)
@@ -77,31 +77,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // Convert string date to Date object for DatePicker
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
 
-  // Use onChange for digit/backspace handling instead of onKeyDown,
-  // because Firefox Android fires onKeyDown with e.key === "Unidentified"
-  // for the virtual keyboard's backspace key.
-  const handleAmountKeyDown = (e: React.KeyboardEvent) => {
-    // Enter moves focus to description instead of submitting the form
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      descriptionRef.current?.focus()
-      return
-    }
-    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
-    if (allowedKeys.includes(e.key)) return
-    if (e.key >= '0' && e.key <= '9') return
-    if (e.ctrlKey || e.metaKey) return
-    if (e.key === 'Unidentified') return
-    e.preventDefault()
-  }
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '')
-    const next = parseInt(raw, 10) || 0
-    if (next <= 999999999) { // cap at ~10M
-      setCentsRaw(next)
-      setAmount(next > 0 ? next / 100 : NaN)
-    }
+  const handleCentsChange = (next: number) => {
+    setCentsRaw(next)
+    setAmount(next > 0 ? next / 100 : NaN)
   }
 
   // Helper functions for tracking usage recency (timestamp-based)
@@ -438,53 +416,16 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
       {/* Amount - hero cents-first input with inline currency toggle */}
       <div>
-        <div
-          className={`flex items-center h-16 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${formErrors.amount ? "border-destructive" : "border-input"}`}
-          onClick={() => amountInputRef.current?.focus()}
-        >
-          {/* Invisible input that captures keyboard events */}
-          <input
-            ref={amountInputRef}
-            type="text"
-            inputMode="decimal"
-            autoFocus
-            autoComplete="off"
-            value={centsRaw > 0 ? String(centsRaw) : ""}
-            onChange={handleAmountChange}
-            onKeyDown={handleAmountKeyDown}
-            className="sr-only"
-            aria-label="Amount"
-          />
-          {/* Display */}
-          <span className={`flex-1 text-3xl font-semibold text-center tabular-nums ${centsRaw === 0 ? "text-muted-foreground" : ""}`}>
-            {formatCentsDisplay(centsRaw)}
-          </span>
-          {/* Currency toggle inline */}
-          <div className="inline-flex rounded-md shrink-0" role="group">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setCurrency("EUR"); amountInputRef.current?.focus() }}
-              className={`px-2.5 py-1 text-xs font-semibold border rounded-l-md transition-colors ${
-                selectedCurrency === "EUR"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-input hover:bg-accent"
-              }`}
-            >
-              EUR
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setCurrency("BRL"); amountInputRef.current?.focus() }}
-              className={`px-2.5 py-1 text-xs font-semibold border-l-0 border rounded-r-md transition-colors ${
-                selectedCurrency === "BRL"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-input hover:bg-accent"
-              }`}
-            >
-              BRL
-            </button>
-          </div>
-        </div>
+        <AmountInputWithCurrency
+          ref={amountInputRef}
+          centsRaw={centsRaw}
+          onCentsChange={handleCentsChange}
+          currency={selectedCurrency}
+          onCurrencyChange={setCurrency}
+          error={!!formErrors.amount}
+          autoFocus
+          onEnter={() => descriptionRef.current?.focus()}
+        />
         {formErrors.amount && (
           <p className="text-sm text-destructive mt-1">{formErrors.amount}</p>
         )}
