@@ -8,7 +8,6 @@ import { Receipt, Wallet, LogOut } from "lucide-react"
 import { UserProvider } from "@/lib/contexts/user-context"
 import type { UserData } from "@/lib/hooks/use-user"
 import { useKeyboardVisible } from "@/lib/hooks/use-keyboard-visible"
-import { RealtimeDebugBadge } from "@/components/realtime-debug-badge"
 
 const tabs = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
@@ -53,9 +52,6 @@ export default function AppLayoutClient({
 
         {/* Page content */}
         <div className="pb-16">{children}</div>
-
-        {/* TEMP realtime status badge — remove with src/lib/realtime-debug.ts */}
-        <RealtimeDebugBadge />
 
         {/* Bottom tab bar — hidden when mobile keyboard is open */}
         {!isKeyboardVisible && <nav className="fixed bottom-0 left-0 right-0 z-10 bg-card border-t">
