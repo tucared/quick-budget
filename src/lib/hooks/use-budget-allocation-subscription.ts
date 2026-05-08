@@ -8,7 +8,8 @@ export type BudgetAllocationChangeCallback = () => void
 
 /**
  * Subscribe to real-time budget_allocations changes for the current household.
- * Calls the callback whenever any allocation is inserted, updated, or deleted.
+ * Backed by a Postgres trigger that calls realtime.broadcast_changes() —
+ * postgres_changes is broken on this project.
  */
 export function useBudgetAllocationSubscription(
   callback: BudgetAllocationChangeCallback,
@@ -26,15 +27,12 @@ export function useBudgetAllocationSubscription(
 
     const supabase = createClient()
     const channel = supabase
-      .channel(`budget_allocations_household_${user.householdId}`)
+      .channel(`budget_allocations_household_${user.householdId}`, {
+        config: { private: true },
+      })
       .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "budget_allocations",
-          filter: `household_id=eq.${user.householdId}`,
-        },
+        "broadcast",
+        { event: "*" },
         () => {
           callbackRef.current()
         }

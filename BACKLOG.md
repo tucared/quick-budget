@@ -54,7 +54,13 @@ There's no convention doc, so additions drift.
 
 ---
 
-## 4. Migrate realtime to broadcast-via-trigger (postgres_changes is broken on this project)
+## 4. Migrate realtime to broadcast-via-trigger (postgres_changes is broken on this project) — DONE
+
+> Shipped on `claude/implement-backlog-item-4-9wAVe`. Migration `20260508223813_migrate_realtime_to_broadcast.sql` adds a `SECURITY DEFINER` trigger function on `expenses` and `budget_allocations` that calls `realtime.broadcast_changes()` with topic `<table>_household_<household_id>`, plus a SELECT policy on `realtime.messages` keyed off `get_my_household_id()`. Hooks switched to `private: true` broadcast channels. Partner-sync verified end-to-end with two sessions on Dev.
+
+---
+
+## 4. (original) Migrate realtime to broadcast-via-trigger
 
 **Why this approach is correct:** Supabase's own docs (May 2026) explicitly recommend broadcast-via-trigger over postgres_changes:
 
