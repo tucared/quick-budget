@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { format, startOfMonth, parseISO } from "date-fns"
+import { format, startOfMonth } from "date-fns"
 import {
   getServerUser,
   getBudgetSummary,
@@ -20,7 +20,7 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   // Parse month from searchParams (format: yyyy-MM) or default to current month
   let budgetMonth: string
   if (month && /^\d{4}-\d{2}$/.test(month)) {
-    budgetMonth = format(parseISO(`${month}-01`), "yyyy-MM-dd")
+    budgetMonth = `${month}-01`
   } else {
     budgetMonth = format(startOfMonth(new Date()), "yyyy-MM-dd")
   }
