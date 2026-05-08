@@ -54,6 +54,26 @@ There's no convention doc, so additions drift.
 
 ---
 
+## 4. Realtime postgres_changes is silent on this project
+
+**Problem:** The Supabase Realtime tenant for the project only initializes the broadcast publication (`supabase_realtime_messages_publication`), never the `supabase_realtime` postgres_changes publication. Any `.on("postgres_changes", ...)` subscription fails with `CHANNEL_ERROR: mismatch between server and client bindings for postgres changes` (server returns 0 bindings, client expects 1). Verified via `get_logs --service realtime` and `pg_publication_tables`.
+
+**Where it bites:**
+- Partner-sync: changes made by user A don't appear for user B until refresh.
+- `/budget` page: editing an allocation in one tab doesn't update another tab; expense inserts don't update category totals live.
+- `category-expense-dialog`: editing an expense via the budget drill-down doesn't refresh the row until manual refresh (its own delete already does optimistic removal).
+
+**Already mitigated:** the `/expenses` page now uses optimistic callbacks for INSERT (form save), UPDATE (edit dialog), DELETE (delete button) — these don't depend on realtime.
+
+**Idea:** Decide between (a) re-enabling postgres_changes on the Supabase project (dashboard or support ticket — note that the new "publishable" key + recent realtime versions have known compatibility issues) and migrating to the new private-channel + RLS authorization model; or (b) replacing realtime entirely with explicit broadcast events sent after each mutation, plus a fallback "tab focus → refetch" pattern. Option (b) is more work but doesn't depend on Supabase infra decisions.
+
+**Tradeoff:** Until this is resolved, every page that displays shared state needs an optimistic-update path or a manual refresh trigger.
+
+**Launch prompt:**
+> Investigate why postgres_changes realtime is silent on the Supabase project (check `get_logs --service realtime` — only `supabase_realtime_messages_publication` initialises, never `supabase_realtime`). The `useExpenseSubscription` and `useBudgetAllocationSubscription` hooks in `src/lib/hooks/` end up logging `CHANNEL_ERROR: mismatch between server and client bindings for postgres changes`. First try setting `private: true` on the channel and using the new RLS authorization on `realtime.messages`; if that doesn't work, propose either a Supabase support escalation or migrating to broadcast-based change events. The `/budget` page (`src/components/budget-page-content.tsx`) and the budget drill-down (`src/components/category-expense-dialog.tsx`) both still rely on these subscriptions for partner-sync and live updates — design an optimistic-update fallback similar to the `/expenses` page if the infra fix isn't viable.
+
+---
+
 ## How to use this file
 
 When you have time for one of these, copy its launch prompt into a fresh Claude Code session. Each prompt is self-contained — it references the right files and constraints.

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { getErrorMessage } from "@/lib/error-handler"
 
-export function useExpenseDelete() {
+export function useExpenseDelete(onDeleted?: (expenseId: string) => void) {
   const [showingDeleteId, setShowingDeleteId] = useState<string | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [deleteError, setDeleteError] = useState("")
@@ -30,8 +30,10 @@ export function useExpenseDelete() {
         return next
       })
     } else {
-      // Fallback: clear deleting state after 5s in case the realtime
-      // DELETE event is delayed or lost (normally it clears it sooner)
+      // Optimistic update — postgres_changes realtime is unreliable on this
+      // project, so the parent removes from state via this callback. The 5s
+      // fallback below clears the animation flag in case the parent doesn't.
+      onDeleted?.(expenseId)
       setTimeout(() => clearDeletingId(expenseId), 5000)
     }
   }

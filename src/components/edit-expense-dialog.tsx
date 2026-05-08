@@ -25,7 +25,7 @@ interface EditExpenseDialogProps {
   onOpenChange: (open: boolean) => void
   expense: Expense | null
   categories: Category[]
-  onSuccess?: () => void
+  onSaved?: (updated: Expense) => void
 }
 
 export function EditExpenseDialog({
@@ -33,7 +33,7 @@ export function EditExpenseDialog({
   onOpenChange,
   expense,
   categories,
-  onSuccess,
+  onSaved,
 }: EditExpenseDialogProps) {
   if (!expense) return null
 
@@ -45,7 +45,7 @@ export function EditExpenseDialog({
           expense={expense}
           categories={categories}
           onOpenChange={onOpenChange}
-          onSuccess={onSuccess}
+          onSaved={onSaved}
         />
       </DialogContent>
     </Dialog>
@@ -56,14 +56,14 @@ interface EditExpenseFormProps {
   expense: Expense
   categories: Category[]
   onOpenChange: (open: boolean) => void
-  onSuccess?: () => void
+  onSaved?: (updated: Expense) => void
 }
 
 function EditExpenseForm({
   expense,
   categories,
   onOpenChange,
-  onSuccess,
+  onSaved,
 }: EditExpenseFormProps) {
   const [centsRaw, setCentsRaw] = useState(() => Math.round(Math.abs(expense.amount) * 100))
   const [categoryId, setCategoryId] = useState(expense.category_id || "")
@@ -121,20 +121,23 @@ function EditExpenseForm({
       const convertedAmount = data.amount * exchangeRate
 
       const supabase = createClient()
-      const { error: updateError } = await supabase
+      const updates = {
+        amount: data.amount,
+        currency: cur,
+        converted_amount: convertedAmount,
+        converted_currency: "EUR",
+        exchange_rate: exchangeRate,
+        category_id: data.category_id,
+        is_cash: data.is_cash ?? false,
+        expense_date: data.expense_date,
+        description: data.description || null,
+      }
+      const { data: updated, error: updateError } = await supabase
         .from("expenses")
-        .update({
-          amount: data.amount,
-          currency: cur,
-          converted_amount: convertedAmount,
-          converted_currency: "EUR",
-          exchange_rate: exchangeRate,
-          category_id: data.category_id,
-          is_cash: data.is_cash ?? false,
-          expense_date: data.expense_date,
-          description: data.description || null,
-        })
+        .update(updates)
         .eq("id", expense.id)
+        .select()
+        .single()
 
       if (updateError) {
         setError(getErrorMessage(updateError))
@@ -144,7 +147,9 @@ function EditExpenseForm({
 
       setSaving(false)
       onOpenChange(false)
-      onSuccess?.()
+      // Optimistic update — postgres_changes realtime is unreliable on this
+      // project, so the parent re-renders immediately from this callback.
+      if (updated) onSaved?.(updated as Expense)
     } catch (err) {
       setError(getErrorMessage(err))
       setSaving(false)

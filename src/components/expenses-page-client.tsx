@@ -29,6 +29,18 @@ export function ExpensesPageClient({
     setExpenses((prev) => [expense as ExpenseWithDetails, ...prev])
   }, [])
 
+  // Same pattern for edit — replace in place. Realtime UPDATE is unreliable
+  // on this project, so the dialog's onSaved callback drives the refresh.
+  const handleExpenseUpdated = useCallback((updated: Expense) => {
+    setExpenses((prev) =>
+      prev.map((exp) => (exp.id === updated.id ? (updated as ExpenseWithDetails) : exp))
+    )
+  }, [])
+
+  const handleExpenseDeleted = useCallback((id: string) => {
+    setExpenses((prev) => prev.filter((exp) => exp.id !== id))
+  }, [])
+
   // Handle realtime events for partner-initiated changes and deletes/updates
   const handleRealtimeEvent = useCallback((event: ExpenseChangeEvent) => {
     if (event.type === "INSERT") {
@@ -102,6 +114,8 @@ export function ExpensesPageClient({
         categories={initialCategories}
         hasMore={hasMore}
         onLoadMore={handleLoadMore}
+        onExpenseUpdated={handleExpenseUpdated}
+        onExpenseDeleted={handleExpenseDeleted}
       />
     </>
   )

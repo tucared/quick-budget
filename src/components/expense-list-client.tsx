@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { format, isToday, isYesterday } from "date-fns"
 import { Search, X } from "lucide-react"
-import type { ExpenseWithDetails, Category } from "@/lib/types"
+import type { Expense, ExpenseWithDetails, Category } from "@/lib/types"
 import { parseLocalDate } from "@/lib/date-utils"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
@@ -16,6 +16,8 @@ interface ExpenseListClientProps {
   categories: Category[]
   hasMore: boolean
   onLoadMore: () => Promise<void>
+  onExpenseUpdated?: (updated: Expense) => void
+  onExpenseDeleted?: (id: string) => void
 }
 
 const SEARCH_LIMIT = 50
@@ -31,6 +33,8 @@ export function ExpenseListClient({
   categories: categoryList,
   hasMore,
   onLoadMore,
+  onExpenseUpdated,
+  onExpenseDeleted,
 }: ExpenseListClientProps) {
   const categories = useMemo(() => {
     const map = new Map<string, Category>()
@@ -60,7 +64,7 @@ export function ExpenseListClient({
     handleCardClick,
     handleDelete,
     clearDeletingId,
-  } = useExpenseDelete()
+  } = useExpenseDelete(onExpenseDeleted)
 
   // Debounce raw input → committed search query
   useEffect(() => {
@@ -287,6 +291,7 @@ export function ExpenseListClient({
         onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
         expense={editingExpense}
         categories={categoryList}
+        onSaved={onExpenseUpdated}
       />
     </div>
   )
