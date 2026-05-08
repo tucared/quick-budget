@@ -39,6 +39,7 @@ export function ExpenseListClient({
   }, [categoryList])
 
   const [editingExpense, setEditingExpense] = useState<ExpenseWithDetails | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [searchData, setSearchData] = useState<{ query: string; results: ExpenseWithDetails[] } | null>(null)
@@ -46,6 +47,11 @@ export function ExpenseListClient({
   const sentinelRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef(onLoadMore)
   useEffect(() => { loadMoreRef.current = onLoadMore }, [onLoadMore])
+
+  const closeSearch = () => {
+    setSearchInput("")
+    setSearchOpen(false)
+  }
 
   const {
     showingDeleteId,
@@ -175,39 +181,50 @@ export function ExpenseListClient({
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-3 px-1">
-        <h2 className="text-base font-semibold">
-          {isSearchMode ? "Search results" : "Recent expenses"}
-        </h2>
-        {isSearchMode && !searching && (
-          <span className="text-xs text-muted-foreground">
-            {visibleExpenses.length}{visibleExpenses.length === SEARCH_LIMIT ? "+" : ""} match{visibleExpenses.length === 1 ? "" : "es"}
-          </span>
+      <div className="flex items-center justify-between mb-3 px-1 gap-2 min-h-9">
+        {searchOpen ? (
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              inputMode="search"
+              autoComplete="off"
+              autoFocus
+              placeholder="Search description or category"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") closeSearch() }}
+              className="pl-9 pr-9 h-9"
+            />
+            <button
+              type="button"
+              onClick={closeSearch}
+              aria-label="Close search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-base font-semibold">Recent expenses</h2>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search expenses"
+              className="p-1.5 -mr-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          </>
         )}
       </div>
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          type="text"
-          inputMode="search"
-          autoComplete="off"
-          placeholder="Search by description or category"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="pl-9 pr-9"
-        />
-        {searchInput && (
-          <button
-            type="button"
-            onClick={() => setSearchInput("")}
-            aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      {isSearchMode && !searching && (
+        <div className="text-xs text-muted-foreground mb-3 px-1">
+          {visibleExpenses.length}{visibleExpenses.length === SEARCH_LIMIT ? "+" : ""} match{visibleExpenses.length === 1 ? "" : "es"} for &ldquo;{searchQuery}&rdquo;
+        </div>
+      )}
 
       {deleteError && (
         <div className="mb-3 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
