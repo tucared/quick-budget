@@ -1,5 +1,11 @@
 // Currency conversion utilities
 
+// Currencies the user can pick when logging an expense. Order is preserved
+// for the EUR/BRL toggle. Add a new currency here AND in
+// FALLBACK_RATES_TO_EUR / CURRENCY_SYMBOLS below.
+export const SUPPORTED_CURRENCIES = ["EUR", "BRL"] as const
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number]
+
 export const FALLBACK_RATES_TO_EUR: Record<string, number> = {
   EUR: 1.0,
   BRL: 0.17, // 1 BRL ≈ 0.17 EUR (fallback only)

@@ -32,9 +32,9 @@ BEGIN
     (shared_household_id, 'Bills', '📋', TRUE);
 
   -- Allowance categories (excluded from budget total)
-  INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, color, is_active) VALUES
-    (shared_household_id, 'User One Allowance', '👤', TRUE, '#6366f1', TRUE),
-    (shared_household_id, 'User Two Allowance', '👤', TRUE, '#f97316', TRUE);
+  INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active) VALUES
+    (shared_household_id, 'User One Allowance', '👤', TRUE, TRUE),
+    (shared_household_id, 'User Two Allowance', '👤', TRUE, TRUE);
 
   RAISE NOTICE '  ✓ Created categories';
 END $$;

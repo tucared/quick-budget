@@ -208,14 +208,12 @@ export async function getCategories(): Promise<Category[]> {
 
 /**
  * Compute the most-used category IDs from a set of recent expenses.
- * Matches the semantics of the top_categories_by_usage RPC (active categories,
- * last 30 days) but runs in TypeScript on data we've already fetched — no extra
- * database round-trip.
+ * Counts active categories used within the last 30 days, ordered by
+ * frequency. Runs in TypeScript on already-fetched data — no extra DB
+ * round-trip.
  *
- * Note: if the caller passes fewer than 30 days' worth of expenses, the result
- * is based on whatever window those expenses cover. For the expenses page,
- * getRecentExpenses(50) typically spans well over 30 days in a 2-person
- * household, so the result matches the RPC in practice.
+ * Note: if the caller passes fewer than 30 days' worth of expenses, the
+ * result is based on whatever window those expenses cover.
  */
 export function computeTopCategoryIds(
   expenses: ExpenseWithDetails[],

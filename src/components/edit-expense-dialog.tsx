@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
@@ -10,6 +10,7 @@ import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
+import { AmountInputWithCurrency } from "@/components/amount-input-with-currency"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog,
@@ -18,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { formatCentsDisplay } from "@/components/ui/cents-input"
 
 interface EditExpenseDialogProps {
   open: boolean
@@ -75,8 +75,6 @@ function EditExpenseForm({
   const [error, setError] = useState("")
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  const amountInputRef = useRef<HTMLInputElement | null>(null)
-
   const amount = centsRaw > 0 ? centsRaw / 100 : NaN
 
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
@@ -97,23 +95,6 @@ function EditExpenseForm({
       })),
     [categories]
   )
-
-  const handleAmountKeyDown = (e: React.KeyboardEvent) => {
-    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
-    if (allowedKeys.includes(e.key)) return
-    if (e.key >= '0' && e.key <= '9') return
-    if (e.ctrlKey || e.metaKey) return
-    if (e.key === 'Unidentified') return
-    e.preventDefault()
-  }
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '')
-    const next = parseInt(raw, 10) || 0
-    if (next <= 999999999) {
-      setCentsRaw(next)
-    }
-  }
 
   const handleSave = async () => {
     setError("")
@@ -192,49 +173,13 @@ function EditExpenseForm({
 
         {/* Amount with currency toggle */}
         <div>
-          <div
-            className={`flex items-center h-16 rounded-md border bg-background px-3 gap-2 cursor-text focus-within:ring-2 focus-within:ring-ring ${formErrors.amount ? "border-destructive" : "border-input"}`}
-            onClick={() => amountInputRef.current?.focus()}
-          >
-            <input
-              ref={amountInputRef}
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={centsRaw > 0 ? String(centsRaw) : ""}
-              onChange={handleAmountChange}
-              onKeyDown={handleAmountKeyDown}
-              className="sr-only"
-              aria-label="Amount"
-            />
-            <span className={`flex-1 text-3xl font-semibold text-center tabular-nums ${centsRaw === 0 ? "text-muted-foreground" : ""}`}>
-              {formatCentsDisplay(centsRaw)}
-            </span>
-            <div className="inline-flex rounded-md shrink-0" role="group">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setCurrency("EUR"); amountInputRef.current?.focus() }}
-                className={`px-2.5 py-1 text-xs font-semibold border rounded-l-md transition-colors ${
-                  currency === "EUR"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-muted-foreground border-input hover:bg-accent"
-                }`}
-              >
-                EUR
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setCurrency("BRL"); amountInputRef.current?.focus() }}
-                className={`px-2.5 py-1 text-xs font-semibold border-l-0 border rounded-r-md transition-colors ${
-                  currency === "BRL"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-muted-foreground border-input hover:bg-accent"
-                }`}
-              >
-                BRL
-              </button>
-            </div>
-          </div>
+          <AmountInputWithCurrency
+            centsRaw={centsRaw}
+            onCentsChange={setCentsRaw}
+            currency={currency}
+            onCurrencyChange={setCurrency}
+            error={!!formErrors.amount}
+          />
           {formErrors.amount && (
             <p className="text-sm text-destructive mt-1">{formErrors.amount}</p>
           )}

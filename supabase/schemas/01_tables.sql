@@ -57,7 +57,6 @@ CREATE TABLE categories (
   name TEXT NOT NULL,
   exclude_from_budget_total BOOLEAN NOT NULL DEFAULT FALSE,
   icon TEXT,
-  color TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
