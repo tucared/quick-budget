@@ -120,15 +120,11 @@ export function BudgetBurndownChartClient({
       const dailyExpenses = expensesByDate.get(dateKey) || 0
       cumulativeActual += dailyExpenses
 
-      // Linear burndown of the pace baseline → 0 at month-end.
+      // Each pace line is a linear burndown of its own baseline → 0 at month-end.
+      // They start at different Y values (target vs allocated) and converge at 0.
       const plannedTarget = paceBaseline - (paceBaseline / daysInMonth) * day
-
-      // Linear burndown projecting only the allocated portion onto the same
-      // (target) Y-frame. Ends at (paceBaseline − totalAllocated) on day-of-month-end:
-      //   target > allocated → ends above zero, the unallocated reserve
-      //   target < allocated → ends below zero, signalling over-allocation
       const plannedAllocated = showAllocatedLine
-        ? paceBaseline - (totalAllocated / daysInMonth) * day
+        ? totalAllocated - (totalAllocated / daysInMonth) * day
         : null
 
       // Actual remaining (baseline − cumulative spent), only up to today.
