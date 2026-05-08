@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase"
 import { useUser } from "@/lib/contexts/user-context"
+import { setRealtimeStatus, bumpRealtimeEvent } from "@/lib/realtime-debug"
 
 export type BudgetAllocationChangeCallback = () => void
 
@@ -36,14 +37,16 @@ export function useBudgetAllocationSubscription(
           filter: `household_id=eq.${user.householdId}`,
         },
         () => {
-          // TEMP diagnostic: confirm budget allocation realtime events arrive.
+          // TEMP diagnostic
           console.log("[realtime budget_allocations] event")
+          bumpRealtimeEvent("budget_allocations")
           callbackRef.current()
         }
       )
       .subscribe((status, err) => {
-        // TEMP diagnostic: subscribe lifecycle. Expected: "SUBSCRIBED".
+        // TEMP diagnostic
         console.log("[realtime budget_allocations] status:", status, err)
+        setRealtimeStatus("budget_allocations", status, err)
       })
 
     return () => {
