@@ -13,8 +13,9 @@ interface BudgetSummaryCardProps {
 export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: BudgetSummaryCardProps) {
   const totalAllocated = budgets.reduce((sum, b) => sum + Number(b.allocated_amount), 0)
   const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spent_amount), 0)
-  const totalRemaining = totalAllocated - totalSpent
-  const percentSpent = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0
+  const paceBaseline = target ? target.amount : totalAllocated
+  const totalRemaining = paceBaseline - totalSpent
+  const percentSpent = paceBaseline > 0 ? (totalSpent / paceBaseline) * 100 : 0
   const theme = getBudgetStatusTheme(percentSpent, dayOfMonth, daysInMonth, totalRemaining)
   const overTarget = target ? target.unallocated < 0 : false
 
@@ -40,7 +41,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
         {/* Footer row */}
         <div className="flex justify-between items-center text-xs">
           <span className="text-muted-foreground">
-            {formatCurrency(totalSpent, 0)} of {formatCurrency(totalAllocated, 0)} spent · {formatNumber(percentSpent, 0)}%
+            {formatCurrency(totalSpent, 0)} of {formatCurrency(paceBaseline, 0)} spent · {formatNumber(percentSpent, 0)}%
           </span>
           <span className={`${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)} font-medium`}>
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}
