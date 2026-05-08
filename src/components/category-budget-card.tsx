@@ -55,14 +55,6 @@ export function CategoryBudgetCard({
   const statusColor = getBudgetStatusTheme(newPercentSpent, dayOfMonth, daysInMonth, newRemaining)
   const willOverspend = newRemaining < 0
 
-  // Daily budget remaining: only show for current month with days left
-  const daysLeft = isCurrentMonth && daysInMonth != null && dayOfMonth != null
-    ? daysInMonth - dayOfMonth
-    : null
-  const dailyBudget = daysLeft != null && daysLeft > 0 && newRemaining > 0
-    ? newRemaining / daysLeft
-    : null
-
   const isClickable = !!onClick
 
   return (
@@ -123,7 +115,6 @@ export function CategoryBudgetCard({
         </span>
         <span>
           <span className="font-semibold">{formatCurrency(remaining)} left</span>
-          {dailyBudget != null && <span className="text-muted-foreground"> · {formatCurrency(dailyBudget, 0)}/day</span>}
         </span>
       </div>
 
