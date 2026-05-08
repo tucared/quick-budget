@@ -54,23 +54,33 @@ There's no convention doc, so additions drift.
 
 ---
 
-## 4. Realtime postgres_changes is silent on this project
+## 4. Migrate realtime to broadcast-via-trigger (postgres_changes is broken on this project)
 
-**Problem:** The Supabase Realtime tenant for the project only initializes the broadcast publication (`supabase_realtime_messages_publication`), never the `supabase_realtime` postgres_changes publication. Any `.on("postgres_changes", ...)` subscription fails with `CHANNEL_ERROR: mismatch between server and client bindings for postgres changes` (server returns 0 bindings, client expects 1). Verified via `get_logs --service realtime` and `pg_publication_tables`.
+**Diagnosis (confirmed on Vercel preview, May 2026):** `.on("postgres_changes", ...)` subscriptions on this project return `CHANNEL_ERROR: mismatch between server and client bindings for postgres changes` — the realtime broker accepts the channel join but returns zero accepted bindings while the client expects one. Verified:
+- `pg_publication_tables` includes `expenses`, `budget_allocations`, `categories` in `supabase_realtime`.
+- `REPLICA IDENTITY FULL` is set on all three.
+- Realtime Service is enabled in the dashboard, "Allow public access to channels" is on.
+- Tested with both publishable key and legacy anon JWT — same error.
+- Tested with `private: true` channel config — error became "Unauthorized" (auth flow works, no policies on `realtime.messages`).
 
-**Where it bites:**
-- Partner-sync: changes made by user A don't appear for user B until refresh.
-- `/budget` page: editing an allocation in one tab doesn't update another tab; expense inserts don't update category totals live.
-- `category-expense-dialog`: editing an expense via the budget drill-down doesn't refresh the row until manual refresh (its own delete already does optimistic removal).
+It is not a network/proxy artifact, not a key-format issue, and not a publication issue. The realtime broker on this project simply isn't accepting `postgres_changes` bindings. Supabase has been pushing new projects toward the broadcast-via-trigger pattern (`realtime.broadcast_changes()` + RLS on `realtime.messages` + `private: true`); the partition tables `realtime.messages_2026_05_07` etc. are already provisioned, suggesting that's the intended path here.
 
-**Already mitigated:** the `/expenses` page now uses optimistic callbacks for INSERT (form save), UPDATE (edit dialog), DELETE (delete button) — these don't depend on realtime.
+**Where it bites today:**
+- Partner-sync: changes by user A don't appear for user B until refresh.
+- `/budget` page: editing an allocation in one tab doesn't update another tab; expense inserts elsewhere don't update category totals live.
+- `/expenses` page: same-tab edits/deletes already work via the optimistic-update path shipped in commit `163d4db`. Partner-sync remains broken.
 
-**Idea:** Decide between (a) re-enabling postgres_changes on the Supabase project (dashboard or support ticket — note that the new "publishable" key + recent realtime versions have known compatibility issues) and migrating to the new private-channel + RLS authorization model; or (b) replacing realtime entirely with explicit broadcast events sent after each mutation, plus a fallback "tab focus → refetch" pattern. Option (b) is more work but doesn't depend on Supabase infra decisions.
+**Migration plan:**
+1. Add a Postgres trigger on `expenses` and `budget_allocations` that calls `realtime.broadcast_changes('expenses_household_' || NEW.household_id, TG_OP, TG_OP, TG_TABLE_NAME, TG_TABLE_SCHEMA, NEW, OLD)` (and the equivalent for `budget_allocations`). Topic name encodes household.
+2. Add an RLS policy on `realtime.messages` allowing authenticated users to read topics matching `'expenses_household_' || get_my_household_id()::text` or the budget allocation equivalent. Don't grant write — clients shouldn't push events.
+3. In `useExpenseSubscription` / `useBudgetAllocationSubscription`, set `config: { private: true }` on the channel and replace `.on("postgres_changes", ...)` with `.on("broadcast", { event: "*" }, ...)`. The payload shape changes from `{ eventType, new, old }` to `{ event, payload: { record, old_record, op } }` — adapt the handler accordingly.
+4. Drop the postgres_changes publication entries for these tables once broadcast is verified working (optional — keeps migrations idempotent).
+5. Verify partner-sync: open two browser sessions for different household members, edit in one, watch the other refresh.
 
-**Tradeoff:** Until this is resolved, every page that displays shared state needs an optimistic-update path or a manual refresh trigger.
+**Tradeoff vs option 3 ("live with it"):** ~1 hour of work for proper partner-sync that won't break under future Supabase realtime changes, vs zero work but partners always see stale state until manual refresh. For a 2-person household used daily, a manual refresh is annoying but not blocking.
 
 **Launch prompt:**
-> Investigate why postgres_changes realtime is silent on the Supabase project (check `get_logs --service realtime` — only `supabase_realtime_messages_publication` initialises, never `supabase_realtime`). The `useExpenseSubscription` and `useBudgetAllocationSubscription` hooks in `src/lib/hooks/` end up logging `CHANNEL_ERROR: mismatch between server and client bindings for postgres changes`. First try setting `private: true` on the channel and using the new RLS authorization on `realtime.messages`; if that doesn't work, propose either a Supabase support escalation or migrating to broadcast-based change events. The `/budget` page (`src/components/budget-page-content.tsx`) and the budget drill-down (`src/components/category-expense-dialog.tsx`) both still rely on these subscriptions for partner-sync and live updates — design an optimistic-update fallback similar to the `/expenses` page if the infra fix isn't viable.
+> The Supabase project's realtime postgres_changes feature returns `CHANNEL_ERROR: mismatch between server and client bindings`, confirmed on production. Migrate the two subscription hooks (`src/lib/hooks/use-expense-subscription.ts`, `src/lib/hooks/use-budget-allocation-subscription.ts`) to use the broadcast-via-trigger pattern: add Postgres triggers on `expenses` and `budget_allocations` that call `realtime.broadcast_changes()` with a household-scoped topic, add an RLS policy on `realtime.messages` keyed off `get_my_household_id()`, and switch the client hooks to `private: true` channels using `.on("broadcast", { event: "*" })`. Drop the now-unused `expenses` / `budget_allocations` entries from the `supabase_realtime` postgres_changes publication. The optimistic-update fix already in place (commit 163d4db) means same-tab edits keep working through the migration, so this can ship as a single PR. Verify partner-sync end-to-end with two browser sessions before considering it done.
 
 ---
 
