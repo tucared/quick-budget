@@ -47,7 +47,7 @@ export function BudgetBurndownChartClient({
   const expenses = initialExpenses
 
   const chartData = useMemo(() => {
-    if (budgets.length === 0) return { data: [], weekends: [] }
+    if (budgets.length === 0) return { data: [], weekends: [], paceBaseline: 0, unallocated: 0 }
 
     // Get set of category IDs from budgets prop (these are the categories we're tracking)
     const budgetCategoryIds = new Set(budgets.map((b) => b.category_id))
