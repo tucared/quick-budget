@@ -4,6 +4,7 @@ import { format } from "date-fns"
 import { Pencil, Trash2 } from "lucide-react"
 import type { Category } from "@/lib/types"
 import { formatCurrency } from "@/lib/currency"
+import { parseLocalDate } from "@/lib/date-utils"
 
 interface ExpenseCardExpense {
   id: string
@@ -71,7 +72,7 @@ export function ExpenseCard({
                 {showDate ? (
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <span>
-                      {format(new Date(expense.expense_date), "MMM d, yyyy")}
+                      {format(parseLocalDate(expense.expense_date), "MMM d, yyyy")}
                     </span>
                     {expense.is_cash && (
                       <>

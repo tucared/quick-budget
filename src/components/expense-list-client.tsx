@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { format, isToday, isYesterday, parseISO } from "date-fns"
+import { format, isToday, isYesterday } from "date-fns"
 import type { ExpenseWithDetails, Category } from "@/lib/types"
+import { parseLocalDate } from "@/lib/date-utils"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
 import { EditExpenseDialog } from "@/components/edit-expense-dialog"
@@ -70,7 +71,7 @@ export function ExpenseListClient({
   for (const expense of visibleExpenses) {
     const dateKey = expense.expense_date
     if (!seenDates.has(dateKey)) {
-      const parsed = parseISO(dateKey)
+      const parsed = parseLocalDate(dateKey)
       let label: string
       if (isToday(parsed)) label = "Today"
       else if (isYesterday(parsed)) label = "Yesterday"

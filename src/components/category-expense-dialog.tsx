@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { format } from "date-fns"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
+import { monthPrefix, parseLocalDate } from "@/lib/date-utils"
 import {
   Dialog,
   DialogContent,
@@ -67,9 +68,7 @@ export function CategoryExpenseDialog({
   const expenses = useMemo(() => {
     if (!budget) return []
 
-    // Use string prefix match to avoid UTC-midnight timezone issues with
-    // parseISO + startOfMonth/endOfMonth (would shift to wrong month in UTC-N).
-    const budgetYearMonth = budgetMonth.slice(0, 7) // "2026-05"
+    const budgetYearMonth = monthPrefix(budgetMonth)
 
     return allExpenses
       .filter((expense) =>
@@ -94,7 +93,7 @@ export function CategoryExpenseDialog({
             {budget.category_icon && (
               <span className="mr-2">{budget.category_icon}</span>
             )}
-            {budget.category_name} - {format(new Date(parseInt(budgetMonth), parseInt(budgetMonth.slice(5, 7)) - 1, 1), "MMMM yyyy")}
+            {budget.category_name} - {format(parseLocalDate(budgetMonth), "MMMM yyyy")}
           </DialogTitle>
         </DialogHeader>
 
