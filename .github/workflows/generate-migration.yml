@@ -1,0 +1,92 @@
+name: Generate Migration from Schema
+
+# When a PR changes a declarative schema file (`supabase/schemas/**`), this
+# workflow boots a local Supabase stack, runs `supabase db diff` against the
+# already-applied migration chain, and auto-commits the generated migration
+# back to the PR branch — but only if the diff has real DDL. A comment-only
+# or empty diff is treated as a no-op so this is safe to run on every PR.
+#
+# Why: lets agents (Claude Code on the web, etc.) iterate on schemas without
+# needing local Docker for `supabase start`. The CLI-generated migration is
+# guaranteed to match the declarative schema, so PRs ship without drift.
+
+on:
+  pull_request:
+    paths:
+      - "supabase/schemas/**"
+  workflow_dispatch:
+
+jobs:
+  generate:
+    # Skip on fork PRs: GITHUB_TOKEN can't push back to a fork's branch.
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.84.2
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Generate migration from schema diff
+        id: gen
+        run: |
+          set -euo pipefail
+          NAME="auto_$(date -u +%Y%m%d%H%M%S)"
+          # `supabase db diff -f <name>` writes the diff to
+          # supabase/migrations/<timestamp>_<name>.sql. If schemas already
+          # match the migration chain, the file body is comment-only.
+          supabase db diff -f "$NAME"
+          FILE=$(ls -1t supabase/migrations/*_"$NAME".sql 2>/dev/null | head -1 || true)
+          if [ -z "$FILE" ]; then
+            echo "produced=false" >> "$GITHUB_OUTPUT"
+            echo "no file produced"
+            exit 0
+          fi
+          # Count non-comment, non-blank lines to decide if there's real DDL.
+          REAL_LINES=$(grep -cvE '^\s*(--|$)' "$FILE" || true)
+          if [ "${REAL_LINES:-0}" -gt 0 ]; then
+            echo "Generated migration with $REAL_LINES non-comment lines: $FILE"
+            echo "produced=true" >> "$GITHUB_OUTPUT"
+            echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          else
+            echo "Schemas already in sync with migrations; dropping comment-only $FILE"
+            rm -f "$FILE"
+            echo "produced=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push generated migration
+        if: steps.gen.outputs.produced == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${{ steps.gen.outputs.file }}"
+          git commit -m "Auto-generate migration from schema diff"
+          git push
+
+      - name: Comment on PR if migration was generated
+        if: steps.gen.outputs.produced == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const file = '${{ steps.gen.outputs.file }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Auto-generated migration committed: \`${file}\`\n\nReview the SQL before merging — pull the bot's commit if you have local checkouts.`
+            });

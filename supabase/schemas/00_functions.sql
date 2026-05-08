@@ -1,4 +1,10 @@
--- Utility functions used by tables, triggers, and RLS policies
+-- Utility functions used by tables, triggers, and RLS policies.
+--
+-- This file is part of the declarative schema. PRs that touch
+-- supabase/schemas/** trigger .github/workflows/generate-migration.yml,
+-- which runs `supabase db diff` and auto-commits any generated migration
+-- to the PR branch. A comment-only change like this one is a no-op for
+-- the diff and serves as a smoke test that the workflow runs cleanly.
 
 -- Automatically create user profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
