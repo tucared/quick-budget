@@ -56,6 +56,16 @@ There's no convention doc, so additions drift.
 
 ## 4. Migrate realtime to broadcast-via-trigger (postgres_changes is broken on this project)
 
+**Why this approach is correct:** Supabase's own docs (May 2026) explicitly recommend broadcast-via-trigger over postgres_changes:
+
+> "This is the recommended method for scalability and security."
+>
+> "Postgres Changes are simple to use, but have some limitations as your application scales. We recommend using Broadcast for most use cases."
+>
+> — [Subscribing to Database Changes](https://supabase.com/docs/guides/realtime/subscribing-to-database-changes)
+
+Postgres_changes isn't deprecated, but new applications are pointed at broadcast-via-trigger by name. Plus our project's postgres_changes is currently broken (see diagnosis below), so this migration both fixes the bug and aligns with Supabase's recommended path.
+
 **Diagnosis (confirmed on Vercel preview, May 2026):** `.on("postgres_changes", ...)` subscriptions on this project return `CHANNEL_ERROR: mismatch between server and client bindings for postgres changes` — the realtime broker accepts the channel join but returns zero accepted bindings while the client expects one. Verified:
 - `pg_publication_tables` includes `expenses`, `budget_allocations`, `categories` in `supabase_realtime`.
 - `REPLICA IDENTITY FULL` is set on all three.
@@ -63,7 +73,7 @@ There's no convention doc, so additions drift.
 - Tested with both publishable key and legacy anon JWT — same error.
 - Tested with `private: true` channel config — error became "Unauthorized" (auth flow works, no policies on `realtime.messages`).
 
-It is not a network/proxy artifact, not a key-format issue, and not a publication issue. The realtime broker on this project simply isn't accepting `postgres_changes` bindings. Supabase has been pushing new projects toward the broadcast-via-trigger pattern (`realtime.broadcast_changes()` + RLS on `realtime.messages` + `private: true`); the partition tables `realtime.messages_2026_05_07` etc. are already provisioned, suggesting that's the intended path here.
+It is not a network/proxy artifact, not a key-format issue, and not a publication issue. The realtime broker on this project simply isn't accepting `postgres_changes` bindings. The partition tables `realtime.messages_2026_05_07` etc. are already provisioned, suggesting broadcast-via-trigger is the intended path here.
 
 **Where it bites today:**
 - Partner-sync: changes by user A don't appear for user B until refresh.
@@ -80,7 +90,7 @@ It is not a network/proxy artifact, not a key-format issue, and not a publicatio
 **Tradeoff vs option 3 ("live with it"):** ~1 hour of work for proper partner-sync that won't break under future Supabase realtime changes, vs zero work but partners always see stale state until manual refresh. For a 2-person household used daily, a manual refresh is annoying but not blocking.
 
 **Launch prompt:**
-> The Supabase project's realtime postgres_changes feature returns `CHANNEL_ERROR: mismatch between server and client bindings`, confirmed on production. Migrate the two subscription hooks (`src/lib/hooks/use-expense-subscription.ts`, `src/lib/hooks/use-budget-allocation-subscription.ts`) to use the broadcast-via-trigger pattern: add Postgres triggers on `expenses` and `budget_allocations` that call `realtime.broadcast_changes()` with a household-scoped topic, add an RLS policy on `realtime.messages` keyed off `get_my_household_id()`, and switch the client hooks to `private: true` channels using `.on("broadcast", { event: "*" })`. Drop the now-unused `expenses` / `budget_allocations` entries from the `supabase_realtime` postgres_changes publication. The optimistic-update fix already in place (commit 163d4db) means same-tab edits keep working through the migration, so this can ship as a single PR. Verify partner-sync end-to-end with two browser sessions before considering it done.
+> Migrate realtime from postgres_changes to broadcast-via-trigger, the pattern Supabase officially recommends ("This is the recommended method for scalability and security" — https://supabase.com/docs/guides/realtime/subscribing-to-database-changes). Postgres_changes is also currently broken on this project (returns `CHANNEL_ERROR: mismatch between server and client bindings`). Add Postgres triggers on `expenses` and `budget_allocations` calling `realtime.broadcast_changes()` with a household-scoped topic, add an RLS policy on `realtime.messages` keyed off `get_my_household_id()`, and switch the client hooks (`src/lib/hooks/use-expense-subscription.ts`, `src/lib/hooks/use-budget-allocation-subscription.ts`) to `private: true` channels using `.on("broadcast", { event: "*" })`. Drop the now-unused `expenses` / `budget_allocations` entries from the `supabase_realtime` postgres_changes publication. The optimistic-update fix already in place (commit 163d4db) means same-tab edits keep working through the migration, so this can ship as a single PR. Verify partner-sync end-to-end with two browser sessions before considering it done.
 
 ---
 
