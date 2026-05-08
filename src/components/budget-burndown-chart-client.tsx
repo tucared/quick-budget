@@ -21,8 +21,9 @@ import type { BudgetSummary, Expense } from "@/lib/types"
 interface BurndownDataPoint {
   date: string // "Jan 1", "Jan 2", etc.
   dateKey: string // "2026-01-01" for sorting
-  planned: number // Remaining budget - linear burndown to zero
-  actual: number | null // Actual remaining budget (allocated - spent), null for future dates
+  plannedTarget: number // Linear burndown of the pace baseline to zero
+  plannedAllocated: number | null // Linear burndown projecting only the allocated portion (in the target frame); null when target is absent or equals allocated
+  actual: number | null // Actual remaining budget (baseline - spent), null for future dates
 }
 
 interface WeekendRange {
@@ -47,7 +48,9 @@ export function BudgetBurndownChartClient({
   const expenses = initialExpenses
 
   const chartData = useMemo(() => {
-    if (budgets.length === 0) return { data: [], weekends: [], paceBaseline: 0, unallocated: 0 }
+    if (budgets.length === 0) {
+      return { data: [], weekends: [], paceBaseline: 0, totalAllocated: 0, showAllocatedLine: false }
+    }
 
     // Get set of category IDs from budgets prop (these are the categories we're tracking)
     const budgetCategoryIds = new Set(budgets.map((b) => b.category_id))
@@ -59,6 +62,11 @@ export function BudgetBurndownChartClient({
     // reflects the planned spend for the month — not just what's already
     // assigned to categories. Falls back to allocated total when no target.
     const paceBaseline = target?.amount ?? totalAllocated
+
+    // Render the second pace line only when target is set AND distinct from
+    // the allocated total — otherwise the two lines overlap and the legend
+    // gets noisy.
+    const showAllocatedLine = target !== undefined && Math.abs(target.amount - totalAllocated) > 0.005
 
     // Filter expenses to only include expenses from budgeted categories
     const filteredExpenses = expenses.filter((e) => e.category_id && budgetCategoryIds.has(e.category_id))
@@ -112,17 +120,25 @@ export function BudgetBurndownChartClient({
       const dailyExpenses = expensesByDate.get(dateKey) || 0
       cumulativeActual += dailyExpenses
 
-      // Calculate planned remaining (linear burndown to zero)
-      const plannedRemaining = paceBaseline - (paceBaseline / daysInMonth) * day
+      // Linear burndown of the pace baseline → 0 at month-end.
+      const plannedTarget = paceBaseline - (paceBaseline / daysInMonth) * day
 
-      // Calculate actual remaining (baseline - spent)
-      // Only show actual data up to today, not future days
+      // Linear burndown projecting only the allocated portion onto the same
+      // (target) Y-frame. Ends at (paceBaseline − totalAllocated) on day-of-month-end:
+      //   target > allocated → ends above zero, the unallocated reserve
+      //   target < allocated → ends below zero, signalling over-allocation
+      const plannedAllocated = showAllocatedLine
+        ? paceBaseline - (totalAllocated / daysInMonth) * day
+        : null
+
+      // Actual remaining (baseline − cumulative spent), only up to today.
       const actualRemaining = paceBaseline - cumulativeActual
 
       data.push({
         date: dateLabel,
         dateKey,
-        planned: Math.round(plannedRemaining * 100) / 100,
+        plannedTarget: Math.round(plannedTarget * 100) / 100,
+        plannedAllocated: plannedAllocated !== null ? Math.round(plannedAllocated * 100) / 100 : null,
         actual: dateKey <= todayDateKey ? Math.round(actualRemaining * 100) / 100 : null,
       })
     }
@@ -135,7 +151,7 @@ export function BudgetBurndownChartClient({
       })
     }
 
-    return { data, weekends, paceBaseline, unallocated: target?.unallocated ?? 0 }
+    return { data, weekends, paceBaseline, totalAllocated, showAllocatedLine }
   }, [budgets, expenses, currentMonth, target])
 
   if (budgets.length === 0) {
@@ -152,8 +168,11 @@ export function BudgetBurndownChartClient({
     ? "var(--destructive)"
     : "hsl(160 40% 35%)" // muted teal
 
-  const { paceBaseline, unallocated } = chartData
-  const showUnallocatedBand = unallocated > 0
+  const { paceBaseline, totalAllocated, showAllocatedLine } = chartData
+  // YAxis tops at whichever baseline is higher so the allocated line stays visible
+  // when target < allocated (over-allocated case).
+  const yAxisMax = Math.max(paceBaseline, totalAllocated)
+  const targetLineLabel = showAllocatedLine ? "Target pace" : "Planned"
 
   return (
     <Card>
@@ -191,42 +210,39 @@ export function BudgetBurndownChartClient({
                 axisLine={{ stroke: "var(--border)" }}
                 tickFormatter={(value) => formatCurrency(value, 0)}
                 width={60}
-                domain={[(min: number) => Math.min(0, min), paceBaseline]}
+                domain={[(min: number) => Math.min(0, min), yAxisMax]}
               />
-              {showUnallocatedBand && (
-                <ReferenceArea
-                  y1={paceBaseline - unallocated}
-                  y2={paceBaseline}
-                  fill="var(--muted-foreground)"
-                  fillOpacity={0.08}
-                  label={{
-                    value: "Unallocated",
-                    position: "insideTopRight",
-                    fontSize: 10,
-                    fill: "var(--muted-foreground)",
-                  }}
-                  ifOverflow="extendDomain"
-                />
-              )}
               <Tooltip
                 contentStyle={{
                   backgroundColor: "var(--card)",
                   border: "1px solid var(--border)",
                   borderRadius: "8px",
                 }}
-                formatter={(value) => [typeof value === "number" ? formatCurrency(value) : "", ""]}
+                formatter={(value, name) => [typeof value === "number" ? formatCurrency(value) : "", name]}
                 labelStyle={{ color: "var(--foreground)" }}
               />
               <Legend />
               <Line
                 type="monotone"
-                dataKey="planned"
+                dataKey="plannedTarget"
                 stroke="var(--muted-foreground)"
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 dot={false}
-                name="Planned"
+                name={targetLineLabel}
               />
+              {showAllocatedLine && (
+                <Line
+                  type="monotone"
+                  dataKey="plannedAllocated"
+                  stroke="var(--muted-foreground)"
+                  strokeDasharray="2 4"
+                  strokeWidth={1.5}
+                  strokeOpacity={0.7}
+                  dot={false}
+                  name="Allocated pace"
+                />
+              )}
               <Line
                 type="monotone"
                 dataKey="actual"
