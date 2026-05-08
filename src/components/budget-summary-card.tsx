@@ -17,7 +17,6 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
   const totalRemaining = paceBaseline - totalSpent
   const percentSpent = paceBaseline > 0 ? (totalSpent / paceBaseline) * 100 : 0
   const theme = getBudgetStatusTheme(percentSpent, dayOfMonth, daysInMonth, totalRemaining)
-  const overTarget = target ? target.unallocated < 0 : false
 
   return (
     <Card className={`border-l-4 ${theme.border} ${theme.bg}`}>
@@ -49,12 +48,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
         </div>
 
         {target && (
-          <div className="mt-2 pt-2 border-t border-black/10 flex justify-between items-center text-xs">
-            <span className={overTarget ? "text-destructive font-medium" : "text-muted-foreground"}>
-              {overTarget
-                ? `Over target by ${formatCurrency(-target.unallocated, 0)}`
-                : `Unallocated ${formatCurrency(target.unallocated, 0)}`}
-            </span>
+          <div className="mt-2 pt-2 border-t border-black/10 flex justify-end items-center text-xs">
             <span className="text-muted-foreground">
               Target {formatCurrency(target.amount, 0)}
             </span>
