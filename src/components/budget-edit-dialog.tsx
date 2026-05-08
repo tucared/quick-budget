@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { format, parseISO } from "date-fns"
+import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
@@ -204,7 +204,7 @@ export function BudgetEditDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            Edit Budget - {format(parseISO(budgetMonth), "MMMM yyyy")}
+            Edit Budget - {format(new Date(parseInt(budgetMonth), parseInt(budgetMonth.slice(5, 7)) - 1, 1), "MMMM yyyy")}
           </DialogTitle>
           <DialogDescription>
             Set a monthly target, then split it across categories.

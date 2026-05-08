@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { format, parseISO } from "date-fns"
+import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
@@ -176,7 +176,7 @@ export function RebalanceDialog({
           <DialogTitle>
             {effectiveDestId
               ? `Add funds to ${destBudgetForTitle?.category_name ?? "category"}`
-              : `Rebalance - ${format(parseISO(budgetMonth), "MMMM yyyy")}`}
+              : `Rebalance - ${format(new Date(parseInt(budgetMonth), parseInt(budgetMonth.slice(5, 7)) - 1, 1), "MMMM yyyy")}`}
           </DialogTitle>
           <DialogDescription>
             {step === "source" && (effectiveDestId

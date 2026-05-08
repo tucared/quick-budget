@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { format, getDaysInMonth, parseISO } from "date-fns"
+import { format, getDaysInMonth } from "date-fns"
 import { formatCurrency } from "@/lib/currency"
 import {
   LineChart,
@@ -55,8 +55,11 @@ export function BudgetBurndownChartClient({
     // Filter expenses to only include expenses from budgeted categories
     const filteredExpenses = expenses.filter((e) => e.category_id && budgetCategoryIds.has(e.category_id))
 
-    // Get number of days in the month and today's date
-    const currentDate = parseISO(currentMonth)
+    // Build a local-time Date for the first of the month to avoid UTC-midnight
+    // timezone issues (parseISO returns UTC midnight, which shifts the month
+    // back by one day for users in UTC-negative timezones like UTC-3).
+    const [chartYear, chartMon] = currentMonth.split("-").map(Number)
+    const currentDate = new Date(chartYear, chartMon - 1, 1)
     const daysInMonth = getDaysInMonth(currentDate)
     const today = new Date()
     const todayDateKey = format(today, "yyyy-MM-dd")

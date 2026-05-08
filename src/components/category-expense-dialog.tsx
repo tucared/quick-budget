@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns"
+import { format } from "date-fns"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import {
   Dialog,
@@ -67,19 +67,16 @@ export function CategoryExpenseDialog({
   const expenses = useMemo(() => {
     if (!budget) return []
 
-    const monthStart = startOfMonth(parseISO(budgetMonth))
-    const monthEnd = endOfMonth(parseISO(budgetMonth))
+    // Use string prefix match to avoid UTC-midnight timezone issues with
+    // parseISO + startOfMonth/endOfMonth (would shift to wrong month in UTC-N).
+    const budgetYearMonth = budgetMonth.slice(0, 7) // "2026-05"
 
     return allExpenses
-      .filter((expense) => {
-        const expenseDate = new Date(expense.expense_date + "T00:00:00")
-        return (
-          !deletedIds.has(expense.id) &&
-          expense.category_id === budget.category_id &&
-          expenseDate >= monthStart &&
-          expenseDate <= monthEnd
-        )
-      })
+      .filter((expense) =>
+        !deletedIds.has(expense.id) &&
+        expense.category_id === budget.category_id &&
+        expense.expense_date.startsWith(budgetYearMonth)
+      )
       .sort((a, b) => b.expense_date.localeCompare(a.expense_date))
   }, [budget, budgetMonth, allExpenses, deletedIds])
 
@@ -97,7 +94,7 @@ export function CategoryExpenseDialog({
             {budget.category_icon && (
               <span className="mr-2">{budget.category_icon}</span>
             )}
-            {budget.category_name} - {format(parseISO(budgetMonth), "MMMM yyyy")}
+            {budget.category_name} - {format(new Date(parseInt(budgetMonth), parseInt(budgetMonth.slice(5, 7)) - 1, 1), "MMMM yyyy")}
           </DialogTitle>
         </DialogHeader>
 
