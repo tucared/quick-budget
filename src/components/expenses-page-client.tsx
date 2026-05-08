@@ -1,10 +1,13 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import type { ExpenseWithDetails, Category, Expense } from "@/lib/types"
 import { useExpenseSubscription, type ExpenseChangeEvent } from "@/lib/hooks/use-expense-subscription"
 import { ExpenseForm } from "@/components/expense-form"
 import { ExpenseListClient } from "@/components/expense-list-client"
+import { createClient } from "@/lib/supabase"
+
+const PAGE_SIZE = 30
 
 interface ExpensesPageClientProps {
   initialExpenses: ExpenseWithDetails[]
@@ -18,10 +21,12 @@ export function ExpensesPageClient({
   initialTopCategoryIds,
 }: ExpensesPageClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
+  const [hasMore, setHasMore] = useState(initialExpenses.length === PAGE_SIZE)
+  const loadingRef = useRef(false)
 
   // Called immediately after the form saves — adds expense to list without waiting for realtime
   const handleExpenseSaved = useCallback((expense: Expense) => {
-    setExpenses((prev) => [expense as ExpenseWithDetails, ...prev].slice(0, 50))
+    setExpenses((prev) => [expense as ExpenseWithDetails, ...prev])
   }, [])
 
   // Handle realtime events for partner-initiated changes and deletes/updates
@@ -29,7 +34,7 @@ export function ExpensesPageClient({
     if (event.type === "INSERT") {
       const newExpense = event.new as ExpenseWithDetails
       // Dedup by ID — covers both our own optimistic add and concurrent inserts
-      setExpenses((prev) => prev.some((exp) => exp.id === newExpense.id) ? prev : [newExpense, ...prev].slice(0, 50))
+      setExpenses((prev) => prev.some((exp) => exp.id === newExpense.id) ? prev : [newExpense, ...prev])
     } else if (event.type === "UPDATE") {
       const updated = event.new as ExpenseWithDetails
       setExpenses((prev) =>
@@ -42,6 +47,43 @@ export function ExpensesPageClient({
   }, [])
 
   useExpenseSubscription(handleRealtimeEvent)
+
+  // Cursor-based load-more keyed on the oldest loaded expense.
+  // Cursor (vs .range()) keeps results stable when realtime inserts arrive mid-scroll.
+  const handleLoadMore = useCallback(async () => {
+    if (loadingRef.current || !hasMore) return
+    loadingRef.current = true
+    try {
+      const last = expenses[expenses.length - 1]
+      if (!last) return
+
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .or(
+          `expense_date.lt.${last.expense_date},and(expense_date.eq.${last.expense_date},created_at.lt.${last.created_at})`
+        )
+        .order("expense_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE)
+
+      if (error) {
+        console.error("Failed to load more expenses:", error)
+        return
+      }
+
+      const batch = (data ?? []) as ExpenseWithDetails[]
+      setExpenses((prev) => {
+        const seen = new Set(prev.map((e) => e.id))
+        const fresh = batch.filter((e) => !seen.has(e.id))
+        return [...prev, ...fresh]
+      })
+      setHasMore(batch.length === PAGE_SIZE)
+    } finally {
+      loadingRef.current = false
+    }
+  }, [expenses, hasMore])
 
   return (
     <>
@@ -58,6 +100,8 @@ export function ExpensesPageClient({
       <ExpenseListClient
         expenses={expenses}
         categories={initialCategories}
+        hasMore={hasMore}
+        onLoadMore={handleLoadMore}
       />
     </>
   )
