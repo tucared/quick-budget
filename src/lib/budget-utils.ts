@@ -42,7 +42,7 @@ const statusLabels: Record<BudgetStatus, string> = {
   over: "Overspent",
   fully_used: "Fully used",
   critical: "Nearly exhausted",
-  ahead: "Ahead of budget",
+  ahead: "Above pace",
   warning: "Almost there",
   on_track: "On track",
 }

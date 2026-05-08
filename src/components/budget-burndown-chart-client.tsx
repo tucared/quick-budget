@@ -34,12 +34,14 @@ interface BudgetBurndownChartClientProps {
   budgets: BudgetSummary[]
   currentMonth: string // "2026-01-01" format
   initialExpenses: Expense[]
+  target?: { amount: number; unallocated: number }
 }
 
 export function BudgetBurndownChartClient({
   budgets,
   currentMonth,
   initialExpenses,
+  target,
 }: BudgetBurndownChartClientProps) {
   // expenses come from parent (kept live via parent's subscription)
   const expenses = initialExpenses
@@ -52,6 +54,11 @@ export function BudgetBurndownChartClient({
 
     // Calculate total allocated amount
     const totalAllocated = budgets.reduce((sum, b) => sum + (b.allocated_amount ?? 0), 0)
+
+    // When a monthly target exists, anchor the burndown to it so the chart
+    // reflects the planned spend for the month — not just what's already
+    // assigned to categories. Falls back to allocated total when no target.
+    const paceBaseline = target?.amount ?? totalAllocated
 
     // Filter expenses to only include expenses from budgeted categories
     const filteredExpenses = expenses.filter((e) => e.category_id && budgetCategoryIds.has(e.category_id))
@@ -106,11 +113,11 @@ export function BudgetBurndownChartClient({
       cumulativeActual += dailyExpenses
 
       // Calculate planned remaining (linear burndown to zero)
-      const plannedRemaining = totalAllocated - (totalAllocated / daysInMonth) * day
+      const plannedRemaining = paceBaseline - (paceBaseline / daysInMonth) * day
 
-      // Calculate actual remaining (allocated - spent)
+      // Calculate actual remaining (baseline - spent)
       // Only show actual data up to today, not future days
-      const actualRemaining = totalAllocated - cumulativeActual
+      const actualRemaining = paceBaseline - cumulativeActual
 
       data.push({
         date: dateLabel,
@@ -128,8 +135,8 @@ export function BudgetBurndownChartClient({
       })
     }
 
-    return { data, weekends }
-  }, [budgets, expenses, currentMonth])
+    return { data, weekends, paceBaseline, unallocated: target?.unallocated ?? 0 }
+  }, [budgets, expenses, currentMonth, target])
 
   if (budgets.length === 0) {
     return null
@@ -144,6 +151,9 @@ export function BudgetBurndownChartClient({
   const actualLineColor = isOverBudget
     ? "var(--destructive)"
     : "hsl(160 40% 35%)" // muted teal
+
+  const { paceBaseline, unallocated } = chartData
+  const showUnallocatedBand = unallocated > 0
 
   return (
     <Card>
@@ -181,7 +191,23 @@ export function BudgetBurndownChartClient({
                 axisLine={{ stroke: "var(--border)" }}
                 tickFormatter={(value) => formatCurrency(value, 0)}
                 width={60}
+                domain={[(min: number) => Math.min(0, min), paceBaseline]}
               />
+              {showUnallocatedBand && (
+                <ReferenceArea
+                  y1={paceBaseline - unallocated}
+                  y2={paceBaseline}
+                  fill="var(--muted-foreground)"
+                  fillOpacity={0.08}
+                  label={{
+                    value: "Unallocated",
+                    position: "insideTopRight",
+                    fontSize: 10,
+                    fill: "var(--muted-foreground)",
+                  }}
+                  ifOverflow="extendDomain"
+                />
+              )}
               <Tooltip
                 contentStyle={{
                   backgroundColor: "var(--card)",

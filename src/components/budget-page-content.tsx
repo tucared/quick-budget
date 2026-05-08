@@ -179,6 +179,7 @@ export function BudgetPageContent({
             budgets={budgets}
             currentMonth={budgetMonth}
             initialExpenses={expenses}
+            target={hasTarget ? { amount: targetAmount, unallocated } : undefined}
           />
 
           {/* Category Budgets */}
