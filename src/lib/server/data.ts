@@ -1,6 +1,7 @@
 import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
-import { format, parseISO, startOfMonth, subDays } from "date-fns"
+import { format, startOfMonth, subDays } from "date-fns"
+import { nextMonthString } from "@/lib/date-utils"
 import type {
   BudgetSummary,
   Category,
@@ -146,20 +147,11 @@ export async function getMonthlyExpenses(
 ): Promise<Expense[]> {
   const supabase = await getSupabase()
 
-  // Calculate next month for range query
-  const currentDate = parseISO(budgetMonth)
-  const nextMonth = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth() + 1,
-    1
-  )
-  const nextMonthStr = format(nextMonth, "yyyy-MM-dd")
-
   const { data, error } = await supabase
     .from("expenses")
     .select("*")
     .gte("expense_date", budgetMonth)
-    .lt("expense_date", nextMonthStr)
+    .lt("expense_date", nextMonthString(budgetMonth))
     .order("expense_date", { ascending: true })
 
   if (error) {

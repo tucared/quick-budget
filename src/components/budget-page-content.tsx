@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
-import { startOfMonth, getDaysInMonth } from "date-fns"
+import { startOfMonth, getDaysInMonth, format } from "date-fns"
 import { Pencil } from "lucide-react"
 import type { BudgetSummary, Expense, Category, MonthlyBudgetTarget } from "@/lib/types"
+import { nextMonthString } from "@/lib/date-utils"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import dynamic from "next/dynamic"
 
@@ -66,9 +67,7 @@ export function BudgetPageContent({
 
   function reloadData() {
     const supabase = createClient()
-    // Compute next month boundary from string to avoid UTC-midnight timezone issues
-    const [bYear, bMon] = budgetMonth.split("-").map(Number)
-    const nextMonthStr = bMon === 12 ? `${bYear + 1}-01-01` : `${bYear}-${String(bMon + 1).padStart(2, "0")}-01`
+    const nextMonthStr = nextMonthString(budgetMonth)
     Promise.all([
       supabase
         .from("budget_summary")

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
+import { parseLocalDate } from "@/lib/date-utils"
 import { formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import type { BudgetSummary } from "@/lib/types"
@@ -176,7 +177,7 @@ export function RebalanceDialog({
           <DialogTitle>
             {effectiveDestId
               ? `Add funds to ${destBudgetForTitle?.category_name ?? "category"}`
-              : `Rebalance - ${format(new Date(parseInt(budgetMonth), parseInt(budgetMonth.slice(5, 7)) - 1, 1), "MMMM yyyy")}`}
+              : `Rebalance - ${format(parseLocalDate(budgetMonth), "MMMM yyyy")}`}
           </DialogTitle>
           <DialogDescription>
             {step === "source" && (effectiveDestId

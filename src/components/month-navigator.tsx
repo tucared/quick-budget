@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { format, addMonths, subMonths, startOfMonth } from "date-fns"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { parseLocalDate } from "@/lib/date-utils"
 
 interface MonthNavigatorProps {
   budgetMonth: string // yyyy-MM-dd format (first of month)
@@ -12,12 +13,9 @@ interface MonthNavigatorProps {
 export function MonthNavigator({ budgetMonth }: MonthNavigatorProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  // Parse year/month directly from the string so the Date is in local time,
-  // not UTC midnight (which shifts the month for users in UTC-N timezones).
-  const [navYear, navMon] = budgetMonth.split("-").map(Number)
-  const current = new Date(navYear, navMon - 1, 1)
+  const current = parseLocalDate(budgetMonth)
   const now = startOfMonth(new Date())
-  const isCurrentMonth = navYear === now.getFullYear() && navMon - 1 === now.getMonth()
+  const isCurrentMonth = format(current, "yyyy-MM") === format(now, "yyyy-MM")
 
   function navigate(date: Date) {
     const params = new URLSearchParams(searchParams.toString())
