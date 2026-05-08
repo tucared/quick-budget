@@ -2,6 +2,8 @@
 
 Fast expense tracking and flexible budgeting for partners. Used daily by a two-person household splitting expenses across EUR and BRL.
 
+Scope: running discretionary spending only. Rent, subscriptions, and other fixed costs are netted out upstream — the monthly target represents what's left to spend day-to-day, so even spending across the month is a realistic baseline.
+
 <p align="center">
   <img src="screenshot-expenses.png" alt="Expense logging with category tiles and recent expenses" width="250">
   &nbsp;&nbsp;
