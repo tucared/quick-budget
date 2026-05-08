@@ -12,11 +12,11 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
-import { CategoryTileSelector, type GroupedOption } from "@/components/category-tile-selector"
+import { CategoryTileSelector, buildCategoryOptions } from "@/components/category-tile-selector"
 import { AmountInputWithCurrency, type AmountInputHandle } from "@/components/amount-input-with-currency"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
-import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface ExpenseFormProps {
@@ -102,18 +102,11 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     }
   }
 
-  // Transform categories into grouped options with frequency
-  const getCategoryOptions = (): GroupedOption[] => {
-    const usageMap = storageKeys ? getUsageMap(storageKeys.CATEGORY_USAGE) : {}
-
-    return categories.map((category) => ({
-      value: category.id,
-      label: category.name,
-      icon: category.icon || undefined,
-      group: category.exclude_from_budget_total ? "Allowances" : "Spending",
-      frequency: usageMap[category.id] || 0,
-    }))
-  }
+  const getCategoryOptions = () =>
+    buildCategoryOptions(
+      categories,
+      storageKeys ? getUsageMap(storageKeys.CATEGORY_USAGE) : {}
+    )
 
   // Load form data on mount. When initialCategories + initialTopCategoryIds are
   // provided by the server, skip the Supabase fetches entirely — only apply
