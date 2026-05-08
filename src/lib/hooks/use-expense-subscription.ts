@@ -14,7 +14,8 @@ export type ExpenseChangeCallback = (event: ExpenseChangeEvent) => void
 
 /**
  * Subscribe to real-time expense changes for the current user's household.
- * Creates a household-scoped Supabase Realtime channel.
+ * Backed by a Postgres trigger that calls realtime.broadcast_changes() —
+ * postgres_changes is broken on this project.
  */
 export function useExpenseSubscription(
   callback: ExpenseChangeCallback,
@@ -32,20 +33,23 @@ export function useExpenseSubscription(
 
     const supabase = createClient()
     const channel = supabase
-      .channel(`expenses_household_${user.householdId}`)
+      .channel(`expenses_household_${user.householdId}`, {
+        config: { private: true },
+      })
       .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "expenses",
-          filter: `household_id=eq.${user.householdId}`,
-        },
-        (payload) => {
+        "broadcast",
+        { event: "*" },
+        (msg) => {
+          const p = msg.payload as {
+            operation?: string
+            record?: unknown
+            old_record?: unknown
+          }
+          if (p.operation !== "INSERT" && p.operation !== "UPDATE" && p.operation !== "DELETE") return
           callbackRef.current({
-            type: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
-            new: payload.new,
-            old: payload.old,
+            type: p.operation,
+            new: p.record,
+            old: p.old_record,
           })
         }
       )
