@@ -29,6 +29,7 @@
 - Database schema is declarative: edit files in `supabase/schemas/`, then run `supabase db diff -f migration_name` to generate a migration
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
+- `npm run lint` runs ESLint only — it does not invoke `tsc`. Run `npm run typecheck` after touching TS types, component props, or memo return shapes; otherwise structural type errors only surface during `npm run build` (or on Vercel)
 - Local credentials: `user1@example.com` / `password1` (see `supabase/seeds/01_create_users.sql`)
 
 ## Browser agent guardrails

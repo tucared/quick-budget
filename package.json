@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "types:generate": "supabase gen types typescript --local > src/lib/database.types.ts",
     "seed:reset": "supabase db reset"
   },
