@@ -40,20 +40,13 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
         {/* Footer row */}
         <div className="flex justify-between items-center text-xs">
           <span className="text-muted-foreground">
-            {formatCurrency(totalSpent, 0)} of {formatCurrency(paceBaseline, 0)} spent · {formatNumber(percentSpent, 0)}%
+            {formatCurrency(totalSpent, 0)} of {formatCurrency(paceBaseline, 0)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
           </span>
           <span className={`${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)} font-medium`}>
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}
           </span>
         </div>
 
-        {target && (
-          <div className="mt-2 pt-2 border-t border-black/10 flex justify-end items-center text-xs">
-            <span className="text-muted-foreground">
-              Target {formatCurrency(target.amount, 0)}
-            </span>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
