@@ -26,7 +26,7 @@
 - `src/instrumentation.ts` configures Node.js to route server-side fetch through the proxy (via undici `EnvHttpProxyAgent`)
 - The dev server is started with `NODE_TLS_REJECT_UNAUTHORIZED=0` to accept the proxy's TLS certificates
 - Seeds are committed directly in `supabase/seeds/` with fake data
-- Database schema is declarative: edit files in `supabase/schemas/`, then run `supabase db diff -f migration_name` to generate a migration
+- Database schema is declarative: edit files in `supabase/schemas/`, then run `supabase db diff -f migration_name` to generate a migration. **From a cloud session without local Docker, you can skip step 2: just commit the schema change and push. The `Generate Migration from Schema` GitHub Action (`.github/workflows/generate-migration.yml`) runs `supabase db diff` and auto-commits the generated migration to your PR branch — pull the bot's commit before continuing work locally. The action is a no-op if your schemas are already in sync with the migration chain (e.g. you wrote the migration by hand).**
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 - `npm run lint` runs ESLint only — it does not invoke `tsc`. Run `npm run typecheck` after touching TS types, component props, or memo return shapes; otherwise structural type errors only surface during `npm run build` (or on Vercel)
