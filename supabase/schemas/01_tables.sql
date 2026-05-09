@@ -157,3 +157,6 @@ CREATE INDEX idx_monthly_budget_targets_household_month ON monthly_budget_target
 
 CREATE TRIGGER update_monthly_budget_targets_updated_at BEFORE UPDATE ON monthly_budget_targets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Throwaway smoke-test table for PR #79; safe to drop.
+CREATE TABLE _pr79_smoke (id int);
