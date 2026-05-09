@@ -1,5 +1,9 @@
 -- Supabase Realtime: broadcast-via-trigger for expenses + budget_allocations.
 --
+-- This file is the source of truth for the realtime layer; the migration
+-- under supabase/migrations/ is auto-generated from this diff by
+-- .github/workflows/generate-migration.yml.
+--
 -- postgres_changes is broken on this project (returns
 -- CHANNEL_ERROR: mismatch between server and client bindings) and Supabase's
 -- own docs recommend broadcast for new applications:
