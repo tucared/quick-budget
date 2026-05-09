@@ -3,6 +3,9 @@
     "deny": [
       "Write(supabase/migrations/**)",
       "Edit(supabase/migrations/**)"
+    ],
+    "allow": [
+      "Write(supabase/migrations/20260509120817_realtime_publication_replica_identity_cleanup.sql)"
     ]
   },
   "hooks": {
