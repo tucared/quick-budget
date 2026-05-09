@@ -94,6 +94,21 @@ It is not a network/proxy artifact, not a key-format issue, and not a publicatio
 
 ---
 
+## 5. Guard the auto-migration workflow against RLS-less public tables
+
+**Where:** `.github/workflows/generate-migration.yml` (added in PR #79)
+
+**Problem:** `supabase db diff` emits `CREATE TABLE` plus the standard Supabase grants (`anon`, `authenticated`, `service_role` get full CRUD on every new public-schema table). RLS is OFF by default in Postgres, so a freshly auto-generated table with no matching RLS edit in `supabase/schemas/02_rls.sql` is publicly readable and writable via PostgREST. With the auto-commit-back path, a reviewer eyeballing the migration may assume "the workflow handled it" and miss the missing RLS — a bigger slip risk than with hand-written migrations.
+
+**Idea:** After `supabase db diff` runs in the workflow, grep the generated migration for `create table "public"\.`, then for each match assert that `supabase/schemas/02_rls.sql` contains both `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY` and at least one `CREATE POLICY ... ON <name>`. Fail the job (and skip the commit-back + apply-to-dev steps) if any new public table is missing either. Print a clear error pointing the author at the two lines they need to add.
+
+**Tradeoff:** ~30 lines of bash in the workflow to close a security gap that today depends on reviewer vigilance. False positives possible if someone intentionally wants a public table (rare in this app — none exist today). Could add an opt-out comment marker (e.g., `-- @rls-public-ok`) in `02_rls.sql` if needed later.
+
+**Launch prompt:**
+> In `.github/workflows/generate-migration.yml`, add a guard step between "Generate migration from schema diff" and "Commit and push generated migration". When `produced=true`, parse the generated migration file for lines matching `^create table "public"\.` (case-insensitive). For each table name found, verify `supabase/schemas/02_rls.sql` contains both `ENABLE ROW LEVEL SECURITY` for that table AND at least one `CREATE POLICY ... ON <table>` (any operation). If any new public-schema table fails either check, fail the job with a clear message naming the table and pointing to the two missing lines. Do not run the commit-back, comment, or apply-to-dev steps when the guard fails. Background: Supabase exposes `public` through PostgREST, and `db diff` auto-grants CRUD to `anon`/`authenticated`, so a public table without RLS is wide open. Verify the guard by opening a throwaway PR that adds a public table to `supabase/schemas/01_tables.sql` without touching `02_rls.sql` — the workflow should fail. Then add the RLS lines and confirm the workflow passes.
+
+---
+
 ## How to use this file
 
 When you have time for one of these, copy its launch prompt into a fresh Claude Code session. Each prompt is self-contained — it references the right files and constraints.
