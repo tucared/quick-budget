@@ -27,6 +27,9 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
   fi
 
   if [ -x "$RTK_BIN" ]; then
+    # Register the Claude Code PreToolUse hook so rtk stops warning on every git call.
+    "$RTK_BIN" init -g --auto-patch > /dev/null 2>&1 || true
+
     mkdir -p "$SHIM_DIR"
     for cmd in git gh npm npx pnpm tsc jest vitest playwright pytest docker kubectl curl wget ls find grep prettier prisma cargo rake rspec; do
       cat > "$SHIM_DIR/$cmd" <<EOF
