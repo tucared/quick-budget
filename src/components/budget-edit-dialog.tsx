@@ -166,8 +166,8 @@ export function BudgetEditDialog({
 
       onOpenChange(false)
       onSuccess?.()
-    } catch {
-      setError("An unexpected error occurred. Please try again.")
+    } catch (e) {
+      setError(getErrorMessage(e))
     } finally {
       setSaving(false)
     }

@@ -1,4 +1,22 @@
 // Error handling utilities for consistent error messages
+//
+// Convention — three layers, three patterns:
+//
+// SERVER LAYER (src/lib/server/data.ts): Silent fallback. On error, log with
+// console.error and return [] or null. The page renders with empty data rather
+// than crashing. This is intentional for a household app where a transient DB
+// error should degrade gracefully rather than show an error page.
+//
+// CLIENT DATA LAYER (src/lib/client/data.ts): Pass-through. Return the raw
+// { data, error } tuple from Supabase unchanged. Callers (e.g.
+// budget-page-content.tsx) are responsible for checking .error and calling
+// getErrorMessage() before surfacing it to the user. Do not swallow errors
+// here — the consumer decides what to do with them.
+//
+// MUTATION LAYER (dialogs and forms): Surface immediately. Destructure
+// { error } from the Supabase call, then: if (error) { setError(getErrorMessage(error)); return }.
+// Always use getErrorMessage() — never hardcode strings or bypass it in catch
+// blocks. Keep the dialog/form open on error so the user can retry.
 
 type ErrorType = "auth" | "validation" | "network" | "database" | "unknown"
 
