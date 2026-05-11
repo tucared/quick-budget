@@ -89,8 +89,37 @@ export function BudgetPageContent({
     })
   }
 
-  useExpenseSubscription(reloadData, true)
-  useBudgetAllocationSubscription(reloadData, true)
+  function reloadExpenses() {
+    const supabase = createClient()
+    Promise.all([
+      fetchBudgetSummary(supabase, householdId, budgetMonth),
+      fetchMonthlyExpenses(supabase, householdId, budgetMonth),
+    ]).then(([budgetResult, expensesResult]) => {
+      if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
+      else if (budgetResult.data) setBudgets(budgetResult.data)
+      if (expensesResult.error) setError(getErrorMessage(expensesResult.error))
+      else if (expensesResult.data) setExpenses(expensesResult.data)
+    })
+  }
+
+  function reloadAllocations() {
+    const supabase = createClient()
+    Promise.all([
+      fetchBudgetSummary(supabase, householdId, budgetMonth),
+      fetchAllowanceSummary(supabase, householdId, budgetMonth),
+      fetchMonthlyBudgetTarget(supabase, householdId, budgetMonth),
+    ]).then(([budgetResult, allowanceResult, targetResult]) => {
+      if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
+      else if (budgetResult.data) setBudgets(budgetResult.data)
+      if (allowanceResult.error) setError(getErrorMessage(allowanceResult.error))
+      else if (allowanceResult.data) setAllowances(allowanceResult.data)
+      if (targetResult.error) setError(getErrorMessage(targetResult.error))
+      else setTarget(targetResult.data)
+    })
+  }
+
+  useExpenseSubscription(reloadExpenses, true)
+  useBudgetAllocationSubscription(reloadAllocations, true)
 
   const handleCategoryClick = (budget: BudgetSummary) => {
     setSelectedCategoryId(budget.category_id)
