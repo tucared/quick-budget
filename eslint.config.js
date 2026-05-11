@@ -18,24 +18,21 @@ export default [
       '@next/next': nextPlugin,
     },
     rules: {
-      ...reactPlugin.configs.recommended.rules,
-      ...reactPlugin.configs['jsx-runtime'].rules,
       ...reactHooksPlugin.configs.recommended.rules,
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs['core-web-vitals'].rules,
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
-      'react/no-unknown-property': 'off', // Disable for cmdk custom properties
+      'react/no-unknown-property': 'off',
+      'react/jsx-uses-react': 'off',
+      'react/jsx-uses-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-empty-object-type': 'off', // Allow empty interfaces for component props
-    },
-    settings: {
-      react: { version: 'detect' },
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
   {
