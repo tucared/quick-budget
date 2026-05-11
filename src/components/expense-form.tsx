@@ -6,7 +6,7 @@ import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { fetchExchangeRateFromAPI } from "@/lib/currency"
+import { fetchExchangeRateFromAPI, SUPPORTED_CURRENCIES } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -23,9 +23,19 @@ interface ExpenseFormProps {
   onExpenseSaved?: (expense: Expense) => void
   initialCategories?: Category[]
   initialTopCategoryIds?: string[]
+  initialAmount?: number
+  initialCurrency?: string
+  initialDescription?: string
 }
 
-export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds }: ExpenseFormProps) {
+export function ExpenseForm({
+  onExpenseSaved,
+  initialCategories,
+  initialTopCategoryIds,
+  initialAmount,
+  initialCurrency,
+  initialDescription,
+}: ExpenseFormProps) {
   const { user } = useUser()
   const storageKeys = useMemo(
     () => (user?.householdId ? getStorageKeys(user.householdId) : null),
@@ -161,6 +171,22 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           }
         } catch (_err) {
           // localStorage might be disabled (incognito mode, etc.)
+        }
+
+        // Deep-link prefill (e.g. from a phone Shortcut triggered by a bank
+        // payment notification). Overrides the localStorage defaults above so
+        // the user lands on the form with the actual paid amount ready to save.
+        if (initialAmount !== undefined && initialAmount > 0) {
+          handleCentsChange(Math.round(initialAmount * 100))
+        }
+        if (
+          initialCurrency &&
+          (SUPPORTED_CURRENCIES as readonly string[]).includes(initialCurrency)
+        ) {
+          setCurrency(initialCurrency)
+        }
+        if (initialDescription) {
+          setDescription(initialDescription)
         }
 
         setLoadState({ status: 'idle' })

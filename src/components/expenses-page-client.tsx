@@ -13,12 +13,18 @@ interface ExpensesPageClientProps {
   initialExpenses: ExpenseWithDetails[]
   initialCategories: Category[]
   initialTopCategoryIds: string[]
+  prefillAmount?: number
+  prefillCurrency?: string
+  prefillDescription?: string
 }
 
 export function ExpensesPageClient({
   initialExpenses,
   initialCategories,
   initialTopCategoryIds,
+  prefillAmount,
+  prefillCurrency,
+  prefillDescription,
 }: ExpensesPageClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
   const [hasMore, setHasMore] = useState(initialExpenses.length === PAGE_SIZE)
@@ -105,6 +111,9 @@ export function ExpensesPageClient({
           onExpenseSaved={handleExpenseSaved}
           initialCategories={initialCategories}
           initialTopCategoryIds={initialTopCategoryIds}
+          initialAmount={prefillAmount}
+          initialCurrency={prefillCurrency}
+          initialDescription={prefillDescription}
         />
       </div>
 
