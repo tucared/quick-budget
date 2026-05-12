@@ -24,11 +24,6 @@ export function ExpensesPageClient({
   const [hasMore, setHasMore] = useState(initialExpenses.length === PAGE_SIZE)
   const loadingRef = useRef(false)
 
-  // Called immediately after the form saves — adds expense to list without waiting for realtime
-  const handleExpenseSaved = useCallback((expense: Expense) => {
-    setExpenses((prev) => [expense as ExpenseWithDetails, ...prev])
-  }, [])
-
   // Same pattern for edit — replace in place. Realtime UPDATE is unreliable
   // on this project, so the dialog's onSaved callback drives the refresh.
   const handleExpenseUpdated = useCallback((updated: Expense) => {
@@ -41,11 +36,11 @@ export function ExpensesPageClient({
     setExpenses((prev) => prev.filter((exp) => exp.id !== id))
   }, [])
 
-  // Handle realtime events for partner-initiated changes and deletes/updates
+  // Handle realtime events for all inserts (own + partner) and deletes/updates
   const handleRealtimeEvent = useCallback((event: ExpenseChangeEvent) => {
     if (event.type === "INSERT") {
       const newExpense = event.new as ExpenseWithDetails
-      // Dedup by ID — covers both our own optimistic add and concurrent inserts
+      // Dedup by ID — guards against replay on reconnect
       setExpenses((prev) => prev.some((exp) => exp.id === newExpense.id) ? prev : [newExpense, ...prev])
     } else if (event.type === "UPDATE") {
       const updated = event.new as ExpenseWithDetails
@@ -102,7 +97,6 @@ export function ExpensesPageClient({
       {/* Expense Form */}
       <div className="mb-6">
         <ExpenseForm
-          onExpenseSaved={handleExpenseSaved}
           initialCategories={initialCategories}
           initialTopCategoryIds={initialTopCategoryIds}
         />
