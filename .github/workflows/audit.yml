@@ -1,0 +1,34 @@
+name: Dependency Audit
+
+# Fails the PR if any production dependency has a high or critical CVE.
+# devDependencies are intentionally excluded — the agent-browser / selenium
+# chain carries known vulns that don't ship to production.
+
+on:
+  pull_request:
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
