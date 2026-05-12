@@ -41,7 +41,7 @@ This is the third iteration of a personal finance tool:
 ### Quick Start
 
 ```bash
-npm install
+npm ci                # Strict install from package-lock.json
 supabase start        # First run takes ~3 min to download images
 npm run dev
 ```

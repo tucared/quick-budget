@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Installing npm dependencies..."
-npm install
+npm ci
 
 if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
   # Install rtk (Rust Token Killer) + transparent shims so all common
