@@ -1,4 +1,5 @@
 -- Utility functions used by tables, triggers, and RLS policies.
+-- ci-test-trigger
 --
 -- This file is part of the declarative schema. PRs that touch
 -- supabase/schemas/** trigger .github/workflows/generate-migration.yml,
