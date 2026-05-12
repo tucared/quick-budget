@@ -32,6 +32,8 @@
 - After modifying the database schema, regenerate TypeScript types with `npm run types:generate`
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 - `npm run lint` runs ESLint only — it does not invoke `tsc`. Run `npm run typecheck` after touching TS types, component props, or memo return shapes; otherwise structural type errors only surface during `npm run build` (or on Vercel)
+- Vitest is configured in `vitest.config.ts` and covers the pure-logic islands (`src/lib/currency.ts`, `src/lib/budget-utils.ts`, `src/lib/date-utils.ts`, and `computeTopCategoryIds` in `src/lib/server/data.ts`). Run `npm test` to verify. Co-locate new tests as `*.test.ts` next to the source. Scope is intentionally pure-logic-only — flag and ask before adding component or integration tests
+- `lint`, `typecheck`, and `test` all run on every PR via `.github/workflows/test.yml`
 - Local credentials: `user1@example.com` / `password1` (see `supabase/seeds/01_create_users.sql`)
 
 ## Browser agent guardrails

@@ -65,6 +65,9 @@ supabase db reset           # Reset DB + reapply migrations + seeds
 npm run dev                 # Start Next.js dev server
 npm run build               # Production build
 npm run lint                # Run ESLint
+npm run typecheck           # TypeScript type check (no emit)
+npm test                    # Run Vitest unit tests once
+npm run test:watch          # Run Vitest in watch mode
 npm run types:generate      # Regenerate TypeScript types from DB schema
 ```
 

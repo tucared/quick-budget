@@ -37,7 +37,13 @@ There's no convention doc, so additions drift.
 
 ---
 
-## 3. Add unit tests for pure logic
+## 3. Add unit tests for pure logic — DONE
+
+> Shipped on `claude/evaluate-unit-tests-3bA50`. Added Vitest 2.x + `vite-tsconfig-paths`, co-located `*.test.ts` files for `src/lib/currency.ts`, `src/lib/budget-utils.ts`, `src/lib/date-utils.ts`, and `computeTopCategoryIds` in `src/lib/server/data.ts`. 62 tests, ~30ms run time. New `.github/workflows/test.yml` gates every PR with `lint` + `typecheck` + `test` (the repo previously had no PR-check workflow). Scope kept intentionally narrow — no React Testing Library, no jsdom, no coverage thresholds.
+
+---
+
+## 3. (original) Add unit tests for pure logic
 
 **Problem:** Zero tests in the repo. The pure-logic islands (`src/lib/currency.ts` formatting + fallback rates, `src/lib/budget-utils.ts` status calculations, `src/lib/date-utils.ts`, `src/lib/server/data.ts:computeTopCategoryIds`) are easy to cover and protect against regressions.
 
