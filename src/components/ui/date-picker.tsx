@@ -116,7 +116,6 @@ export function DatePicker({
           mode="single"
           selected={date}
           onSelect={handleCalendarSelect}
-          initialFocus
           weekStartsOn={1}
         />
       </PopoverContent>
