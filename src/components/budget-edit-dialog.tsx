@@ -126,6 +126,7 @@ export function BudgetEditDialog({
   }, [open, householdId, budgetMonth, activeCategories, initialAllocations, initialTarget])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadData is async; setState only runs after awaits, not synchronously
     loadData()
   }, [open, householdId, budgetMonth]) // eslint-disable-line react-hooks/exhaustive-deps
 
