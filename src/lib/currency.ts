@@ -93,5 +93,7 @@ export function formatCurrency(
   currency: string = 'EUR'
 ): string {
   const symbol = CURRENCY_SYMBOLS[currency] || currency
-  return `${symbol}${formatNumber(value, decimals)}`
+  const negative = value < 0
+  const absFormatted = formatNumber(Math.abs(value), decimals)
+  return negative ? `-${symbol}${absFormatted}` : `${symbol}${absFormatted}`
 }
