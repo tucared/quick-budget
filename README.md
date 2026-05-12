@@ -7,7 +7,6 @@ Scope: running discretionary spending only. Rent, subscriptions, and other fixed
 - Log expenses in seconds, including in foreign currency with automatic conversion
 - Shared budget dashboard with real-time sync between partners
 - Mid-month rebalancing — move money between categories when priorities shift
-- Budget vs actuals history to set more realistic targets each month
 - Personal allowances tracked separately from shared spending
 
 ## Background
