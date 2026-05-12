@@ -50,6 +50,7 @@ export function ExpenseCard({
           isDeleting ? "scale-95 -translate-x-4" : "scale-100 translate-x-0"
         }`}
       >
+        {/* onClick is the mobile tap-to-reveal for edit/delete buttons; on md+ the buttons appear on CSS hover instead */}
         <div
           className="group cursor-pointer md:cursor-default py-3 px-1"
           onClick={() => onCardClick(expense.id)}
