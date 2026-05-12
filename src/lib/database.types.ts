@@ -1,4 +1,3 @@
-// stale-marker (should be removed by CI)
 export type Json =
   | string
   | number
