@@ -68,7 +68,16 @@ describe("formatCurrency", () => {
     expect(formatCurrency(0)).toBe("€0,00")
   })
 
-  it("handles negative amounts", () => {
-    expect(formatCurrency(-1234.56)).toBe("€-1 234,56")
+  it("places minus sign before the currency symbol for negatives", () => {
+    expect(formatCurrency(-1234.56)).toBe("-€1 234,56")
+  })
+
+  it("places minus sign before symbol for non-EUR currencies too", () => {
+    expect(formatCurrency(-50, 2, "BRL")).toBe("-R$50,00")
+    expect(formatCurrency(-50, 2, "USD")).toBe("-$50,00")
+  })
+
+  it("handles -0 as positive (no minus sign)", () => {
+    expect(formatCurrency(-0)).toBe("€0,00")
   })
 })
