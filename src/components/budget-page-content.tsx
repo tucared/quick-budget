@@ -64,10 +64,16 @@ export function BudgetPageContent({
   const isCurrentMonth =
     format(startOfMonth(new Date()), "yyyy-MM-dd") === budgetMonth
 
-  // Update state when initial data changes (e.g. month navigation via server)
+  // Sync SSR-provided props into local state when the parent passes new data (e.g. month navigation).
+  // These synchronous setState calls are intentional: local state is also updated via real-time
+  // subscriptions, so we can't eliminate it in favour of using props directly.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setBudgets(initialBudgets) }, [initialBudgets])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setAllowances(initialAllowances) }, [initialAllowances])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setTarget(initialTarget) }, [initialTarget])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setExpenses(initialExpenses) }, [initialExpenses])
 
   function reloadData() {

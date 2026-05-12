@@ -27,9 +27,10 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds }: ExpenseFormProps) {
   const { user } = useUser()
+  const householdId = user?.householdId
   const storageKeys = useMemo(
-    () => (user?.householdId ? getStorageKeys(user.householdId) : null),
-    [user?.householdId]
+    () => (householdId ? getStorageKeys(householdId) : null),
+    [householdId]
   )
   const [categories, setCategories] = useState<Category[]>(initialCategories ?? [])
   const [loading, setLoading] = useState(false)
@@ -73,6 +74,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   // Debounce the amount for budget calculations to avoid re-rendering on every keystroke
   const debouncedAmount = useDebouncedValue(expenseAmount, 300)
+  const effectiveExchangeRate = (!selectedCurrency || selectedCurrency === "EUR") ? 1.0 : previewExchangeRate
 
   // Convert string date to Date object for DatePicker
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
@@ -225,10 +227,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   // Fetch exchange rate for budget preview when currency or date changes
   useEffect(() => {
-    if (!selectedCurrency || selectedCurrency === "EUR") {
-      setPreviewExchangeRate(1.0)
-      return
-    }
+    if (!selectedCurrency || selectedCurrency === "EUR") return
     let cancelled = false
     fetchExchangeRateFromAPI(selectedCurrency, expenseDate).then((rate) => {
       if (!cancelled) setPreviewExchangeRate(rate)
@@ -450,7 +449,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                 isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                 dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                 daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                additionalAmount={debouncedAmount > 0 ? debouncedAmount * previewExchangeRate : 0}
+                additionalAmount={debouncedAmount > 0 ? debouncedAmount * effectiveExchangeRate : 0}
                 loading={loadingBudget}
               />
             )}
