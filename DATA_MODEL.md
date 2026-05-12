@@ -10,32 +10,22 @@ Normalized (2NF-3NF) approach optimized for transactional workloads with simple 
 erDiagram
     users }o--|| households : "belongs to"
     users ||--o{ expenses : "logs"
-    users ||--o{ accounts : "owns (for display)"
-
-    accounts ||--o{ expenses : "sources from"
 
     categories ||--o{ expenses : "categorizes"
     categories ||--o{ budget_allocations : "allocated in"
 
-    households ||--o{ accounts : "contains"
     households ||--o{ categories : "has"
+    households ||--o{ expenses : "scopes"
     households ||--o{ budget_allocations : "plans"
     households ||--o{ monthly_budget_targets : "targets"
 
-    users
-    households
-    categories
-    budget_allocations
-    monthly_budget_targets
-    expenses
-    accounts
-    exchange_rates
+    exchange_rates ||--o{ expenses : "converts (by currency + date)"
 ```
 
 ## Key Design Decisions
 
 ### 1. Household-Based Sharing Model
-All financial data (accounts, categories, budget allocations) is scoped to households. Users belong to exactly one household via `users.household_id`. Audit trails (`accounts.owner_user_id`, `expenses.logged_by_user_id`) track who performed actions without restricting access.
+All financial data (categories, expenses, budget allocations, monthly targets) is scoped to households. Users belong to exactly one household via `users.household_id`. `expenses.logged_by_user_id` records who entered each row as an audit trail, without restricting visibility — every household member sees every expense.
 
 ### 2. No Budgets Table - Monthly Cadence
 No separate budgets table. Monthly periods are represented by `budget_month` (date) fields on `budget_allocations`. Strongly oriented toward monthly planning cycle.
@@ -45,3 +35,9 @@ Both regular expense categories and personal allowances are in the same `categor
 
 ### 4. Monthly Budget Target & Unallocated Pool
 `monthly_budget_targets` stores an optional per-month total budget figure for a household (`household_id`, `budget_month`, `target_amount`). It covers the sum of regular categories only — allowances live outside it. When a row exists, the "unallocated pool" is computed as `target_amount − sum(regular allocations)` and can be assigned mid-month via the `allocate_from_unallocated` RPC, which re-validates the constraint under a row lock to prevent races. No row = no target = legacy behaviour.
+
+### 5. Foreign Currency on Expenses
+Expenses store both the original (`amount`, `currency`) and a converted value (`converted_amount`, `converted_currency`, `exchange_rate`). The `exchange_rates` table holds one `rate_to_eur` per `(currency, rate_date)` pair, populated from Frankfurter. Storing the rate on the expense row makes historical totals stable even if a rate is later revised.
+
+### 6. Realtime via Broadcast Triggers
+`expenses` and `budget_allocations` publish changes through a `SECURITY DEFINER` trigger that calls `realtime.broadcast_changes()` on a household-scoped topic (`<table>_household_<household_id>`). An RLS policy on `realtime.messages` lets authenticated clients subscribe only to their own household's topics. `categories` stays on the legacy `postgres_changes` publication (no client subscribes to it today). Source of truth: `supabase/schemas/05_realtime.sql`.

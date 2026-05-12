@@ -4,12 +4,6 @@ Fast expense tracking and flexible budgeting for partners. Used daily by a two-p
 
 Scope: running discretionary spending only. Rent, subscriptions, and other fixed costs are netted out upstream — the monthly target represents what's left to spend day-to-day, so even spending across the month is a realistic baseline.
 
-<p align="center">
-  <img src="screenshot-expenses.png" alt="Expense logging with category tiles and recent expenses" width="250">
-  &nbsp;&nbsp;
-  <img src="screenshot-budget.png" alt="Budget dashboard with burndown chart and progress bar" width="250">
-</p>
-
 - Log expenses in seconds, including in foreign currency with automatic conversion
 - Shared budget dashboard with real-time sync between partners
 - Mid-month rebalancing — move money between categories when priorities shift
@@ -34,7 +28,7 @@ This is the third iteration of a personal finance tool:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (CI pins Node 20)
 - Docker Desktop ([download](https://docs.docker.com/desktop/))
 - Supabase CLI: `brew install supabase/tap/supabase`
 
@@ -73,17 +67,17 @@ npm run types:generate      # Regenerate TypeScript types from DB schema
 
 ## Database
 
-Schema is defined declaratively in `supabase/schemas/`. To make changes:
+Schema is defined declaratively in `supabase/schemas/`. The migration files in `supabase/migrations/` are CI-generated — **don't edit them by hand** (a `permissions.deny` rule in `.claude/settings.json` blocks it).
 
-```bash
-# 1. Edit schema files in supabase/schemas/
-# 2. Generate a migration from the diff
-supabase db diff -f descriptive_name
-# 3. Verify locally
-supabase db reset
-# 4. Push to production
-supabase db push
-```
+To make a schema change:
+
+1. Edit files in `supabase/schemas/`
+2. Verify locally: `supabase db reset` (regenerates from migrations + seeds; your unstaged schema edits won't apply until step 4 produces a migration)
+3. Open a PR — the **Generate Migration from Schema** workflow runs `supabase db diff` and auto-commits the generated migration to your branch
+4. Pull the bot's commit, run `supabase db reset` again to verify
+5. Merge to `main` — the **Apply Database Migrations to Prod** workflow pushes to prod automatically
+
+To dogfood a schema change on the Dev Supabase project before merging, add the `apply-to-dev` label to your PR. See [DEPLOYMENT.md](./DEPLOYMENT.md) for full details.
 
 Seeds in `supabase/seeds/` provide ~3 months of fake data (two users, shared household, budget allocations, expenses, exchange rates).
 

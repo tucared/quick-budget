@@ -34,6 +34,7 @@
 - `npm run lint` runs ESLint only — it does not invoke `tsc`. Run `npm run typecheck` after touching TS types, component props, or memo return shapes; otherwise structural type errors only surface during `npm run build` (or on Vercel)
 - Vitest is configured in `vitest.config.ts` and covers the pure-logic islands (`src/lib/currency.ts`, `src/lib/budget-utils.ts`, `src/lib/date-utils.ts`, and `computeTopCategoryIds` in `src/lib/server/data.ts`). Run `npm test` to verify. Co-locate new tests as `*.test.ts` next to the source. Scope is intentionally pure-logic-only — flag and ask before adding component or integration tests
 - `lint`, `typecheck`, and `test` all run on every PR via `.github/workflows/test.yml`
+- `.github/workflows/audit.yml` runs `npm audit --omit=dev --audit-level=high` on PRs that touch `package.json`/`package-lock.json` and on push to `main`. It blocks high/critical CVEs in production deps only — devDependencies are intentionally excluded because the agent-browser/Selenium chain carries known vulns that don't ship to production. Fix prod-dep CVEs at the root; don't try to silence the gate
 - Local credentials: `user1@example.com` / `password1` (see `supabase/seeds/01_create_users.sql`)
 
 ## Browser agent guardrails
