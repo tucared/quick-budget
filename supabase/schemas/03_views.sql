@@ -48,3 +48,6 @@ GROUP BY
   ba.currency;
 
 ALTER VIEW budget_summary SET (security_invoker = true);
+
+GRANT SELECT ON public.budget_summary TO authenticated;
+GRANT SELECT ON public.budget_summary TO service_role;

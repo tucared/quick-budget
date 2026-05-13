@@ -13,6 +13,9 @@ CREATE TABLE households (
 CREATE TRIGGER update_households_updated_at BEFORE UPDATE ON households
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+GRANT SELECT ON public.households TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.households TO service_role;
+
 -- ============================================================================
 -- USERS
 -- ============================================================================
@@ -46,6 +49,9 @@ AS $$
   SELECT household_id FROM users WHERE id = auth.uid() LIMIT 1;
 $$;
 
+GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.users TO service_role;
+
 GRANT EXECUTE ON FUNCTION public.get_my_household_id() TO authenticated;
 
 -- ============================================================================
@@ -67,6 +73,9 @@ CREATE INDEX idx_categories_household_active ON categories(household_id, is_acti
 
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.categories TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.categories TO service_role;
 
 -- ============================================================================
 -- EXPENSES
@@ -96,6 +105,9 @@ CREATE INDEX idx_expenses_category ON expenses(category_id);
 CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.expenses TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.expenses TO service_role;
+
 -- ============================================================================
 -- EXCHANGE_RATES
 -- ============================================================================
@@ -112,6 +124,9 @@ CREATE INDEX idx_exchange_rates_currency_date ON exchange_rates(currency, rate_d
 
 CREATE TRIGGER update_exchange_rates_updated_at BEFORE UPDATE ON exchange_rates
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT ON public.exchange_rates TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.exchange_rates TO service_role;
 
 -- ============================================================================
 -- BUDGET_ALLOCATIONS
@@ -133,6 +148,9 @@ CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.budget_allocations TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.budget_allocations TO service_role;
 
 -- ============================================================================
 -- MONTHLY_BUDGET_TARGETS
@@ -157,3 +175,6 @@ CREATE INDEX idx_monthly_budget_targets_household_month ON monthly_budget_target
 
 CREATE TRIGGER update_monthly_budget_targets_updated_at BEFORE UPDATE ON monthly_budget_targets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_budget_targets TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_budget_targets TO service_role;
