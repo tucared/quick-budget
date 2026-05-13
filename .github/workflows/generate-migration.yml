@@ -108,6 +108,29 @@ jobs:
             echo "types_updated=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # GitHub suppresses workflow re-triggers when an action pushes with the
+      # default GITHUB_TOKEN, so test.yml does not re-run on the bot's commit.
+      # Verify the regenerated types/migrations against the codebase here,
+      # before committing, so the bot can't push a broken state. Gated on the
+      # same condition as the commit step — no point installing Node when the
+      # diff is a no-op.
+      - name: Set up Node.js (for verification)
+        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        run: npm ci
+
+      - name: Typecheck and test
+        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        run: |
+          npm run typecheck
+          npm test
+
       - name: Commit and push
         if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
         run: |
