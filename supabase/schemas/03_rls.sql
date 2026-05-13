@@ -16,7 +16,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view household members" ON users
   FOR SELECT USING (
-    id = (SELECT auth.uid()) OR household_id = public.get_my_household_id()
+    id = (SELECT auth.uid()) OR household_id = private.get_my_household_id()
   );
 
 CREATE POLICY "Users can update own profile" ON users
@@ -32,7 +32,7 @@ ALTER TABLE households ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own household" ON households
   FOR SELECT USING (
-    id = public.get_my_household_id()
+    id = private.get_my_household_id()
   );
 
 -- ============================================================================
@@ -41,16 +41,16 @@ CREATE POLICY "Users can view own household" ON households
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Household members can view categories" ON categories
-  FOR SELECT USING (household_id = public.get_my_household_id());
+  FOR SELECT USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can insert categories" ON categories
-  FOR INSERT WITH CHECK (household_id = public.get_my_household_id());
+  FOR INSERT WITH CHECK (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can update categories" ON categories
-  FOR UPDATE USING (household_id = public.get_my_household_id());
+  FOR UPDATE USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can delete categories" ON categories
-  FOR DELETE USING (household_id = public.get_my_household_id());
+  FOR DELETE USING (household_id = private.get_my_household_id());
 
 -- ============================================================================
 -- EXPENSES
@@ -58,19 +58,19 @@ CREATE POLICY "Household members can delete categories" ON categories
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Household members can view expenses" ON expenses
-  FOR SELECT USING (household_id = public.get_my_household_id());
+  FOR SELECT USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can insert expenses" ON expenses
   FOR INSERT WITH CHECK (
-    household_id = public.get_my_household_id()
+    household_id = private.get_my_household_id()
     AND logged_by_user_id = (SELECT auth.uid())
   );
 
 CREATE POLICY "Household members can update expenses" ON expenses
-  FOR UPDATE USING (household_id = public.get_my_household_id());
+  FOR UPDATE USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can delete expenses" ON expenses
-  FOR DELETE USING (household_id = public.get_my_household_id());
+  FOR DELETE USING (household_id = private.get_my_household_id());
 
 -- ============================================================================
 -- EXCHANGE_RATES
@@ -95,16 +95,16 @@ CREATE POLICY "No one can delete exchange rates" ON exchange_rates
 ALTER TABLE budget_allocations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Household members can view budget allocations" ON budget_allocations
-  FOR SELECT USING (household_id = public.get_my_household_id());
+  FOR SELECT USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can insert budget allocations" ON budget_allocations
-  FOR INSERT WITH CHECK (household_id = public.get_my_household_id());
+  FOR INSERT WITH CHECK (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can update budget allocations" ON budget_allocations
-  FOR UPDATE USING (household_id = public.get_my_household_id());
+  FOR UPDATE USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can delete budget allocations" ON budget_allocations
-  FOR DELETE USING (household_id = public.get_my_household_id());
+  FOR DELETE USING (household_id = private.get_my_household_id());
 
 -- ============================================================================
 -- MONTHLY_BUDGET_TARGETS
@@ -112,13 +112,13 @@ CREATE POLICY "Household members can delete budget allocations" ON budget_alloca
 ALTER TABLE monthly_budget_targets ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Household members can view monthly budget targets" ON monthly_budget_targets
-  FOR SELECT USING (household_id = public.get_my_household_id());
+  FOR SELECT USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can insert monthly budget targets" ON monthly_budget_targets
-  FOR INSERT WITH CHECK (household_id = public.get_my_household_id());
+  FOR INSERT WITH CHECK (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can update monthly budget targets" ON monthly_budget_targets
-  FOR UPDATE USING (household_id = public.get_my_household_id());
+  FOR UPDATE USING (household_id = private.get_my_household_id());
 
 CREATE POLICY "Household members can delete monthly budget targets" ON monthly_budget_targets
-  FOR DELETE USING (household_id = public.get_my_household_id());
+  FOR DELETE USING (household_id = private.get_my_household_id());

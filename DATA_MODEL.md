@@ -41,3 +41,6 @@ Expenses store both the original (`amount`, `currency`) and a converted value (`
 
 ### 6. Realtime via Broadcast Triggers
 `expenses` and `budget_allocations` publish changes through a `SECURITY DEFINER` trigger that calls `realtime.broadcast_changes()` on a household-scoped topic (`<table>_household_<household_id>`). An RLS policy on `realtime.messages` lets authenticated clients subscribe only to their own household's topics. `categories` stays on the legacy `postgres_changes` publication (no client subscribes to it today). Source of truth: `supabase/schemas/06_realtime.sql`.
+
+### 7. RLS Helper in `private` Schema
+The `get_my_household_id()` helper used by every household-scoped RLS policy lives in a dedicated `private` schema rather than `public`. `private` is intentionally excluded from `db.schemas` in `supabase/config.toml`, so PostgREST and pg_graphql do not expose the function as an RPC — only RLS policies (which reference it as `private.get_my_household_id()`) can invoke it. `authenticated` gets `USAGE` on the schema and `EXECUTE` on the function so policy evaluation works; no other role can call it directly. Source of truth: `supabase/schemas/00_setup.sql` (schema setup) and `supabase/schemas/02_tables.sql` (function definition).
