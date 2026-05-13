@@ -191,12 +191,24 @@ revoke truncate on table "public"."users" from "service_role";
 
 -- Default privileges: revoke auto-grants under both configured granters
 -- (pg_default_acl shows postgres + supabase_admin both granting on public).
-alter default privileges for role postgres       in schema public revoke all     on tables    from anon, authenticated, service_role;
-alter default privileges for role postgres       in schema public revoke execute on functions from anon, authenticated, service_role;
-alter default privileges for role postgres       in schema public revoke all     on sequences from anon, authenticated, service_role;
-alter default privileges for role supabase_admin in schema public revoke all     on tables    from anon, authenticated, service_role;
-alter default privileges for role supabase_admin in schema public revoke execute on functions from anon, authenticated, service_role;
-alter default privileges for role supabase_admin in schema public revoke all     on sequences from anon, authenticated, service_role;
+-- The supabase_admin block is wrapped in DO/EXCEPTION because the local
+-- Supabase CLI applies migrations as `postgres`, which lacks admin rights on
+-- supabase_admin. Managed Supabase environments have the membership and run
+-- the inner statements for real.
+alter default privileges for role postgres in schema public revoke all     on tables    from anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke execute on functions from anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke all     on sequences from anon, authenticated, service_role;
+
+do $$
+begin
+  alter default privileges for role supabase_admin in schema public revoke all     on tables    from anon, authenticated, service_role;
+  alter default privileges for role supabase_admin in schema public revoke execute on functions from anon, authenticated, service_role;
+  alter default privileges for role supabase_admin in schema public revoke all     on sequences from anon, authenticated, service_role;
+exception
+  when insufficient_privilege then
+    raise notice 'Skipping supabase_admin default-privilege revokes: current role lacks rights on supabase_admin (expected on the local Supabase CLI stack).';
+end;
+$$;
 
 -- Function REVOKEs: clean up lingering pre-opt-in auto-grants
 revoke execute on function public.update_updated_at_column() from PUBLIC, anon, authenticated, service_role;
