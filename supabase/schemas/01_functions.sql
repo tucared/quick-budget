@@ -51,3 +51,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Trigger-only function: block direct REST/RPC calls from every role.
+REVOKE EXECUTE ON FUNCTION public.update_updated_at_column() FROM PUBLIC, anon, authenticated, service_role;
