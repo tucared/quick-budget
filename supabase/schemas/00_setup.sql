@@ -14,6 +14,11 @@
 -- `postgres` and `supabase_admin` keep their own defaults so the roles still
 -- own and can fully manage everything.
 --
+-- The supabase_admin block is wrapped in DO/EXCEPTION because the local
+-- Supabase CLI applies migrations as `postgres`, which does not have admin
+-- rights on `supabase_admin`. On managed Supabase environments the executing
+-- role has the necessary membership, so the statements apply for real.
+--
 -- Forward-only: ALTER DEFAULT PRIVILEGES does not affect existing objects.
 -- Pre-existing grants on the current set of objects are cleaned up by the
 -- per-object REVOKE statements in 01_functions.sql, 05_rpcs.sql and
@@ -21,9 +26,17 @@
 -- accompanying migration (supabase db diff / migra ignores pg_default_acl
 -- and function ACLs, so these can't be auto-generated).
 
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres       IN SCHEMA public REVOKE ALL     ON TABLES    FROM anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres       IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres       IN SCHEMA public REVOKE ALL     ON SEQUENCES FROM anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL     ON TABLES    FROM anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL     ON SEQUENCES FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL     ON TABLES    FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL     ON SEQUENCES FROM anon, authenticated, service_role;
+
+DO $$
+BEGIN
+  ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL     ON TABLES    FROM anon, authenticated, service_role;
+  ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated, service_role;
+  ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL     ON SEQUENCES FROM anon, authenticated, service_role;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Skipping supabase_admin default-privilege revokes: current role lacks rights on supabase_admin (expected on the local Supabase CLI stack).';
+END;
+$$;
