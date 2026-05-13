@@ -67,6 +67,6 @@ CREATE POLICY "household_members_read_household_topics"
   FOR SELECT
   TO authenticated
   USING (
-    realtime.topic() = 'expenses_household_' || public.get_my_household_id()::text
-    OR realtime.topic() = 'budget_allocations_household_' || public.get_my_household_id()::text
+    realtime.topic() = 'expenses_household_' || private.get_my_household_id()::text
+    OR realtime.topic() = 'budget_allocations_household_' || private.get_my_household_id()::text
   );

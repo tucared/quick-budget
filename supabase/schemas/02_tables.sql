@@ -39,8 +39,12 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Get household_id without triggering RLS (SQL function — must be after users table)
-CREATE OR REPLACE FUNCTION public.get_my_household_id()
+-- RLS helper: returns the caller's household_id without triggering RLS on
+-- public.users. Lives in the `private` schema (set up in 00_setup.sql) so
+-- PostgREST/GraphQL do not expose it as an RPC — only RLS policies that
+-- reference it by `private.get_my_household_id()` can invoke it.
+-- Must come after the users table is defined.
+CREATE OR REPLACE FUNCTION private.get_my_household_id()
 RETURNS UUID
 LANGUAGE sql
 SECURITY DEFINER
@@ -58,8 +62,8 @@ REVOKE SELECT ON public.users FROM anon;
 -- function EXECUTE to anon/authenticated/service_role on creation, so revoking
 -- only from PUBLIC leaves those explicit grants in place. Then re-grant to
 -- authenticated, the one role that legitimately calls this RLS helper.
-REVOKE EXECUTE ON FUNCTION public.get_my_household_id() FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.get_my_household_id() TO authenticated;
+REVOKE EXECUTE ON FUNCTION private.get_my_household_id() FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.get_my_household_id() TO authenticated;
 
 -- ============================================================================
 -- CATEGORIES
@@ -154,7 +158,9 @@ CREATE TABLE budget_allocations (
 );
 
 CREATE INDEX idx_budget_allocations_household_month ON budget_allocations(household_id, budget_month DESC);
-CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
+-- idx_budget_allocations_category dropped: Supabase advisor flagged it as unused
+-- on Prod. The FK is rarely scanned standalone — household-scoped queries hit
+-- idx_budget_allocations_household_month. Recreate if profiles change.
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -182,7 +188,9 @@ CREATE TABLE monthly_budget_targets (
   UNIQUE(household_id, budget_month)
 );
 
-CREATE INDEX idx_monthly_budget_targets_household_month ON monthly_budget_targets(household_id, budget_month DESC);
+-- idx_monthly_budget_targets_household_month dropped: Supabase advisor flagged
+-- it as unused on Prod. The UNIQUE(household_id, budget_month) constraint
+-- already creates a B-tree index that covers the same access pattern.
 
 CREATE TRIGGER update_monthly_budget_targets_updated_at BEFORE UPDATE ON monthly_budget_targets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

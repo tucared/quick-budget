@@ -40,3 +40,22 @@ EXCEPTION
     RAISE NOTICE 'Skipping supabase_admin default-privilege revokes: current role lacks rights on supabase_admin (expected on the local Supabase CLI stack).';
 END;
 $$;
+
+-- `private` schema: holds RLS helper functions that authenticated must be
+-- able to invoke (e.g. get_my_household_id) but that should NOT be reachable
+-- from PostgREST/RPC. PostgREST's exposed-schema list lives in
+-- supabase/config.toml `db.schemas` and intentionally excludes `private`,
+-- so functions here are invisible to REST/GraphQL clients while RLS
+-- policies can still call them via schema-qualified references.
+CREATE SCHEMA IF NOT EXISTS private;
+GRANT USAGE ON SCHEMA private TO authenticated;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA private REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated, service_role;
+DO $$
+BEGIN
+  ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA private REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated, service_role;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Skipping supabase_admin default-privilege revokes on private schema: current role lacks rights on supabase_admin (expected on the local Supabase CLI stack).';
+END;
+$$;
