@@ -34,8 +34,10 @@ BEGIN
 END;
 $$;
 
--- Trigger-only function: block direct REST/RPC calls from all non-superuser roles
-REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
+-- Trigger-only function: block direct REST/RPC calls from all non-superuser roles.
+-- Must revoke from PUBLIC — REVOKE FROM anon/authenticated alone is a no-op
+-- because functions default to GRANT EXECUTE TO PUBLIC, which both roles inherit.
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
 
 -- Automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

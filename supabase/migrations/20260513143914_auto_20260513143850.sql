@@ -4,6 +4,10 @@
 -- added in supabase/schemas/**. Supabase is removing this auto-grant
 -- behavior (May 30 / Oct 30); after that, fresh environments restored from
 -- this migration chain alone need these grants applied explicitly.
+--
+-- Function REVOKEs target PUBLIC: REVOKE EXECUTE FROM anon/authenticated
+-- alone is a no-op because functions default to GRANT EXECUTE TO PUBLIC,
+-- which both roles inherit.
 
 -- Tables
 revoke select on table "public"."budget_allocations" from "anon";
@@ -39,6 +43,7 @@ revoke select on table "public"."budget_summary" from "anon";
 grant select on table "public"."budget_summary" to "authenticated";
 grant select on table "public"."budget_summary" to "service_role";
 
--- Functions
-revoke execute on function public.handle_new_user() from anon, authenticated;
-revoke execute on function public.get_my_household_id() from anon;
+-- Functions: revoke from PUBLIC (anon/authenticated inherit via PUBLIC), keep get_my_household_id callable by authenticated.
+revoke execute on function public.handle_new_user() from PUBLIC;
+revoke execute on function public.get_my_household_id() from PUBLIC;
+grant execute on function public.get_my_household_id() to authenticated;
