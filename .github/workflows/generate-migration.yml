@@ -67,7 +67,14 @@ jobs:
           # `supabase db diff -f <name>` writes the diff to
           # supabase/migrations/<timestamp>_<name>.sql. If schemas already
           # match the migration chain, the file body is comment-only.
-          supabase db diff -f "$NAME"
+          #
+          # --schema public,realtime keeps the RLS policy on realtime.messages
+          # (defined in supabase/schemas/06_realtime.sql) in scope so cross-
+          # schema function references stay consistent. Without it, migra
+          # would drop a public function while the realtime policy still
+          # references it. Other realtime objects (messages table,
+          # broadcast_changes) are platform-managed and produce no diff.
+          supabase db diff -f "$NAME" --schema public,realtime
           FILE=$(ls -1t supabase/migrations/*_"$NAME".sql 2>/dev/null | head -1 || true)
           if [ -z "$FILE" ]; then
             echo "produced=false" >> "$GITHUB_OUTPUT"
