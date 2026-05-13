@@ -56,12 +56,13 @@ enabled = true
 # Specifies an ordered list of schema files that describe your database.
 # Supports glob patterns relative to supabase directory: "./schemas/*.sql"
 schema_paths = [
-  "./schemas/00_functions.sql",
-  "./schemas/01_tables.sql",
-  "./schemas/02_rls.sql",
-  "./schemas/03_views.sql",
-  "./schemas/04_rpcs.sql",
-  "./schemas/05_realtime.sql",
+  "./schemas/00_setup.sql",
+  "./schemas/01_functions.sql",
+  "./schemas/02_tables.sql",
+  "./schemas/03_rls.sql",
+  "./schemas/04_views.sql",
+  "./schemas/05_rpcs.sql",
+  "./schemas/06_realtime.sql",
 ]
 
 [db.seed]
