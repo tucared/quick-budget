@@ -54,8 +54,11 @@ GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.users TO service_role;
 REVOKE SELECT ON public.users FROM anon;
 
+-- Revoke from PUBLIC first (functions default to GRANT EXECUTE TO PUBLIC),
+-- then explicitly grant to authenticated. Revoking from anon alone is a no-op
+-- because anon inherits EXECUTE via PUBLIC.
+REVOKE EXECUTE ON FUNCTION public.get_my_household_id() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_my_household_id() TO authenticated;
-REVOKE EXECUTE ON FUNCTION public.get_my_household_id() FROM anon;
 
 -- ============================================================================
 -- CATEGORIES
