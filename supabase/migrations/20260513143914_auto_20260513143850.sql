@@ -2,12 +2,13 @@
 -- the local Supabase stack auto-grants public-schema tables to
 -- authenticated/service_role by default, producing no diff for the GRANTs
 -- added in supabase/schemas/**. Supabase is removing this auto-grant
--- behavior (May 30 / Oct 30); after that, fresh environments restored from
--- this migration chain alone need these grants applied explicitly.
+-- behavior (May 30 / Oct 30, see https://github.com/orgs/supabase/discussions/45329);
+-- after that, fresh environments restored from this migration chain alone
+-- need these grants applied explicitly.
 --
--- Function REVOKEs target PUBLIC: REVOKE EXECUTE FROM anon/authenticated
--- alone is a no-op because functions default to GRANT EXECUTE TO PUBLIC,
--- which both roles inherit.
+-- Function REVOKEs target PUBLIC *and* anon/authenticated/service_role: the
+-- local stack auto-grants function EXECUTE to those roles on creation (same
+-- pattern as tables), so REVOKE FROM PUBLIC alone is a no-op.
 
 -- Tables
 revoke select on table "public"."budget_allocations" from "anon";
@@ -43,7 +44,8 @@ revoke select on table "public"."budget_summary" from "anon";
 grant select on table "public"."budget_summary" to "authenticated";
 grant select on table "public"."budget_summary" to "service_role";
 
--- Functions: revoke from PUBLIC (anon/authenticated inherit via PUBLIC), keep get_my_household_id callable by authenticated.
-revoke execute on function public.handle_new_user() from PUBLIC;
-revoke execute on function public.get_my_household_id() from PUBLIC;
+-- Functions: revoke from PUBLIC and the auto-granted default API roles, then
+-- re-grant to authenticated where intended.
+revoke execute on function public.handle_new_user() from PUBLIC, anon, authenticated, service_role;
+revoke execute on function public.get_my_household_id() from PUBLIC, anon, authenticated, service_role;
 grant execute on function public.get_my_household_id() to authenticated;
