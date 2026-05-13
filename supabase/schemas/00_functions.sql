@@ -34,6 +34,9 @@ BEGIN
 END;
 $$;
 
+-- Trigger-only function: block direct REST/RPC calls from all non-superuser roles
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
+
 -- Automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER

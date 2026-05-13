@@ -15,6 +15,7 @@ CREATE TRIGGER update_households_updated_at BEFORE UPDATE ON households
 
 GRANT SELECT ON public.households TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.households TO service_role;
+REVOKE SELECT ON public.households FROM anon;
 
 -- ============================================================================
 -- USERS
@@ -51,8 +52,10 @@ $$;
 
 GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.users TO service_role;
+REVOKE SELECT ON public.users FROM anon;
 
 GRANT EXECUTE ON FUNCTION public.get_my_household_id() TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_my_household_id() FROM anon;
 
 -- ============================================================================
 -- CATEGORIES
@@ -76,6 +79,7 @@ CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.categories TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.categories TO service_role;
+REVOKE SELECT ON public.categories FROM anon;
 
 -- ============================================================================
 -- EXPENSES
@@ -107,6 +111,7 @@ CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.expenses TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.expenses TO service_role;
+REVOKE SELECT ON public.expenses FROM anon;
 
 -- ============================================================================
 -- EXCHANGE_RATES
@@ -127,6 +132,7 @@ CREATE TRIGGER update_exchange_rates_updated_at BEFORE UPDATE ON exchange_rates
 
 GRANT SELECT ON public.exchange_rates TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.exchange_rates TO service_role;
+REVOKE SELECT ON public.exchange_rates FROM anon;
 
 -- ============================================================================
 -- BUDGET_ALLOCATIONS
@@ -151,6 +157,7 @@ CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allo
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.budget_allocations TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.budget_allocations TO service_role;
+REVOKE SELECT ON public.budget_allocations FROM anon;
 
 -- ============================================================================
 -- MONTHLY_BUDGET_TARGETS
@@ -178,3 +185,4 @@ CREATE TRIGGER update_monthly_budget_targets_updated_at BEFORE UPDATE ON monthly
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_budget_targets TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_budget_targets TO service_role;
+REVOKE SELECT ON public.monthly_budget_targets FROM anon;

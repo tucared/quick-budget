@@ -51,3 +51,4 @@ ALTER VIEW budget_summary SET (security_invoker = true);
 
 GRANT SELECT ON public.budget_summary TO authenticated;
 GRANT SELECT ON public.budget_summary TO service_role;
+REVOKE SELECT ON public.budget_summary FROM anon;
