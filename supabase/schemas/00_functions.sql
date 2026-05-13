@@ -34,10 +34,11 @@ BEGIN
 END;
 $$;
 
--- Trigger-only function: block direct REST/RPC calls from all non-superuser roles.
--- Must revoke from PUBLIC — REVOKE FROM anon/authenticated alone is a no-op
--- because functions default to GRANT EXECUTE TO PUBLIC, which both roles inherit.
-REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
+-- Trigger-only function: block direct REST/RPC calls from every role. Must
+-- revoke from PUBLIC *and* the explicit default API roles — Supabase auto-grants
+-- EXECUTE to anon/authenticated/service_role on creation, so REVOKE FROM PUBLIC
+-- alone leaves those explicit grants in place.
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated, service_role;
 
 -- Automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
