@@ -140,4 +140,4 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DEV_DB_PASSWORD }}
         run: |
           supabase link --project-ref "${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
-          supabase db push
+          supabase db push --linked
