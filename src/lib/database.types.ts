@@ -344,7 +344,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      get_my_household_id: { Args: never; Returns: string }
       rebalance_budget: {
         Args: {
           p_amount: number
