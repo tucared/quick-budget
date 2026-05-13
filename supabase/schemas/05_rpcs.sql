@@ -66,6 +66,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.rebalance_budget(UUID, DATE, UUID, UUID, DECIMAL) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.rebalance_budget(UUID, DATE, UUID, UUID, DECIMAL) TO authenticated;
 
 -- ============================================================================
@@ -156,6 +157,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.save_budget(UUID, DATE, JSONB, DECIMAL, BOOLEAN) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.save_budget(UUID, DATE, JSONB, DECIMAL, BOOLEAN) TO authenticated;
 
 -- ============================================================================
@@ -215,6 +217,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.allocate_from_unallocated(UUID, DATE, UUID, DECIMAL) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.allocate_from_unallocated(UUID, DATE, UUID, DECIMAL) TO authenticated;
 
 -- ============================================================================
@@ -245,4 +248,5 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.top_up_budget(UUID, DATE, UUID, DECIMAL) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.top_up_budget(UUID, DATE, UUID, DECIMAL) TO authenticated;

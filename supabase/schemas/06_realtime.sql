@@ -50,7 +50,7 @@ END;
 $$;
 
 -- Trigger functions don't need to be callable from PostgREST RPC.
-REVOKE EXECUTE ON FUNCTION public.broadcast_household_table_changes() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.broadcast_household_table_changes() FROM PUBLIC, anon, authenticated, service_role;
 
 CREATE TRIGGER expenses_broadcast_changes
   AFTER INSERT OR UPDATE OR DELETE ON expenses
