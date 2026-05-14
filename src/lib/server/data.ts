@@ -2,6 +2,7 @@ import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, startOfMonth, subDays } from "date-fns"
 import { nextMonthString } from "@/lib/date-utils"
+import { decodeJwtClaim } from "@/lib/jwt-claim"
 import type {
   BudgetSummary,
   Category,
@@ -23,13 +24,18 @@ const getSupabase = cache(() => createServerSupabaseClient())
  * Cached per request — safe to call from both layout and page without
  * triggering duplicate auth round-trips.
  *
- * Uses getSession() (a cookie read, no network call) and reads
- * household_id from the JWT custom claim populated by the
- * public.custom_access_token_hook auth hook. This avoids hitting
- * public.users on every page load. The hook is configured in
+ * Uses getSession() (a cookie read, no network call) and decodes
+ * household_id from the access token JWT, where it's populated by the
+ * private.custom_access_token_hook auth hook. This avoids a public.users
+ * SELECT on every page load. The hook is configured in
  * supabase/config.toml for local dev and must be set in the Supabase
  * dashboard for Dev/Prod Cloud projects (Authentication → Hooks →
- * Custom Access Token → public.custom_access_token_hook).
+ * Customize Access Token → private.custom_access_token_hook).
+ *
+ * The claim has to be read from the encoded JWT directly, not from
+ * `session.user.app_metadata` — supabase-js populates that field from
+ * the auth.users row, not the JWT payload. The Supabase docs flag this
+ * explicitly for the custom-access-token hook.
  *
  * Falls back to a public.users SELECT when the claim is absent — covers
  * access tokens issued before the hook was enabled. The fallback can be
@@ -47,10 +53,10 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
     return null
   }
 
-  const claimHouseholdId =
-    typeof authUser.app_metadata?.household_id === "string"
-      ? (authUser.app_metadata.household_id as string)
-      : null
+  const claimHouseholdId = decodeJwtClaim(session?.access_token, [
+    "app_metadata",
+    "household_id",
+  ])
 
   if (claimHouseholdId) {
     return {
