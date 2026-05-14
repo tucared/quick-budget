@@ -31,8 +31,6 @@ export function CategoryDailySpendingChart({
 
   if (expenses.length === 0) return null
 
-  const tickInterval = data.length > 20 ? 4 : 2
-
   return (
     <div className="mt-3">
       <div className="text-xs font-medium text-muted-foreground mb-1">
@@ -45,11 +43,12 @@ export function CategoryDailySpendingChart({
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
           >
             <XAxis
-              dataKey="dayLabel"
+              dataKey="dateKey"
               tick={{ fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: "var(--border)" }}
-              interval={tickInterval}
+              interval={4}
+              tickFormatter={(value: string) => String(parseLocalDate(value).getDate())}
             />
             <YAxis
               tick={{ fontSize: 10 }}
@@ -70,11 +69,11 @@ export function CategoryDailySpendingChart({
                 typeof value === "number" ? formatCurrency(value) : "",
                 "Spent",
               ]}
-              labelFormatter={(_, payload) => {
-                const point = payload?.[0]?.payload as { dateKey: string } | undefined
-                if (!point) return ""
-                return format(parseLocalDate(point.dateKey), "EEE, MMM d")
-              }}
+              labelFormatter={(value) =>
+                typeof value === "string"
+                  ? format(parseLocalDate(value), "EEE, MMM d")
+                  : ""
+              }
             />
             <Bar dataKey="total" fill="hsl(24,85%,42%)" radius={[2, 2, 0, 0]} />
           </BarChart>

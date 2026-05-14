@@ -77,7 +77,6 @@ export function getBudgetStatusTheme(percentSpent: number, dayOfMonth?: number, 
 
 export interface DailySpendingPoint {
   dateKey: string
-  dayLabel: string
   total: number
 }
 
@@ -100,7 +99,6 @@ export function computeDailySpending(expenses: Expense[], budgetMonth: string): 
     const dateKey = `${year}-${month}-${dd}`
     points.push({
       dateKey,
-      dayLabel: String(day),
       total: totals.get(dateKey) ?? 0,
     })
   }

@@ -158,8 +158,8 @@ describe("computeDailySpending", () => {
   it("returns one point per day of the month, zero-filled", () => {
     const points = computeDailySpending([], "2026-05-01")
     expect(points).toHaveLength(31)
-    expect(points[0]).toEqual({ dateKey: "2026-05-01", dayLabel: "1", total: 0 })
-    expect(points[30]).toEqual({ dateKey: "2026-05-31", dayLabel: "31", total: 0 })
+    expect(points[0]).toEqual({ dateKey: "2026-05-01", total: 0 })
+    expect(points[30]).toEqual({ dateKey: "2026-05-31", total: 0 })
   })
 
   it("handles February (28 days)", () => {
