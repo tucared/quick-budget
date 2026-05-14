@@ -23,14 +23,17 @@ const getSupabase = cache(() => createServerSupabaseClient())
  * Cached per request — safe to call from both layout and page without
  * triggering duplicate auth round-trips.
  *
- * Uses getSession() instead of getUser() because middleware already validates
- * the JWT server-side via getUser() on every request. Reading the session from
- * cookies here avoids a redundant network roundtrip to Supabase Auth.
+ * Uses getSession() (a cookie read, no network call) and reads
+ * household_id from the JWT custom claim populated by the
+ * public.custom_access_token_hook auth hook. This avoids hitting
+ * public.users on every page load. The hook is configured in
+ * supabase/config.toml for local dev and must be set in the Supabase
+ * dashboard for Dev/Prod Cloud projects (Authentication → Hooks →
+ * Custom Access Token → public.custom_access_token_hook).
  *
- * This function is intentionally designed to run in parallel (via Promise.all)
- * with the data-fetching functions below, which rely on RLS rather than an
- * explicit household_id filter. See expenses/page.tsx and budget/page.tsx for
- * the pattern.
+ * Falls back to a public.users SELECT when the claim is absent — covers
+ * access tokens issued before the hook was enabled. The fallback can be
+ * dropped in a follow-up once all live tokens have rotated.
  */
 export const getServerUser = cache(async (): Promise<UserData | null> => {
   const supabase = await getSupabase()
@@ -42,6 +45,20 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
   const authUser = session?.user
   if (!authUser) {
     return null
+  }
+
+  const claimHouseholdId =
+    typeof authUser.app_metadata?.household_id === "string"
+      ? (authUser.app_metadata.household_id as string)
+      : null
+
+  if (claimHouseholdId) {
+    return {
+      id: authUser.id,
+      email: authUser.email,
+      fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
+      householdId: claimHouseholdId,
+    }
   }
 
   const { data: userData } = await supabase

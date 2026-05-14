@@ -37,7 +37,26 @@ export function useUser(initialUser?: UserData | null) {
           return
         }
 
-        // Get user details from users table
+        // Prefer household_id from the JWT custom claim populated by the
+        // public.custom_access_token_hook auth hook (see supabase/schemas/
+        // 01_functions.sql). Avoids a public.users SELECT on every mount.
+        const claimHouseholdId =
+          typeof authUser.app_metadata?.household_id === "string"
+            ? (authUser.app_metadata.household_id as string)
+            : null
+
+        if (claimHouseholdId) {
+          setUser({
+            id: authUser.id,
+            email: authUser.email,
+            fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
+            householdId: claimHouseholdId,
+          })
+          setLoading(false)
+          return
+        }
+
+        // Fallback for access tokens issued before the hook was enabled.
         const { data: userData, error: userError } = await supabase
           .from("users")
           .select("full_name, household_id")
