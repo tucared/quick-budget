@@ -41,19 +41,31 @@ In each Supabase project's Dashboard → Authentication → URL Configuration:
 - **Site URL**: `https://quick-budget-tucareds-projects.vercel.app`
 - **Redirect URLs**: `https://*-tucareds-projects.vercel.app/**` (wildcard covers all preview URLs)
 
-### Custom Access Token Hook (manual, both projects)
+### Customize Access Token (JWT) Claims hook (manual, both projects)
 
-Dashboard → **Authentication → Hooks → Custom Access Token**:
+Dashboard → **Authentication → Hooks**. Find the **"Customize Access Token (JWT) Claims"** hook (also linked as `/dashboard/project/<ref>/auth/hooks`). The hook ships in the migration chain, but enabling it is a project-level setting with no SQL knob and no Management API surface — it must be toggled in the dashboard for each project.
 
-- **Enabled**: on
-- **Schema**: `private`
-- **Function**: `custom_access_token_hook`
+Click **Enable Customize Access Token (JWT) Claims hook**, then:
 
-This injects `household_id` into the JWT's `app_metadata` so server- and client-side code can read it without hitting `public.users`, and lets the `private.get_my_household_id()` RLS helper skip its DB lookup on every household-scoped query. The function ships with the migration chain (`supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql`), but Supabase Auth Hooks are a project-level setting that **must be toggled manually** — there's no SQL knob and no Management API surface for it.
+| Field | Value |
+|---|---|
+| Hook type | **Postgres** (not HTTPS) |
+| Schema where the function is defined | `private` |
+| Select a function | `custom_access_token_hook` |
 
-If the hook isn't enabled, the app still works: `private.get_my_household_id()` and `getServerUser()` both fall back to a `public.users` SELECT. You just don't get the per-request perf win.
+Save.
 
-The dashboard setting is project-level, not schema-level, so the daily Dev reset (`reset-dev.yml` at 05:00 UTC) doesn't clear it — no need to re-toggle after a reset.
+**Prerequisite**: the function must exist in the project's database before the dropdown can show it. The function lives in [`supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql`](./supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql) and ships with the regular migration chain — it lands on Prod via `migrate.yml` on merge to `main`, and on Dev via either the `apply-to-dev` label or the daily 05:00 UTC `reset-dev.yml` cron.
+
+> If the "Select a function" dropdown says **"No function with a single JSON/B argument and JSON/B return type found in this schema"**, the migration hasn't been applied to that project yet. Trigger `reset-dev.yml` from **Actions → Reset Dev Database → Run workflow** for Dev, or merge to `main` for Prod.
+
+**What the hook does**: injects `household_id` into the JWT's `app_metadata`, so server- and client-side code read it from the token instead of hitting `public.users`, and the `private.get_my_household_id()` RLS helper skips its DB lookup on every household-scoped query.
+
+**Safe to ship without it**: `private.get_my_household_id()` and `getServerUser()` both fall back to a `public.users` SELECT when the claim is absent. You just don't get the per-request perf win until the hook is enabled.
+
+The hook setting is project-level, not schema-level, so the daily Dev reset doesn't clear it — no need to re-toggle after a reset.
+
+See [Supabase: Custom Access Token Auth Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook) for the full hook contract.
 
 ## CI/CD Pipeline
 
