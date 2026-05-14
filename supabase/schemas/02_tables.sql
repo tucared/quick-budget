@@ -51,8 +51,9 @@ CREATE TRIGGER on_auth_user_created
 -- access tokens issued before the hook was enabled and any environment
 -- where the hook isn't yet configured in the Supabase dashboard.
 --
--- Source of truth: the hand-authored migration
--- supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql.
+-- Source of truth: the hand-authored migrations
+-- supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql
+-- and supabase/migrations/20260514163400_drop_users_fallback_from_get_my_household_id.sql.
 -- This declaration is informational because the `private` schema is
 -- excluded from `supabase db diff --schema public` (see CLAUDE.md).
 CREATE OR REPLACE FUNCTION private.get_my_household_id()
@@ -62,10 +63,11 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-  SELECT COALESCE(
-    NULLIF(current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'household_id', '')::uuid,
-    (SELECT household_id FROM users WHERE id = auth.uid() LIMIT 1)
-  );
+  SELECT NULLIF(
+    current_setting('request.jwt.claims', true)::jsonb
+      -> 'app_metadata' ->> 'household_id',
+    ''
+  )::uuid;
 $$;
 
 GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;

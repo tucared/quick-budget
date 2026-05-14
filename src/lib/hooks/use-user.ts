@@ -39,7 +39,7 @@ export function useUser(initialUser?: UserData | null) {
           return
         }
 
-        // Prefer household_id from the JWT custom claim populated by the
+        // Read household_id from the JWT custom claim populated by the
         // private.custom_access_token_hook auth hook (see
         // supabase/schemas/02_tables.sql). The claim lives in the encoded
         // access token, not on authUser.app_metadata — supabase-js
@@ -49,42 +49,17 @@ export function useUser(initialUser?: UserData | null) {
           "household_id",
         ])
 
-        if (claimHouseholdId) {
-          setUser({
-            id: authUser.id,
-            email: authUser.email,
-            fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
-            householdId: claimHouseholdId,
-          })
-          setLoading(false)
-          return
-        }
-
-        // Fallback for access tokens issued before the hook was enabled.
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("full_name, household_id")
-          .eq("id", authUser.id)
-          .single()
-
-        if (userError) {
-          setError("Failed to load user details")
-          setLoading(false)
-          return
-        }
-
-        if (!userData?.household_id) {
+        if (!claimHouseholdId) {
           setError("User is not associated with a household")
           setLoading(false)
           return
         }
 
-        // Set user data with display name fallback
         setUser({
           id: authUser.id,
           email: authUser.email,
-          fullName: userData.full_name || authUser.email?.split("@")[0] || "User",
-          householdId: userData.household_id,
+          fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
+          householdId: claimHouseholdId,
         })
         setLoading(false)
       } catch (_err) {
