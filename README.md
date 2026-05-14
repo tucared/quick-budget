@@ -66,7 +66,7 @@ npm run types:generate      # Regenerate TypeScript types from DB schema
 
 ## Database
 
-Schema is defined declaratively in `supabase/schemas/`. The migration files in `supabase/migrations/` are CI-generated — **don't edit them by hand** (a `permissions.deny` rule in `.claude/settings.json` blocks it).
+Schema is defined declaratively in `supabase/schemas/`. The migration files in `supabase/migrations/` are CI-generated — **don't edit them by hand**. A `permissions.ask` rule in `.claude/settings.json` prompts on every `Write`/`Edit` under `supabase/migrations/**` so the schema-driven flow isn't bypassed by accident; the right answer is almost always to edit `supabase/schemas/` instead. Approve the prompt only for hand-authored migrations covering entities migra can't diff (realtime/storage policies, `ALTER PUBLICATION`, `REPLICA IDENTITY`, schema grants, custom DML, the `private` schema).
 
 To make a schema change:
 
