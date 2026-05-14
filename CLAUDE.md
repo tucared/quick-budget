@@ -14,6 +14,7 @@
 
 ## Cloud environment (Claude Code web)
 
+- **For `agent-browser` / `dogfood` testing, use `http://localhost:3000` — never the Vercel preview URL.** The startup hook starts the dev server on port 3000 and writes `.env.local` with `NEXT_PUBLIC_SUPABASE_URL` pointing at **Dev**, so local already hits the same Supabase project a preview deploy would. Going through Vercel preview adds deploy lag, makes auth-hook propagation harder to reason about, and puts Cloudflare in the request path for no benefit.
 - The cloud security proxy requires special browser launch flags for agent-browser:
   ```bash
   npx agent-browser --proxy "$HTTP_PROXY" --proxy-bypass "localhost,127.0.0.1" --executable-path "$(find /opt/pw-browsers/chromium-*/chrome-linux -name chrome -type f 2>/dev/null | head -1)" open http://localhost:3000 --ignore-https-errors
@@ -25,7 +26,7 @@
   ```
 - `src/instrumentation.ts` configures Node.js to route server-side fetch through the proxy (via undici `EnvHttpProxyAgent`)
 - The dev server is started with `NODE_TLS_REJECT_UNAUTHORIZED=0` to accept the proxy's TLS certificates
-- **Supabase MCP servers are exposed by UUID, not name.** Two remote projects are available — Prod and Dev (reset daily by `reset-dev.yml`, what Vercel previews hit). The startup hook writes `.env.local` with `NEXT_PUBLIC_SUPABASE_URL` pointing at **Dev** (cloud sessions run in preview-equivalent env). To map UUIDs to environments, call `get_project_url` on each MCP server and compare against `NEXT_PUBLIC_SUPABASE_URL` — the match is Dev, the other is Prod. Do this before any write call (`execute_sql`, `apply_migration`, `deploy_edge_function`). Default to Dev unless explicitly asked otherwise.
+- **Supabase MCP servers are exposed by UUID, not name.** Two remote projects are available — Prod and Dev (reset daily by `reset-dev.yml`, what Vercel previews hit). To map UUIDs to environments, call `get_project_url` on each MCP server and compare against `NEXT_PUBLIC_SUPABASE_URL` from `.env.local` — the match is Dev, the other is Prod. Do this before any write call (`execute_sql`, `apply_migration`, `deploy_edge_function`). Default to Dev unless explicitly asked otherwise.
 - Seeds are committed directly in `supabase/seeds/` with fake data
 - Database schema is declarative. **Never hand-write files in `supabase/migrations/`** — edit `supabase/schemas/` only and let CI generate the migration. The `Generate Migration from Schema` GitHub Action (`.github/workflows/generate-migration.yml`) runs `supabase db diff --schema public` on every PR that touches `supabase/schemas/**` and auto-commits the generated migration to your PR branch — pull the bot's commit before continuing work locally. The action is a no-op if your schemas are already in sync with the migration chain. (Data migrations that can't be expressed declaratively are the rare exception — flag and ask before adding one.)
 - The following entities **must** live in hand-authored migrations because migra (`supabase db diff`) can't track them reliably — see the [Supabase declarative-schemas docs disclaimer](https://supabase.com/docs/guides/local-development/declarative-database-schemas):
