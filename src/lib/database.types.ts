@@ -344,6 +344,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       rebalance_budget: {
         Args: {
           p_amount: number
