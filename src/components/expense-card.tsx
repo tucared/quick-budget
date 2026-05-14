@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { format } from "date-fns"
 import { Pencil, Trash2 } from "lucide-react"
 import type { Category } from "@/lib/types"
@@ -29,7 +30,7 @@ interface ExpenseCardProps {
   onDelete: (id: string, e: React.MouseEvent) => void
 }
 
-export function ExpenseCard({
+function ExpenseCardImpl({
   expense,
   category,
   isShowingDelete,
@@ -134,3 +135,5 @@ export function ExpenseCard({
     </div>
   )
 }
+
+export const ExpenseCard = memo(ExpenseCardImpl)

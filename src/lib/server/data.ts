@@ -71,12 +71,14 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
 })
 
 /**
- * Server-side function to fetch budget summary for a given month.
+ * Server-side function to fetch budgets and allowances for a given month
+ * in a single query. Rows are partitioned in JS by `exclude_from_budget_total`
+ * so the budget_summary view is hit once per page load instead of twice.
  * RLS filters by the caller's household — no explicit household_id needed.
  */
-export async function getBudgetSummary(
+export async function getBudgetAndAllowanceSummary(
   budgetMonth?: string
-): Promise<BudgetSummary[]> {
+): Promise<{ budgets: BudgetSummary[]; allowances: BudgetSummary[] }> {
   const supabase = await getSupabase()
   const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
 
@@ -84,41 +86,20 @@ export async function getBudgetSummary(
     .from("budget_summary")
     .select("*")
     .eq("budget_month", month)
-    .eq("exclude_from_budget_total", false)
     .order("category_name", { ascending: true })
 
   if (error) {
     console.error("Failed to fetch budget summary:", error)
-    return []
+    return { budgets: [], allowances: [] }
   }
 
-  return data || []
-}
-
-/**
- * Server-side function to fetch allowance summary for a given month
- * (categories with exclude_from_budget_total = true).
- * RLS filters by the caller's household — no explicit household_id needed.
- */
-export async function getAllowanceSummary(
-  budgetMonth?: string
-): Promise<BudgetSummary[]> {
-  const supabase = await getSupabase()
-  const month = budgetMonth || format(startOfMonth(new Date()), 'yyyy-MM-dd')
-
-  const { data, error } = await supabase
-    .from("budget_summary")
-    .select("*")
-    .eq("budget_month", month)
-    .eq("exclude_from_budget_total", true)
-    .order("category_name", { ascending: true })
-
-  if (error) {
-    console.error("Failed to fetch allowance summary:", error)
-    return []
+  const budgets: BudgetSummary[] = []
+  const allowances: BudgetSummary[] = []
+  for (const row of data ?? []) {
+    if (row.exclude_from_budget_total) allowances.push(row)
+    else budgets.push(row)
   }
-
-  return data || []
+  return { budgets, allowances }
 }
 
 /**
@@ -196,7 +177,6 @@ export async function getRecentExpenses(
 
 /**
  * Combined fetch: expenses + active categories in a single RPC round trip.
- * Replaces the two parallel page-load queries on /expenses and /budget.
  *
  * Mode 'recent' returns the top N expenses ordered by date desc (for
  * /expenses); 'monthly' returns all expenses within the given month

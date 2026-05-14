@@ -13,36 +13,32 @@ import type {
 // explicit householdId for clarity (also enforced by RLS on the database
 // side).
 
-export async function fetchBudgetSummary(
+export async function fetchBudgetAndAllowanceSummary(
   supabase: SupabaseClient,
   householdId: string,
   budgetMonth: string
-): Promise<{ data: BudgetSummary[] | null; error: unknown }> {
+): Promise<{
+  data: { budgets: BudgetSummary[]; allowances: BudgetSummary[] } | null
+  error: unknown
+}> {
   const { data, error } = await supabase
     .from("budget_summary")
     .select("*")
     .eq("household_id", householdId)
     .eq("budget_month", budgetMonth)
-    .eq("exclude_from_budget_total", false)
     .order("category_name", { ascending: true })
 
-  return { data, error }
-}
+  if (error || !data) {
+    return { data: null, error }
+  }
 
-export async function fetchAllowanceSummary(
-  supabase: SupabaseClient,
-  householdId: string,
-  budgetMonth: string
-): Promise<{ data: BudgetSummary[] | null; error: unknown }> {
-  const { data, error } = await supabase
-    .from("budget_summary")
-    .select("*")
-    .eq("household_id", householdId)
-    .eq("budget_month", budgetMonth)
-    .eq("exclude_from_budget_total", true)
-    .order("category_name", { ascending: true })
-
-  return { data, error }
+  const budgets: BudgetSummary[] = []
+  const allowances: BudgetSummary[] = []
+  for (const row of data) {
+    if (row.exclude_from_budget_total) allowances.push(row)
+    else budgets.push(row)
+  }
+  return { data: { budgets, allowances }, error: null }
 }
 
 export async function fetchMonthlyBudgetTarget(

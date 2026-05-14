@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { format, isToday, isYesterday } from "date-fns"
 import { Search, X } from "lucide-react"
 import type { Expense, ExpenseWithDetails, Category } from "@/lib/types"
@@ -51,6 +51,12 @@ export function ExpenseListClient({
   const sentinelRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef(onLoadMore)
   useEffect(() => { loadMoreRef.current = onLoadMore }, [onLoadMore])
+
+  // Latest-pool ref so handleEdit stays referentially stable across renders
+  // (otherwise every change to `expenses` would invalidate the memoized
+  // ExpenseCard children). Updated inside an effect — refs must not be
+  // written during render per react-hooks/refs.
+  const editPoolRef = useRef<ExpenseWithDetails[]>(expenses)
 
   const closeSearch = () => {
     setSearchInput("")
@@ -122,12 +128,16 @@ export function ExpenseListClient({
   const resultsForCurrentQuery = searchData?.query === searchQuery ? searchData.results : null
   const searching = isSearchMode && resultsForCurrentQuery === null
 
-  const handleEdit = (expenseId: string, e: React.MouseEvent) => {
+  // Keep the lookup pool current without rebuilding handleEdit's identity.
+  useEffect(() => {
+    editPoolRef.current = resultsForCurrentQuery ?? expenses
+  }, [resultsForCurrentQuery, expenses])
+
+  const handleEdit = useCallback((expenseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const pool = resultsForCurrentQuery ?? expenses
-    const exp = pool.find((ex) => ex.id === expenseId)
+    const exp = editPoolRef.current.find((ex) => ex.id === expenseId)
     if (exp) setEditingExpense(exp)
-  }
+  }, [])
 
   // Infinite scroll: trigger onLoadMore when sentinel enters viewport.
   // Disabled while searching — search owns its own result set.

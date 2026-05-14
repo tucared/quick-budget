@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useCallback, useMemo, useRef, useState, useEffect } from "react"
 import { format, getDaysInMonth } from "date-fns"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { monthPrefix, parseLocalDate } from "@/lib/date-utils"
@@ -48,16 +48,20 @@ export function CategoryExpenseDialog({
   } = useExpenseDelete()
 
   // Wrap delete to mark as deleted immediately (optimistic UI)
-  const handleDelete = (expenseId: string, e: React.MouseEvent) => {
+  const handleDelete = useCallback((expenseId: string, e: React.MouseEvent) => {
     setDeletedIds((prev) => new Set([...prev, expenseId]))
     handleDeleteBase(expenseId, e)
-  }
+  }, [handleDeleteBase])
 
-  const handleEdit = (expenseId: string, e: React.MouseEvent) => {
+  // Latest-allExpenses ref so handleEdit's identity stays stable across renders.
+  const allExpensesRef = useRef(allExpenses)
+  useEffect(() => { allExpensesRef.current = allExpenses }, [allExpenses])
+
+  const handleEdit = useCallback((expenseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const exp = allExpenses.find((ex) => ex.id === expenseId)
+    const exp = allExpensesRef.current.find((ex) => ex.id === expenseId)
     if (exp) setEditingExpense(exp)
-  }
+  }, [])
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, Category>()

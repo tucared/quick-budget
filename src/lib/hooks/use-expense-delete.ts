@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { getErrorMessage } from "@/lib/error-handler"
 
@@ -9,11 +9,24 @@ export function useExpenseDelete(onDeleted?: (expenseId: string) => void) {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [deleteError, setDeleteError] = useState("")
 
-  const handleCardClick = (expenseId: string) => {
-    setShowingDeleteId((prev) => (prev === expenseId ? null : expenseId))
-  }
+  // Latest-callback ref so handleDelete stays referentially stable for
+  // memoized children even when the parent passes a fresh onDeleted closure.
+  const onDeletedRef = useRef(onDeleted)
+  useEffect(() => { onDeletedRef.current = onDeleted }, [onDeleted])
 
-  const handleDelete = async (expenseId: string, e: React.MouseEvent) => {
+  const handleCardClick = useCallback((expenseId: string) => {
+    setShowingDeleteId((prev) => (prev === expenseId ? null : expenseId))
+  }, [])
+
+  const clearDeletingId = useCallback((expenseId: string) => {
+    setDeletingIds((prev) => {
+      const next = new Set(prev)
+      next.delete(expenseId)
+      return next
+    })
+  }, [])
+
+  const handleDelete = useCallback(async (expenseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setDeletingIds((prev) => new Set(prev).add(expenseId))
     setShowingDeleteId(null)
@@ -33,18 +46,10 @@ export function useExpenseDelete(onDeleted?: (expenseId: string) => void) {
       // Optimistic update — postgres_changes realtime is unreliable on this
       // project, so the parent removes from state via this callback. The 5s
       // fallback below clears the animation flag in case the parent doesn't.
-      onDeleted?.(expenseId)
+      onDeletedRef.current?.(expenseId)
       setTimeout(() => clearDeletingId(expenseId), 5000)
     }
-  }
-
-  const clearDeletingId = (expenseId: string) => {
-    setDeletingIds((prev) => {
-      const next = new Set(prev)
-      next.delete(expenseId)
-      return next
-    })
-  }
+  }, [clearDeletingId])
 
   return {
     showingDeleteId,

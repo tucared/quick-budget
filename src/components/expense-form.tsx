@@ -17,15 +17,20 @@ import { AmountInputWithCurrency, type AmountInputHandle } from "@/components/am
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
-import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 
 interface ExpenseFormProps {
   onExpenseSaved?: (expense: Expense) => void
   initialCategories?: Category[]
   initialTopCategoryIds?: string[]
+  /**
+   * Monotonic counter bumped by the parent on external expense changes
+   * (partner inserts, deletes, etc.). Triggers a refresh of the inline
+   * budget preview without opening a second realtime channel here.
+   */
+  externalRefreshSignal?: number
 }
 
-export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds }: ExpenseFormProps) {
+export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds, externalRefreshSignal }: ExpenseFormProps) {
   const { user } = useUser()
   const householdId = user?.householdId
   const storageKeys = useMemo(
@@ -235,10 +240,14 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     return () => { cancelled = true }
   }, [selectedCurrency, expenseDate])
 
-  // Refresh budget status when any expense changes externally (partner added/deleted/updated)
-  useExpenseSubscription(() => {
+  // Refresh budget status when the parent signals an external expense change
+  // (partner added/deleted/updated). The parent owns the realtime subscription
+  // so this component doesn't open a second channel on the same household.
+  useEffect(() => {
+    if (externalRefreshSignal === undefined) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBudgetRefreshTick((t) => t + 1)
-  })
+  }, [externalRefreshSignal])
 
   // Cleanup success state timer on unmount
   useEffect(() => {
