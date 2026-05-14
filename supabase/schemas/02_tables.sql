@@ -28,6 +28,7 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+COMMENT ON TABLE users IS 'Household member profiles linked to auth.users; throwaway test of the realtime-decouple migration chain.';
 
 CREATE INDEX idx_users_household ON users(household_id);
 
