@@ -24,6 +24,7 @@ CREATE TABLE users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   full_name TEXT,
+  display_name TEXT, -- smoke-test column, DO NOT MERGE (throwaway PR for PR #104)
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
