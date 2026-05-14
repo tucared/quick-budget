@@ -26,20 +26,20 @@ const getSupabase = cache(() => createServerSupabaseClient())
  *
  * Uses getSession() (a cookie read, no network call) and decodes
  * household_id from the access token JWT, where it's populated by the
- * private.custom_access_token_hook auth hook. This avoids a public.users
- * SELECT on every page load. The hook is configured in
- * supabase/config.toml for local dev and must be set in the Supabase
- * dashboard for Dev/Prod Cloud projects (Authentication → Hooks →
- * Customize Access Token → private.custom_access_token_hook).
+ * private.custom_access_token_hook auth hook. The hook is configured in
+ * supabase/config.toml for local dev and is enabled in the Supabase
+ * dashboard for both Dev and Prod (Authentication → Hooks → Customize
+ * Access Token → private.custom_access_token_hook).
  *
  * The claim has to be read from the encoded JWT directly, not from
  * `session.user.app_metadata` — supabase-js populates that field from
- * the auth.users row, not the JWT payload. The Supabase docs flag this
- * explicitly for the custom-access-token hook.
+ * the auth.users row, not the JWT payload.
  *
- * Falls back to a public.users SELECT when the claim is absent — covers
- * access tokens issued before the hook was enabled. The fallback can be
- * dropped in a follow-up once all live tokens have rotated.
+ * Returns null when the claim is missing (the legacy public.users
+ * fallback was dropped in
+ * supabase/migrations/20260514163400_drop_users_fallback_from_get_my_household_id.sql).
+ * Callers redirect to /login on null; tokens missing the claim refresh
+ * on the next /token POST and pick it up.
  */
 export const getServerUser = cache(async (): Promise<UserData | null> => {
   const supabase = await getSupabase()
@@ -58,30 +58,15 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
     "household_id",
   ])
 
-  if (claimHouseholdId) {
-    return {
-      id: authUser.id,
-      email: authUser.email,
-      fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
-      householdId: claimHouseholdId,
-    }
-  }
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("full_name, household_id")
-    .eq("id", authUser.id)
-    .single()
-
-  if (!userData?.household_id) {
+  if (!claimHouseholdId) {
     return null
   }
 
   return {
     id: authUser.id,
     email: authUser.email,
-    fullName: userData.full_name || authUser.email?.split("@")[0] || "User",
-    householdId: userData.household_id,
+    fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
+    householdId: claimHouseholdId,
   }
 })
 
