@@ -34,6 +34,7 @@
   - Storage schema policies
   - `ALTER PUBLICATION` and `REPLICA IDENTITY` statements
   - Schema-level grants (`GRANT USAGE ON SCHEMA <custom>`)
+  - **Function-level `REVOKE EXECUTE` / `GRANT EXECUTE` statements** — `db diff` silently drops them, so declaring grants only in `supabase/schemas/05_rpcs.sql` lands a fresh DB with PostgreSQL's default of `EXECUTE TO PUBLIC`. Every new RPC needs a small hand-authored migration alongside the auto-generated one to apply the schema's declared grants. See `supabase/migrations/20260514175900_grant_get_expenses_and_categories_to_authenticated.sql` for the pattern.
   - Custom DML / data migrations
   - Anything in the `private` schema (the workflow's `--schema public` scope intentionally doesn't diff it; the declarations in `supabase/schemas/` are informational, and changes there must ship as hand-authored migrations)
 - Add the `apply-to-dev` label to a PR if you want the workflow to also push the resulting migration chain to the Dev Supabase project. Without the label, schema PRs only generate the migration; Dev stays at `main`'s state until merge or the daily 05:00 UTC `reset-dev.yml` cron. Useful when you want to dogfood a schema change end-to-end before merging.
