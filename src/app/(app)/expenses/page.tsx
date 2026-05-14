@@ -2,8 +2,7 @@ import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import {
   getServerUser,
-  getRecentExpenses,
-  getCategories,
+  getExpensesAndCategories,
   computeTopCategoryIds,
 } from "@/lib/server/data"
 import { ExpensesPageClient } from "@/components/expenses-page-client"
@@ -20,10 +19,9 @@ export default function ExpensesPage() {
 }
 
 async function ExpensesPageData() {
-  const [user, expenses, categories] = await Promise.all([
+  const [user, { expenses, categories }] = await Promise.all([
     getServerUser(),
-    getRecentExpenses(30),
-    getCategories(),
+    getExpensesAndCategories({ mode: "recent", limit: 30 }),
   ])
 
   if (!user) {

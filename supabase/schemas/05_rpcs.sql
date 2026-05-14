@@ -250,3 +250,68 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.top_up_budget(UUID, DATE, UUID, DECIMAL) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.top_up_budget(UUID, DATE, UUID, DECIMAL) TO authenticated;
+
+-- ============================================================================
+-- GET EXPENSES AND CATEGORIES
+-- ============================================================================
+-- Combines the two parallel page-load fetches (expenses + active categories)
+-- into a single round trip. Used by /expenses (p_mode = 'recent') and /budget
+-- (p_mode = 'monthly'). SECURITY INVOKER so RLS scopes both tables to the
+-- caller's household via private.get_my_household_id().
+CREATE OR REPLACE FUNCTION public.get_expenses_and_categories(
+  p_mode TEXT,
+  p_limit INT DEFAULT 30,
+  p_month DATE DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY INVOKER
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_expenses JSONB;
+  v_categories JSONB;
+BEGIN
+  IF p_mode = 'recent' THEN
+    SELECT COALESCE(
+      jsonb_agg(to_jsonb(e) ORDER BY e.expense_date DESC, e.created_at DESC),
+      '[]'::jsonb
+    )
+    INTO v_expenses
+    FROM (
+      SELECT *
+      FROM expenses
+      ORDER BY expense_date DESC, created_at DESC
+      LIMIT p_limit
+    ) e;
+  ELSIF p_mode = 'monthly' THEN
+    IF p_month IS NULL THEN
+      RAISE EXCEPTION 'p_month is required when p_mode = ''monthly''';
+    END IF;
+    SELECT COALESCE(
+      jsonb_agg(to_jsonb(e) ORDER BY e.expense_date ASC),
+      '[]'::jsonb
+    )
+    INTO v_expenses
+    FROM expenses e
+    WHERE e.expense_date >= p_month
+      AND e.expense_date < (p_month + INTERVAL '1 month')::date;
+  ELSE
+    RAISE EXCEPTION 'p_mode must be ''recent'' or ''monthly''';
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(to_jsonb(c)), '[]'::jsonb)
+  INTO v_categories
+  FROM categories c
+  WHERE c.is_active = TRUE;
+
+  RETURN jsonb_build_object(
+    'expenses', v_expenses,
+    'categories', v_categories
+  );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.get_expenses_and_categories(TEXT, INT, DATE) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_expenses_and_categories(TEXT, INT, DATE) TO authenticated;

@@ -210,6 +210,51 @@ export async function getRecentExpenses(
 }
 
 /**
+ * Combined fetch: expenses + active categories in a single RPC round trip.
+ * Replaces the two parallel page-load queries on /expenses and /budget.
+ *
+ * Mode 'recent' returns the top N expenses ordered by date desc (for
+ * /expenses); 'monthly' returns all expenses within the given month
+ * ordered by date asc (for /budget).
+ */
+type ExpensesAndCategoriesRecent = { mode: "recent"; limit?: number }
+type ExpensesAndCategoriesMonthly = { mode: "monthly"; month: string }
+type ExpensesAndCategoriesArgs =
+  | ExpensesAndCategoriesRecent
+  | ExpensesAndCategoriesMonthly
+
+export async function getExpensesAndCategories(
+  args: ExpensesAndCategoriesArgs
+): Promise<{ expenses: ExpenseWithDetails[]; categories: Category[] }> {
+  const supabase = await getSupabase()
+
+  const params =
+    args.mode === "recent"
+      ? { p_mode: "recent", p_limit: args.limit ?? 30, p_month: null }
+      : { p_mode: "monthly", p_limit: 30, p_month: args.month }
+
+  const { data, error } = await supabase.rpc(
+    "get_expenses_and_categories",
+    params
+  )
+
+  if (error) {
+    console.error("Failed to fetch expenses and categories:", error)
+    return { expenses: [], categories: [] }
+  }
+
+  const payload = (data ?? {}) as {
+    expenses?: Expense[]
+    categories?: Category[]
+  }
+
+  return {
+    expenses: (payload.expenses ?? []) as ExpenseWithDetails[],
+    categories: payload.categories ?? [],
+  }
+}
+
+/**
  * Server-side function to fetch active categories.
  * RLS filters by the caller's household — no explicit household_id needed.
  */
