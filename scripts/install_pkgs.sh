@@ -1,5 +1,28 @@
 #!/bin/bash
 
+# Activate the Node version pinned by .nvmrc so npm ci, the dev server, and
+# subsequent tool calls run on the same major as CI and Vercel. The Claude Code
+# cloud env preinstalls nvm system-wide at /opt/nvm and ships an older default
+# Node on PATH; user installs typically live in ~/.nvm.
+if [ -z "$NVM_DIR" ]; then
+  for candidate in "/opt/nvm" "$HOME/.nvm"; do
+    if [ -s "$candidate/nvm.sh" ]; then
+      export NVM_DIR="$candidate"
+      break
+    fi
+  done
+fi
+if [ -n "$NVM_DIR" ] && [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$NVM_DIR/nvm.sh"
+  nvm install --no-progress < /dev/null
+  nvm use < /dev/null
+  if [ -n "$CLAUDE_ENV_FILE" ]; then
+    NODE_BIN_DIR="$(dirname "$(nvm which current)")"
+    echo "PATH=$NODE_BIN_DIR:\$PATH" >> "$CLAUDE_ENV_FILE"
+  fi
+fi
+
 echo "Installing npm dependencies..."
 npm ci
 
