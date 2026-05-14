@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
+import { decodeJwtClaim } from "@/lib/jwt-claim"
 import type { UserData } from "@/lib/types"
 
 export type { UserData }
@@ -21,9 +22,9 @@ export function useUser(initialUser?: UserData | null) {
       try {
         const supabase = createClient()
         const {
-          data: { user: authUser },
+          data: { session },
           error: authError,
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getSession()
 
         if (authError) {
           setError("Failed to load user session")
@@ -31,6 +32,7 @@ export function useUser(initialUser?: UserData | null) {
           return
         }
 
+        const authUser = session?.user
         if (!authUser) {
           setError("Not authenticated")
           setLoading(false)
@@ -38,12 +40,14 @@ export function useUser(initialUser?: UserData | null) {
         }
 
         // Prefer household_id from the JWT custom claim populated by the
-        // public.custom_access_token_hook auth hook (see supabase/schemas/
-        // 01_functions.sql). Avoids a public.users SELECT on every mount.
-        const claimHouseholdId =
-          typeof authUser.app_metadata?.household_id === "string"
-            ? (authUser.app_metadata.household_id as string)
-            : null
+        // private.custom_access_token_hook auth hook (see
+        // supabase/schemas/02_tables.sql). The claim lives in the encoded
+        // access token, not on authUser.app_metadata — supabase-js
+        // populates that field from the auth.users row, not the JWT.
+        const claimHouseholdId = decodeJwtClaim(session?.access_token, [
+          "app_metadata",
+          "household_id",
+        ])
 
         if (claimHouseholdId) {
           setUser({
