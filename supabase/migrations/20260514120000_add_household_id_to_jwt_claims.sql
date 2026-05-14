@@ -3,26 +3,32 @@
 -- the JWT claim over a public.users lookup.
 --
 -- Why hand-authored:
---   * private.get_my_household_id() lives in the `private` schema, which
---     is intentionally excluded from `supabase db diff --schema public`
---     (see CLAUDE.md). Any change here must ship as a hand-authored
---     migration.
---   * The auth hook function is bundled here so both halves of the
---     change land atomically — the helper's JWT-first path is a no-op
---     without the hook, but it's cleaner to ship the pair together than
---     across two migrations.
+--   * Both functions live in the `private` schema, which is intentionally
+--     excluded from `supabase db diff --schema public` (see CLAUDE.md).
+--     Any change here must ship as a hand-authored migration.
+--
+-- Schema choice: `private` keeps the hook off the PostgREST/RPC surface
+-- (it never appears in generated TypeScript types) and signals that only
+-- supabase_auth_admin should ever call it. The schema is set up in
+-- supabase/schemas/00_setup.sql with USAGE granted to authenticated
+-- (for the RLS helper) and supabase_auth_admin (for the auth hook).
 --
 -- Rollout note: existing access tokens issued before the hook is enabled
 -- on the Supabase Cloud project (Authentication → Hooks → Custom Access
--- Token, set to public.custom_access_token_hook) won't carry the claim.
--- The helper's COALESCE fallback handles those by reading public.users —
--- so there's no broken interim state. The fallback can be removed in a
--- later migration once all tokens have rotated.
+-- Token, set to `private.custom_access_token_hook`) won't carry the
+-- claim. The helper's COALESCE fallback handles those by reading
+-- public.users — so there's no broken interim state. The fallback can be
+-- removed in a later migration once all tokens have rotated.
 
 -- ============================================================================
--- Auth hook function
+-- Schema grant for supabase_auth_admin (idempotent with 00_setup.sql)
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
+GRANT USAGE ON SCHEMA private TO supabase_auth_admin;
+
+-- ============================================================================
+-- Auth hook function (lives in `private`, invoked by supabase_auth_admin)
+-- ============================================================================
+CREATE OR REPLACE FUNCTION private.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -44,8 +50,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
-REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION private.custom_access_token_hook(jsonb) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.custom_access_token_hook(jsonb) TO supabase_auth_admin;
 
 -- ============================================================================
 -- RLS helper: prefer JWT claim, fall back to users SELECT for legacy tokens

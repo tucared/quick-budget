@@ -79,6 +79,52 @@ REVOKE SELECT ON public.users FROM anon;
 REVOKE EXECUTE ON FUNCTION private.get_my_household_id() FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION private.get_my_household_id() TO authenticated;
 
+-- Supabase Auth hook: inject household_id into every issued access token as
+-- app_metadata.household_id. Lets server- and client-side code read the
+-- household scope from the JWT instead of querying public.users on every
+-- page load. Lives in `private` so it stays off the PostgREST/RPC surface
+-- and out of generated TypeScript types — only supabase_auth_admin (the
+-- Supabase Auth service role) ever calls it.
+--
+-- The hook must be configured in supabase/config.toml (local) and in the
+-- Supabase dashboard (Authentication → Hooks → Custom Access Token →
+-- `private.custom_access_token_hook`) for Dev/Prod cloud projects;
+-- config.toml does not propagate.
+--
+-- SECURITY DEFINER so the function reads public.users with the owner's
+-- privileges, sidestepping the row-level grants on authenticated.
+-- supabase_auth_admin only needs USAGE on the `private` schema (granted
+-- in 00_setup.sql) and EXECUTE on this function.
+--
+-- Source of truth: hand-authored migration
+-- supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql.
+-- This declaration is informational because the `private` schema is
+-- excluded from `supabase db diff --schema public` (see CLAUDE.md).
+CREATE OR REPLACE FUNCTION private.custom_access_token_hook(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  hid uuid;
+  claims jsonb;
+BEGIN
+  SELECT household_id INTO hid FROM public.users WHERE id = (event->>'user_id')::uuid;
+  IF hid IS NULL THEN
+    RETURN event;
+  END IF;
+  claims := event->'claims';
+  claims := jsonb_set(claims, '{app_metadata}', COALESCE(claims->'app_metadata', '{}'::jsonb));
+  claims := jsonb_set(claims, '{app_metadata,household_id}', to_jsonb(hid::text));
+  RETURN jsonb_set(event, '{claims}', claims);
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION private.custom_access_token_hook(jsonb) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.custom_access_token_hook(jsonb) TO supabase_auth_admin;
+
 -- Realtime broadcast trigger function. Lives in `private` so migra's
 -- `--schema public` diff scope cannot see it (the body below is informational
 -- only — source of truth is the hand-authored migration

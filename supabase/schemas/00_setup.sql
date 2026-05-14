@@ -51,6 +51,10 @@ $$;
 -- policies can still call them via schema-qualified references.
 CREATE SCHEMA IF NOT EXISTS private;
 GRANT USAGE ON SCHEMA private TO authenticated;
+-- supabase_auth_admin needs USAGE so the custom_access_token_hook in
+-- `private` is reachable when Supabase Auth invokes it during JWT issuance
+-- (see private.custom_access_token_hook in 02_tables.sql).
+GRANT USAGE ON SCHEMA private TO supabase_auth_admin;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA private REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated, service_role;
 DO $$
