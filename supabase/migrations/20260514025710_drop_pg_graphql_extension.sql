@@ -1,0 +1,26 @@
+-- Hand-authored. Drops pg_graphql from the database.
+--
+-- The pg_graphql extension was disabled manually on Prod earlier today. The
+-- app (Next.js + supabase-js) uses PostgREST + RPCs + direct table access
+-- only; no client makes GraphQL queries. Disabling it removes:
+--   - one source of "table visible in GraphQL schema" advisor warnings
+--     (lint 0027) — though those warnings are also documented as by-design
+--     in PR #96, they vanish entirely once the GraphQL surface is gone.
+--   - the schema-cache reload work pg_graphql does on every DDL change.
+--
+-- Without codifying this, Dev's daily `supabase db reset` (reset-dev.yml at
+-- 05:00 UTC) re-enables pg_graphql via baseline migration
+-- 20260308171853_baseline.sql line 20 (`CREATE EXTENSION IF NOT EXISTS
+-- "pg_graphql"`), so Dev would drift back into the install state every
+-- morning. This migration runs at the end of the chain and unconditionally
+-- drops it.
+--
+-- Idempotent: Prod is already in the dropped state, so the IF EXISTS makes
+-- it a no-op there. CASCADE handles the extension's own event trigger
+-- (`issue_pg_graphql_access`) and any other extension-owned objects.
+--
+-- The `graphql` and `graphql_public` schemas are NOT dropped — they're
+-- owned by supabase_admin and platform-managed. They persist on Prod
+-- post-disable and that's fine.
+
+DROP EXTENSION IF EXISTS pg_graphql CASCADE;
