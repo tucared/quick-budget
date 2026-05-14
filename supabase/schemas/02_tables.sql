@@ -44,6 +44,17 @@ CREATE TRIGGER on_auth_user_created
 -- PostgREST/GraphQL do not expose it as an RPC — only RLS policies that
 -- reference it by `private.get_my_household_id()` can invoke it.
 -- Must come after the users table is defined.
+--
+-- Reads household_id from the JWT custom claim populated by the
+-- public.custom_access_token_hook auth hook (see 01_functions.sql). Falls
+-- back to a users table lookup when the claim is absent — covers legacy
+-- access tokens issued before the hook was enabled and any environment
+-- where the hook isn't yet configured in the Supabase dashboard.
+--
+-- Source of truth: the hand-authored migration
+-- supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql.
+-- This declaration is informational because the `private` schema is
+-- excluded from `supabase db diff --schema public` (see CLAUDE.md).
 CREATE OR REPLACE FUNCTION private.get_my_household_id()
 RETURNS UUID
 LANGUAGE sql
@@ -51,7 +62,10 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-  SELECT household_id FROM users WHERE id = auth.uid() LIMIT 1;
+  SELECT COALESCE(
+    NULLIF(current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'household_id', '')::uuid,
+    (SELECT household_id FROM users WHERE id = auth.uid() LIMIT 1)
+  );
 $$;
 
 GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
