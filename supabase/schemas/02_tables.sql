@@ -24,11 +24,11 @@ CREATE TABLE users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   full_name TEXT,
+  display_name TEXT,
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE users IS 'Household member profiles linked to auth.users; throwaway test of the realtime-decouple migration chain.';
 
 CREATE INDEX idx_users_household ON users(household_id);
 
