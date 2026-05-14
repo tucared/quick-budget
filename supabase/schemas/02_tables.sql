@@ -65,6 +65,47 @@ REVOKE SELECT ON public.users FROM anon;
 REVOKE EXECUTE ON FUNCTION private.get_my_household_id() FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION private.get_my_household_id() TO authenticated;
 
+-- Realtime broadcast trigger function. Lives in `private` so migra's
+-- `--schema public` diff scope cannot see it (the body below is informational
+-- only — source of truth is the hand-authored migration
+-- supabase/migrations/20260513235951_decouple_realtime_from_declarative_schemas.sql,
+-- which also owns the realtime.messages policy, publication membership, and
+-- replica identity that migra can't reliably express). SECURITY DEFINER so the
+-- inner realtime.broadcast_changes INSERT bypasses RLS via postgres' BYPASSRLS;
+-- authenticated lacks BYPASSRLS and realtime.send swallows insert failures, so
+-- a non-DEFINER trigger would silently drop every event. The two `*_broadcast_changes`
+-- triggers below (on public.expenses and public.budget_allocations) ARE inside
+-- migra's diff scope and MUST be declared in this file so subsequent diffs don't
+-- emit phantom DROP TRIGGER statements.
+CREATE OR REPLACE FUNCTION private.broadcast_household_table_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  hh UUID;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    hh := OLD.household_id;
+  ELSE
+    hh := NEW.household_id;
+  END IF;
+  PERFORM realtime.broadcast_changes(
+    TG_TABLE_NAME || '_household_' || hh::text,
+    TG_OP,
+    TG_OP,
+    TG_TABLE_NAME,
+    TG_TABLE_SCHEMA,
+    NEW,
+    OLD
+  );
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION private.broadcast_household_table_changes() FROM PUBLIC, anon, authenticated, service_role;
+
 -- ============================================================================
 -- CATEGORIES
 -- ============================================================================
@@ -117,6 +158,12 @@ CREATE INDEX idx_expenses_category ON expenses(category_id);
 CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Informational stub for migra (source of truth: hand-authored migration
+-- 20260513235951_decouple_realtime_from_declarative_schemas.sql).
+CREATE TRIGGER expenses_broadcast_changes
+  AFTER INSERT OR UPDATE OR DELETE ON expenses
+  FOR EACH ROW EXECUTE FUNCTION private.broadcast_household_table_changes();
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.expenses TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.expenses TO service_role;
 REVOKE SELECT ON public.expenses FROM anon;
@@ -164,6 +211,12 @@ CREATE INDEX idx_budget_allocations_household_month ON budget_allocations(househ
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Informational stub for migra (source of truth: hand-authored migration
+-- 20260513235951_decouple_realtime_from_declarative_schemas.sql).
+CREATE TRIGGER budget_allocations_broadcast_changes
+  AFTER INSERT OR UPDATE OR DELETE ON budget_allocations
+  FOR EACH ROW EXECUTE FUNCTION private.broadcast_household_table_changes();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.budget_allocations TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.budget_allocations TO service_role;

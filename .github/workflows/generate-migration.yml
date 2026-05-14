@@ -131,9 +131,10 @@ jobs:
         if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
         run: npm ci
 
-      - name: Typecheck and test
+      - name: Lint, typecheck, and test
         if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
         run: |
+          npm run lint
           npm run typecheck
           npm test
 
