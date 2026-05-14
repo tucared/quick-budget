@@ -18,6 +18,10 @@ The Vercel project `quick-budget` is connected to GitHub. Deployments are automa
 - Push to `main` → **production** deployment (→ Supabase prod)
 - Open a PR → **preview** deployment (→ Supabase dev)
 
+### Function region
+
+`vercel.json` pins serverless functions to `cdg1` (Paris) so they co-locate with Supabase Prod, which lives in `eu-west-3` (Paris). If the Supabase project ever moves region, update `vercel.json` to match — Frankfurt/Dublin/etc. add a transatlantic-irrelevant but in-region hop that shows up directly in p95.
+
 ### Environment Variables
 
 Set these in Vercel → Project Settings → Environment Variables:
