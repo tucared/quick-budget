@@ -3,8 +3,7 @@ import { redirect } from "next/navigation"
 import { format, startOfMonth } from "date-fns"
 import {
   getServerUser,
-  getBudgetSummary,
-  getAllowanceSummary,
+  getBudgetAndAllowanceSummary,
   getMonthlyBudgetTarget,
   getExpensesAndCategories,
 } from "@/lib/server/data"
@@ -35,10 +34,9 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
 }
 
 async function BudgetPageData({ budgetMonth }: { budgetMonth: string }) {
-  const [user, budgets, allowances, target, { expenses, categories }] = await Promise.all([
+  const [user, { budgets, allowances }, target, { expenses, categories }] = await Promise.all([
     getServerUser(),
-    getBudgetSummary(budgetMonth),
-    getAllowanceSummary(budgetMonth),
+    getBudgetAndAllowanceSummary(budgetMonth),
     getMonthlyBudgetTarget(budgetMonth),
     getExpensesAndCategories({ mode: "monthly", month: budgetMonth }),
   ])

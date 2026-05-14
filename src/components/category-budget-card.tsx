@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { Plus } from "lucide-react"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
@@ -9,13 +10,15 @@ interface CategoryBudgetCardProps {
   isCurrentMonth?: boolean
   dayOfMonth?: number
   daysInMonth?: number
-  onClick?: () => void
-  onAddFunds?: (e: React.MouseEvent) => void
+  // Handlers receive the budget so parents can pass stable refs (useCallback)
+  // instead of per-row arrow closures that defeat React.memo.
+  onClick?: (budget: BudgetSummary) => void
+  onAddFunds?: (e: React.MouseEvent, budget: BudgetSummary) => void
   additionalAmount?: number
   loading?: boolean
 }
 
-export function CategoryBudgetCard({
+function CategoryBudgetCardImpl({
   budget,
   showHeader = false,
   isCurrentMonth = false,
@@ -62,11 +65,11 @@ export function CategoryBudgetCard({
       className={`px-2.5 py-2 rounded-md border ${statusColor.bg} ${statusColor.border} ${
         isClickable ? "cursor-pointer hover:brightness-95 transition-[filter]" : ""
       }`}
-      onClick={onClick}
+      onClick={onClick ? () => onClick(budget) : undefined}
       role={isClickable ? "button" : undefined}
       tabIndex={isClickable ? 0 : undefined}
       onKeyDown={isClickable ? (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick!() }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick!(budget) }
       } : undefined}
     >
       {/* Optional header: icon + name + add funds */}
@@ -78,7 +81,7 @@ export function CategoryBudgetCard({
           <span className="text-sm font-medium flex-1 min-w-0 truncate">{budget.category_name}</span>
           {isCurrentMonth && onAddFunds && (
             <button
-              onClick={onAddFunds}
+              onClick={(e) => onAddFunds(e, budget)}
               className="shrink-0 flex items-center gap-1 text-xs text-accent hover:text-accent/80 font-medium px-1.5 py-0.5 rounded hover:bg-accent/10 transition-colors"
               title="Add funds to this category"
             >
@@ -133,3 +136,5 @@ export function CategoryBudgetCard({
     </div>
   )
 }
+
+export const CategoryBudgetCard = memo(CategoryBudgetCardImpl)

@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase"
 import { startOfMonth, getDaysInMonth, format } from "date-fns"
 import { Pencil } from "lucide-react"
 import type { BudgetSummary, Expense, Category, MonthlyBudgetTarget } from "@/lib/types"
 import {
-  fetchAllowanceSummary,
-  fetchBudgetSummary,
+  fetchBudgetAndAllowanceSummary,
   fetchMonthlyBudgetTarget,
   fetchMonthlyExpenses,
 } from "@/lib/client/data"
@@ -79,15 +78,15 @@ export function BudgetPageContent({
   function reloadData() {
     const supabase = createClient()
     Promise.all([
-      fetchBudgetSummary(supabase, householdId, budgetMonth),
-      fetchAllowanceSummary(supabase, householdId, budgetMonth),
+      fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
       fetchMonthlyBudgetTarget(supabase, householdId, budgetMonth),
       fetchMonthlyExpenses(supabase, householdId, budgetMonth),
-    ]).then(([budgetResult, allowanceResult, targetResult, expensesResult]) => {
-      if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
-      else if (budgetResult.data) setBudgets(budgetResult.data)
-      if (allowanceResult.error) setError(getErrorMessage(allowanceResult.error))
-      else if (allowanceResult.data) setAllowances(allowanceResult.data)
+    ]).then(([summaryResult, targetResult, expensesResult]) => {
+      if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
+      else if (summaryResult.data) {
+        setBudgets(summaryResult.data.budgets)
+        setAllowances(summaryResult.data.allowances)
+      }
       if (targetResult.error) setError(getErrorMessage(targetResult.error))
       else setTarget(targetResult.data)
       if (expensesResult.error) setError(getErrorMessage(expensesResult.error))
@@ -98,11 +97,14 @@ export function BudgetPageContent({
   function reloadExpenses() {
     const supabase = createClient()
     Promise.all([
-      fetchBudgetSummary(supabase, householdId, budgetMonth),
+      fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
       fetchMonthlyExpenses(supabase, householdId, budgetMonth),
-    ]).then(([budgetResult, expensesResult]) => {
-      if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
-      else if (budgetResult.data) setBudgets(budgetResult.data)
+    ]).then(([summaryResult, expensesResult]) => {
+      if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
+      else if (summaryResult.data) {
+        setBudgets(summaryResult.data.budgets)
+        setAllowances(summaryResult.data.allowances)
+      }
       if (expensesResult.error) setError(getErrorMessage(expensesResult.error))
       else if (expensesResult.data) setExpenses(expensesResult.data)
     })
@@ -111,14 +113,14 @@ export function BudgetPageContent({
   function reloadAllocations() {
     const supabase = createClient()
     Promise.all([
-      fetchBudgetSummary(supabase, householdId, budgetMonth),
-      fetchAllowanceSummary(supabase, householdId, budgetMonth),
+      fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
       fetchMonthlyBudgetTarget(supabase, householdId, budgetMonth),
-    ]).then(([budgetResult, allowanceResult, targetResult]) => {
-      if (budgetResult.error) setError(getErrorMessage(budgetResult.error))
-      else if (budgetResult.data) setBudgets(budgetResult.data)
-      if (allowanceResult.error) setError(getErrorMessage(allowanceResult.error))
-      else if (allowanceResult.data) setAllowances(allowanceResult.data)
+    ]).then(([summaryResult, targetResult]) => {
+      if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
+      else if (summaryResult.data) {
+        setBudgets(summaryResult.data.budgets)
+        setAllowances(summaryResult.data.allowances)
+      }
       if (targetResult.error) setError(getErrorMessage(targetResult.error))
       else setTarget(targetResult.data)
     })
@@ -127,16 +129,16 @@ export function BudgetPageContent({
   useExpenseSubscription(reloadExpenses, true)
   useBudgetAllocationSubscription(reloadAllocations, true)
 
-  const handleCategoryClick = (budget: BudgetSummary) => {
+  const handleCategoryClick = useCallback((budget: BudgetSummary) => {
     setSelectedCategoryId(budget.category_id)
     setCategoryExpenseDialogOpen(true)
-  }
+  }, [])
 
-  const handleAddFunds = (e: React.MouseEvent, budget: BudgetSummary) => {
+  const handleAddFunds = useCallback((e: React.MouseEvent, budget: BudgetSummary) => {
     e.stopPropagation()
     setRebalanceDestId(budget.category_id)
     setRebalanceOpen(true)
-  }
+  }, [])
 
   const isEmpty = budgets.length === 0 && !target
 
@@ -210,8 +212,8 @@ export function BudgetPageContent({
                   isCurrentMonth={isCurrentMonth}
                   dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
                   daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
-                  onClick={() => handleCategoryClick(budget)}
-                  onAddFunds={(e) => handleAddFunds(e, budget)}
+                  onClick={handleCategoryClick}
+                  onAddFunds={handleAddFunds}
                 />
               ))}
             </div>
@@ -230,8 +232,8 @@ export function BudgetPageContent({
                     isCurrentMonth={isCurrentMonth}
                     dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
                     daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
-                    onClick={() => handleCategoryClick(allowance)}
-                    onAddFunds={(e) => handleAddFunds(e, allowance)}
+                    onClick={handleCategoryClick}
+                    onAddFunds={handleAddFunds}
                   />
                 ))}
               </div>

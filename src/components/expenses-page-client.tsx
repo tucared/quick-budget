@@ -22,6 +22,9 @@ export function ExpensesPageClient({
 }: ExpensesPageClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
   const [hasMore, setHasMore] = useState(initialExpenses.length === PAGE_SIZE)
+  // Bumped on every external realtime event so the inline ExpenseForm can
+  // refresh its budget preview without opening its own subscription.
+  const [externalRefreshSignal, setExternalRefreshSignal] = useState(0)
   const loadingRef = useRef(false)
 
   // Same pattern for edit — replace in place. Realtime UPDATE is unreliable
@@ -51,6 +54,7 @@ export function ExpensesPageClient({
       const deleted = event.old as ExpenseWithDetails
       setExpenses((prev) => prev.filter((exp) => exp.id !== deleted.id))
     }
+    setExternalRefreshSignal((n) => n + 1)
   }, [])
 
   useExpenseSubscription(handleRealtimeEvent)
@@ -99,6 +103,7 @@ export function ExpensesPageClient({
         <ExpenseForm
           initialCategories={initialCategories}
           initialTopCategoryIds={initialTopCategoryIds}
+          externalRefreshSignal={externalRefreshSignal}
         />
       </div>
 
