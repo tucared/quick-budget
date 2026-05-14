@@ -27,7 +27,7 @@ This is the third iteration of a personal finance tool:
 
 ### Prerequisites
 
-- Node.js 22+ (CI pins Node 24)
+- Node.js 24+
 - Docker Desktop ([download](https://docs.docker.com/desktop/))
 - Supabase CLI: `brew install supabase/tap/supabase`
 
