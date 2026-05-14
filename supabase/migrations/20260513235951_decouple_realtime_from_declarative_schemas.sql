@@ -16,8 +16,21 @@
 
 -- ============================================================================
 -- Publication + replica identity
+-- ALTER PUBLICATION ... ADD TABLE does not support IF NOT EXISTS, and a
+-- prior migration (20260509120817) already added categories to the
+-- publication. Guard with a pg_publication_tables check so this re-runs
+-- safely on existing DBs and from a fresh `supabase db reset`.
 -- ============================================================================
-alter publication supabase_realtime add table if not exists categories;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'categories'
+  ) then
+    alter publication supabase_realtime add table categories;
+  end if;
+end;
+$$;
 alter table categories replica identity full;
 
 -- ============================================================================
