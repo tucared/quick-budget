@@ -21,10 +21,12 @@
 --
 -- Forward-only: ALTER DEFAULT PRIVILEGES does not affect existing objects.
 -- Pre-existing grants on the current set of objects are cleaned up by the
--- per-object REVOKE statements in 01_functions.sql, 05_rpcs.sql and
--- 06_realtime.sql, plus the hand-authored statements appended to the
--- accompanying migration (supabase db diff / migra ignores pg_default_acl
--- and function ACLs, so these can't be auto-generated).
+-- per-object REVOKE statements in 01_functions.sql and 05_rpcs.sql, plus
+-- the realtime broadcast layer's REVOKEs in the hand-authored migration
+-- supabase/migrations/*_decouple_realtime_from_declarative_schemas.sql,
+-- plus the hand-authored statements appended to the accompanying baseline
+-- migration (supabase db diff / migra ignores pg_default_acl and function
+-- ACLs, so these can't be auto-generated).
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL     ON TABLES    FROM anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated, service_role;
