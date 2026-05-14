@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { format } from "date-fns"
+import { format, getDaysInMonth } from "date-fns"
 import type { BudgetSummary, Expense, Category } from "@/lib/types"
 import { monthPrefix, parseLocalDate } from "@/lib/date-utils"
 import {
@@ -10,10 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { formatCurrency } from "@/lib/currency"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
 import { EditExpenseDialog } from "@/components/edit-expense-dialog"
+import { CategoryBudgetCard } from "@/components/category-budget-card"
 
 interface CategoryExpenseDialogProps {
   open: boolean
@@ -81,9 +81,10 @@ export function CategoryExpenseDialog({
 
   if (!budget) return null
 
-  const allocated = Number(budget.allocated_amount)
-  const spent = Number(budget.spent_amount)
-  const remaining = Number(budget.remaining_amount)
+  const today = new Date()
+  const isCurrentMonth = budgetMonth.startsWith(format(today, "yyyy-MM"))
+  const dayOfMonth = isCurrentMonth ? today.getDate() : undefined
+  const daysInMonth = isCurrentMonth ? getDaysInMonth(today) : undefined
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,25 +98,13 @@ export function CategoryExpenseDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Budget Summary */}
-        <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Allocated</div>
-            <div className="font-semibold">{formatCurrency(allocated)}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Spent</div>
-            <div className="font-semibold">{formatCurrency(spent)}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground mb-1">Remaining</div>
-            <div
-              className={`font-semibold ${remaining < 0 ? "text-destructive" : "text-[hsl(160,40%,35%)]"}`}
-            >
-              {formatCurrency(remaining)}
-            </div>
-          </div>
-        </div>
+        <CategoryBudgetCard
+          budget={budget}
+          showHeader={false}
+          isCurrentMonth={isCurrentMonth}
+          dayOfMonth={dayOfMonth}
+          daysInMonth={daysInMonth}
+        />
 
         {/* Expense List */}
         <div className="flex-1 overflow-y-auto">
