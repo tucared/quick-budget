@@ -282,6 +282,7 @@ export type Database = {
       users: {
         Row: {
           created_at: string
+          display_name: string | null
           email: string
           full_name: string | null
           household_id: string
@@ -290,6 +291,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           email: string
           full_name?: string | null
           household_id: string
@@ -298,6 +300,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           email?: string
           full_name?: string | null
           household_id?: string
