@@ -14,6 +14,7 @@ import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
 import { EditExpenseDialog } from "@/components/edit-expense-dialog"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
+import { CategoryDailySpendingChart } from "@/components/category-daily-spending-chart"
 
 interface CategoryExpenseDialogProps {
   open: boolean
@@ -109,6 +110,8 @@ export function CategoryExpenseDialog({
           dayOfMonth={dayOfMonth}
           daysInMonth={daysInMonth}
         />
+
+        <CategoryDailySpendingChart expenses={expenses} budgetMonth={budgetMonth} />
 
         {/* Expense List */}
         <div className="flex-1 overflow-y-auto">

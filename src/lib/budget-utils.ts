@@ -1,3 +1,7 @@
+import { getDaysInMonth } from "date-fns"
+import type { Expense } from "@/lib/types"
+import { parseLocalDate } from "@/lib/date-utils"
+
 type BudgetStatus = "over" | "fully_used" | "critical" | "ahead" | "warning" | "on_track"
 
 function getBudgetStatus(percentSpent: number, dayOfMonth?: number, daysInMonth?: number, remainingAmount?: number): BudgetStatus {
@@ -69,5 +73,37 @@ const statusThemes: Record<BudgetStatus, BudgetStatusTheme> = {
 
 export function getBudgetStatusTheme(percentSpent: number, dayOfMonth?: number, daysInMonth?: number, remainingAmount?: number): BudgetStatusTheme {
   return statusThemes[getBudgetStatus(percentSpent, dayOfMonth, daysInMonth, remainingAmount)]
+}
+
+export interface DailySpendingPoint {
+  dateKey: string
+  dayLabel: string
+  total: number
+}
+
+export function computeDailySpending(expenses: Expense[], budgetMonth: string): DailySpendingPoint[] {
+  const monthStart = parseLocalDate(budgetMonth)
+  const daysInMonth = getDaysInMonth(monthStart)
+  const monthPrefix = budgetMonth.slice(0, 7)
+
+  const totals = new Map<string, number>()
+  for (const exp of expenses) {
+    if (!exp.expense_date.startsWith(monthPrefix)) continue
+    totals.set(exp.expense_date, (totals.get(exp.expense_date) ?? 0) + exp.converted_amount)
+  }
+
+  const points: DailySpendingPoint[] = []
+  const year = monthStart.getFullYear()
+  const month = String(monthStart.getMonth() + 1).padStart(2, "0")
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dd = String(day).padStart(2, "0")
+    const dateKey = `${year}-${month}-${dd}`
+    points.push({
+      dateKey,
+      dayLabel: String(day),
+      total: totals.get(dateKey) ?? 0,
+    })
+  }
+  return points
 }
 
