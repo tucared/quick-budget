@@ -265,9 +265,9 @@ CREATE TABLE budget_allocations (
 );
 
 CREATE INDEX idx_budget_allocations_household_month ON budget_allocations(household_id, budget_month DESC);
--- idx_budget_allocations_category dropped: Supabase advisor flagged it as unused
--- on Prod. The FK is rarely scanned standalone — household-scoped queries hit
--- idx_budget_allocations_household_month. Recreate if profiles change.
+-- Re-added 2026-05-14 after Supabase advisor flagged the FK as unindexed
+-- on Prod. (Previously dropped on the "unused" reading; workload changed.)
+CREATE INDEX idx_budget_allocations_category ON budget_allocations(category_id);
 
 CREATE TRIGGER update_budget_allocations_updated_at BEFORE UPDATE ON budget_allocations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
