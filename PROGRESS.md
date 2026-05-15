@@ -43,8 +43,8 @@ When I see a category running out faster than expected, I want to review the ind
 ### [x] JTBD #7: Log expenses without friction, even when catching up
 When I've spent money (whether just now or earlier today), I want to log it in seconds without interrupting what I'm doing, so it doesn't feel like a chore even if I have a few to enter
 
-### [ ] JTBD #8: Split expenses between shared and personal
-When I have a purchase that's partly personal and partly shared (like a lunch alone where we agreed on €10 shared), I want to allocate portions to different categories, so each budget reflects only its relevant spending
+### [x] JTBD #8: Cap a shared category, overflow to allowance
+When I make a purchase where we've agreed to cap the shared portion at a specific amount (like a €30 lunch alone where shared "Dining Out" is capped at €10), I want to log the full purchase and have anything over the cap automatically count against my allowance, so each budget reflects only what we agreed
 
 ### [ ] JTBD #9: Stay accountable to each other
 When either of us hasn't logged any expenses in several days, we want to be notified, so we know our shared financial picture might be incomplete and trigger a catch up

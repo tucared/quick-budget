@@ -162,6 +162,7 @@ export type Database = {
           id: string
           is_cash: boolean
           logged_by_user_id: string
+          split_group_id: string | null
           updated_at: string
         }
         Insert: {
@@ -178,6 +179,7 @@ export type Database = {
           id?: string
           is_cash?: boolean
           logged_by_user_id: string
+          split_group_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -194,6 +196,7 @@ export type Database = {
           id?: string
           is_cash?: boolean
           logged_by_user_id?: string
+          split_group_id?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { format, isToday, isYesterday } from "date-fns"
 import { Search, X } from "lucide-react"
-import type { Expense, ExpenseWithDetails, Category } from "@/lib/types"
+import type { Expense, ExpenseListItem, ExpenseWithDetails, Category } from "@/lib/types"
+import { isSplitGroup } from "@/lib/types"
+import { groupSplitSiblings, partitionSplitSiblings } from "@/lib/split-utils"
 import { parseLocalDate } from "@/lib/date-utils"
 import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
-import { ExpenseCard } from "@/components/expense-card"
+import { ExpenseCard, SplitExpenseCard } from "@/components/expense-card"
 import { EditExpenseDialog } from "@/components/edit-expense-dialog"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase"
@@ -16,8 +18,8 @@ interface ExpenseListClientProps {
   categories: Category[]
   hasMore: boolean
   onLoadMore: () => Promise<void>
-  onExpenseUpdated?: (updated: Expense) => void
-  onExpenseDeleted?: (id: string) => void
+  onExpenseUpdated?: (updated: Expense | Expense[]) => void
+  onExpenseDeleted?: (ids: string[]) => void
 }
 
 const SEARCH_LIMIT = 50
@@ -42,7 +44,14 @@ export function ExpenseListClient({
     return map
   }, [categoryList])
 
-  const [editingExpense, setEditingExpense] = useState<ExpenseWithDetails | null>(null)
+  // Flag map keyed by category id, used to identify the allowance sibling.
+  const categoryExcludeFlags = useMemo(() => {
+    const map = new Map<string, boolean>()
+    categoryList.forEach((cat) => map.set(cat.id, cat.exclude_from_budget_total))
+    return map
+  }, [categoryList])
+
+  const [editingExpenses, setEditingExpenses] = useState<ExpenseWithDetails[] | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
@@ -136,7 +145,15 @@ export function ExpenseListClient({
   const handleEdit = useCallback((expenseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const exp = editPoolRef.current.find((ex) => ex.id === expenseId)
-    if (exp) setEditingExpense(exp)
+    if (!exp) return
+    if (exp.split_group_id) {
+      const siblings = editPoolRef.current.filter(
+        (ex) => ex.split_group_id === exp.split_group_id,
+      )
+      setEditingExpenses(siblings.length >= 2 ? siblings.slice(0, 2) : [exp])
+    } else {
+      setEditingExpenses([exp])
+    }
   }, [])
 
   // Infinite scroll: trigger onLoadMore when sentinel enters viewport.
@@ -171,27 +188,35 @@ export function ExpenseListClient({
     })
   }, [expenses, resultsForCurrentQuery, deletingIds, clearDeletingId])
 
-  const visibleExpenses = isSearchMode ? (resultsForCurrentQuery ?? []) : expenses
+  const visibleExpenses = useMemo(
+    () => (isSearchMode ? (resultsForCurrentQuery ?? []) : expenses),
+    [isSearchMode, resultsForCurrentQuery, expenses],
+  )
+  const visibleItems: ExpenseListItem[] = useMemo(
+    () => groupSplitSiblings(visibleExpenses),
+    [visibleExpenses],
+  )
 
-  // Group expenses by date
-  const groupedExpenses: { label: string; expenses: ExpenseWithDetails[] }[] = []
+  // Group items by date (using the primary row's date for split groups).
+  const groupedItems: { label: string; items: ExpenseListItem[] }[] = []
   const seenDates = new Map<string, number>()
 
-  for (const expense of visibleExpenses) {
-    const dateKey = expense.expense_date
+  for (const item of visibleItems) {
+    const sampleExpense = isSplitGroup(item) ? item.siblings[0] : item
+    const dateKey = sampleExpense.expense_date
     if (!seenDates.has(dateKey)) {
       const parsed = parseLocalDate(dateKey)
       let label: string
       if (isToday(parsed)) label = "Today"
       else if (isYesterday(parsed)) label = "Yesterday"
       else label = format(parsed, "EEE, MMM d")
-      seenDates.set(dateKey, groupedExpenses.length)
-      groupedExpenses.push({ label, expenses: [] })
+      seenDates.set(dateKey, groupedItems.length)
+      groupedItems.push({ label, items: [] })
     }
-    groupedExpenses[seenDates.get(dateKey)!].expenses.push(expense)
+    groupedItems[seenDates.get(dateKey)!].items.push(item)
   }
 
-  const isEmpty = visibleExpenses.length === 0
+  const isEmpty = visibleItems.length === 0
 
   return (
     <div>
@@ -263,24 +288,44 @@ export function ExpenseListClient({
         <div className="text-center py-8 text-sm text-muted-foreground">Searching…</div>
       )}
 
-      {groupedExpenses.map(({ label, expenses: group }) => (
+      {groupedItems.map(({ label, items }) => (
         <div key={label} className="mb-4">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70 mb-1.5 px-1">
             {label}
           </div>
           <div className="divide-y divide-border">
-            {group.map((expense) => (
-              <ExpenseCard
-                key={expense.id}
-                expense={expense}
-                category={expense.category_id ? categories.get(expense.category_id) : null}
-                isShowingDelete={showingDeleteId === expense.id}
-                isDeleting={deletingIds.has(expense.id)}
-                onCardClick={handleCardClick}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
+            {items.map((item) => {
+              if (isSplitGroup(item)) {
+                const { primary, overflow } = partitionSplitSiblings(item, categoryExcludeFlags)
+                const isAnyDeleting = deletingIds.has(primary.id) || deletingIds.has(overflow.id)
+                return (
+                  <SplitExpenseCard
+                    key={item.splitGroupId}
+                    primary={primary}
+                    overflow={overflow}
+                    primaryCategory={primary.category_id ? categories.get(primary.category_id) : null}
+                    overflowCategory={overflow.category_id ? categories.get(overflow.category_id) : null}
+                    isShowingDelete={showingDeleteId === primary.id}
+                    isDeleting={isAnyDeleting}
+                    onCardClick={handleCardClick}
+                    onEdit={handleEdit}
+                    onDelete={(_id, e) => handleDelete(primary, e)}
+                  />
+                )
+              }
+              return (
+                <ExpenseCard
+                  key={item.id}
+                  expense={item}
+                  category={item.category_id ? categories.get(item.category_id) : null}
+                  isShowingDelete={showingDeleteId === item.id}
+                  isDeleting={deletingIds.has(item.id)}
+                  onCardClick={handleCardClick}
+                  onEdit={handleEdit}
+                  onDelete={(_id, e) => handleDelete(item, e)}
+                />
+              )
+            })}
           </div>
         </div>
       ))}
@@ -297,11 +342,12 @@ export function ExpenseListClient({
       )}
 
       <EditExpenseDialog
-        open={editingExpense !== null}
-        onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
-        expense={editingExpense}
+        open={editingExpenses !== null}
+        onOpenChange={(open) => { if (!open) setEditingExpenses(null) }}
+        siblings={editingExpenses}
         categories={categoryList}
         onSaved={onExpenseUpdated}
+        onDeleted={onExpenseDeleted}
       />
     </div>
   )

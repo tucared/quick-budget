@@ -22,6 +22,7 @@ function mkExpense(date: string, amount: number, overrides: Partial<Expense> = {
     is_cash: false,
     household_id: "hh-1",
     logged_by_user_id: "u-1",
+    split_group_id: null,
     created_at: "2026-05-01T00:00:00Z",
     updated_at: "2026-05-01T00:00:00Z",
     ...overrides,
