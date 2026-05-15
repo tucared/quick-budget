@@ -6,13 +6,13 @@ name: Generate Migration from Schema
 # back to the PR branch — but only if the diff has real DDL. A comment-only
 # or empty diff is treated as a no-op so this is safe to run on every PR.
 #
-# Two extra post-processing checks guard against a long-running migra bug
-# where view options (e.g. `security_invoker = true`) are silently stripped
-# on every view recreation, regardless of how the option is declared in the
-# schema file: pure-noise view-recreation migrations are dropped, and real
-# migrations that recreate `budget_summary` as a side effect get an
-# idempotent ALTER VIEW SET appended so the option self-heals. See the inline
-# comments in the "Generate migration" step for the rationale.
+# Migrations that recreate `budget_summary` get an idempotent
+# `ALTER VIEW public.budget_summary SET (security_invoker = true)` appended,
+# working around a documented migra limitation (supabase/cli#3973, #792) that
+# silently strips view options on every drop+create. Without this, the view
+# would run with its owner role (postgres → BYPASSRLS) and leak every
+# household's rows to authenticated callers. See the inline comment in the
+# "Generate migration" step for details.
 #
 # The workflow also regenerates `src/lib/database.types.ts` on every run so
 # the committed TypeScript types always reflect the current schema. If a
@@ -34,6 +34,14 @@ on:
     paths:
       - "supabase/schemas/**"
   workflow_dispatch:
+
+# When a PR is opened already carrying `apply-to-dev`, GitHub fires `opened`
+# and `labeled` near-simultaneously and both pass the job-level filter below.
+# Two concurrent runs would each generate a migration and race to push to the
+# PR branch. Serialize per-PR so newer events cancel older runs cleanly.
+concurrency:
+  group: generate-migration-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   generate:
@@ -104,45 +112,23 @@ jobs:
             exit 0
           fi
 
-          # Migra cannot track view options like security_invoker — it strips
-          # them on every drop+create-or-replace and doesn't read schema-level
-          # ALTER VIEW SET declarations. That produces two failure modes we
-          # need to handle here:
-          #
-          # 1. Pure-noise migrations: migra emits a `drop view + create or
-          #    replace view "public"."budget_summary"` migration on runs where
-          #    nothing real changed, because it perpetually thinks the DB and
-          #    the schema differ on the option. Applying this no-op migration
-          #    silently strips security_invoker, downgrading the view to run
-          #    with the owner role (postgres, superuser → BYPASSRLS) and
-          #    expose every household's rows to authenticated callers. We
-          #    detect these by checking that the migration contains the view
-          #    drop *and* no other DDL keyword, and drop the file.
-          # 2. Real migrations that recreate the view as a side effect (e.g.
-          #    adding a column to `expenses` forces the view to be dropped and
-          #    recreated to update the column dependency). The recreated view
-          #    is missing the option just the same as case 1; we have to
-          #    self-heal by appending an idempotent ALTER VIEW SET.
-          HAS_VIEW_RECREATE=$(grep -c '^drop view if exists "public"\."budget_summary";' "$FILE" || true)
-          if [ "${HAS_VIEW_RECREATE:-0}" -gt 0 ]; then
-            # Whitelist DDL keywords that indicate a real change beyond the
-            # view recreation. If none match, treat the migration as pure
-            # migra noise and drop it.
-            NON_VIEW_DDL=$(grep -cEi '^[[:space:]]*(alter table|create index|drop index|create table|drop table|create function|create or replace function|drop function|alter function|create trigger|drop trigger|alter trigger|grant |revoke |comment on|create publication|alter publication|create policy|drop policy|alter policy|create role|alter role|create extension|drop extension|create sequence|alter sequence|drop sequence|create or replace procedure|drop procedure|create schema|drop schema|create type|alter type|drop type)' "$FILE" || true)
-            if [ "${NON_VIEW_DDL:-0}" -eq 0 ]; then
-              echo "Migration contains only budget_summary view recreation (migra view-options noise); dropping $FILE"
-              rm -f "$FILE"
-              echo "produced=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            # Real DDL alongside view recreation: append idempotent fix.
-            echo "" >> "$FILE"
-            echo "-- Auto-appended by generate-migration.yml: migra strips view" >> "$FILE"
-            echo "-- options on every drop+create-or-replace. Re-apply" >> "$FILE"
-            echo "-- security_invoker=true on budget_summary so authenticated" >> "$FILE"
-            echo "-- callers don't bypass RLS via the view owner role." >> "$FILE"
-            echo "ALTER VIEW public.budget_summary SET (security_invoker = true);" >> "$FILE"
-            echo "Appended ALTER VIEW SET (security_invoker = true) to $FILE (view-recreation side effect)"
+          # Migra cannot track view options like security_invoker
+          # (supabase/cli#3973, #792): it strips them on every drop+create
+          # and doesn't read schema-level ALTER VIEW SET declarations. The
+          # supabase docs recommend hand-authored migrations for views with
+          # this option; until budget_summary is migrated out of
+          # supabase/schemas/, self-heal by appending an idempotent
+          # ALTER VIEW SET whenever the diff recreates the view.
+          if grep -q '^drop view if exists "public"\."budget_summary";' "$FILE"; then
+            {
+              echo ""
+              echo "-- Auto-appended by generate-migration.yml: migra strips view"
+              echo "-- options on every drop+create-or-replace. Re-apply"
+              echo "-- security_invoker=true on budget_summary so authenticated"
+              echo "-- callers don't bypass RLS via the view owner role."
+              echo "ALTER VIEW public.budget_summary SET (security_invoker = true);"
+            } >> "$FILE"
+            echo "Appended ALTER VIEW SET (security_invoker = true) to $FILE"
           fi
 
           echo "Generated migration with $REAL_LINES non-comment lines: $FILE"
