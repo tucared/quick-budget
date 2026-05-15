@@ -50,7 +50,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   const [overflowCategoryBudget, setOverflowCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
-  const [previewExchangeRate, setPreviewExchangeRate] = useState<number>(1.0)
+  const [previewExchangeRate, setPreviewExchangeRate] = useState<number | null>(null)
   const debouncedBudgetRefreshTick = useDebouncedValue(budgetRefreshTick, 500)
 
   // Cents-first input state (POS-style: digits fill from the right)
@@ -66,6 +66,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // different category.
   const [applyCap, setApplyCap] = useState(true)
   const [prevCapCategory, setPrevCapCategory] = useState("")
+  // Per-log override for the overflow target. `null` means "use the category's
+  // configured default" (`overflow_category_id`). Resets on category change so
+  // a stale pick from a different category doesn't carry across.
+  const [overrideOverflowId, setOverrideOverflowId] = useState<string | null>(null)
 
   // Ref for the amount input — used to refocus after currency toggles
   const amountInputRef = useRef<AmountInputHandle | null>(null)
@@ -90,7 +94,12 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   const selectedCurrency = currency
   const expenseAmount = amount
 
-  const effectiveExchangeRate = (!selectedCurrency || selectedCurrency === "EUR") ? 1.0 : previewExchangeRate
+  // For EUR the rate is always 1; for non-EUR we wait for the API fetch to
+  // populate `previewExchangeRate`. `null` while loading prevents the toggle
+  // from briefly displaying nonsensical math (e.g., 60 BRL treated as €60
+  // before the rate resolves).
+  const isNonEuroCurrency = !!selectedCurrency && selectedCurrency !== "EUR"
+  const effectiveExchangeRate: number | null = isNonEuroCurrency ? previewExchangeRate : 1.0
 
   const selectedCategoryObj = useMemo(
     () => categories.find((c) => c.id === selectedCategory) ?? null,
@@ -98,25 +107,37 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   )
   const selectedCategoryIsAllowance = selectedCategoryObj?.exclude_from_budget_total === true
 
-  // Render-time reset of the cap toggle when the category changes — keeps the
-  // "default ON, respect user override within the same category" semantics
-  // without a useEffect (React's recommended pattern for derived state).
+  // Allowance categories in the household — used to render the per-log
+  // override switch when the cap toggle is on.
+  const allowanceCategories = useMemo(
+    () => categories.filter((c) => c.exclude_from_budget_total),
+    [categories],
+  )
+
+  // Render-time reset of the cap toggle (and overflow override) when the
+  // category changes — React's recommended pattern for derived state.
   if (selectedCategory !== prevCapCategory) {
     setPrevCapCategory(selectedCategory)
     setApplyCap(true)
+    setOverrideOverflowId(null)
   }
 
   // Derive cap-split values from the category's configured cap_amount +
   // overflow_category_id. `exceedsCap` is true only when the configured cap
-  // is strictly less than the EUR-converted total.
+  // is strictly less than the EUR-converted total. When the rate isn't loaded
+  // yet (non-EUR mid-fetch), short-circuit to no-split so the UI doesn't show
+  // misleading preview math.
   const capDerivation = useMemo(
-    () => deriveCapState(selectedCategoryObj, expenseAmount, effectiveExchangeRate),
+    () => effectiveExchangeRate == null
+      ? deriveCapState(null, 0, 1)
+      : deriveCapState(selectedCategoryObj, expenseAmount, effectiveExchangeRate),
     [selectedCategoryObj, expenseAmount, effectiveExchangeRate],
   )
   const isSplit = capDerivation.exceedsCap && applyCap
+  const effectiveOverflowCategoryId = overrideOverflowId ?? capDerivation.overflowCategoryId
   const overflowCategoryName = useMemo(
-    () => categories.find((c) => c.id === capDerivation.overflowCategoryId)?.name,
-    [categories, capDerivation.overflowCategoryId],
+    () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
+    [categories, effectiveOverflowCategoryId],
   )
 
   const primaryPortion = isSplit ? capDerivation.primaryOriginal : expenseAmount
@@ -274,8 +295,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   }, [selectedCategory, user, categories, debouncedBudgetRefreshTick, expenseDate])
 
   // Mirror the above for the overflow category when a split is active.
+  // Re-runs when the user flips the per-log allowance override.
   useEffect(() => {
-    if (!isSplit || !capDerivation.overflowCategoryId || !user?.householdId) return
+    if (!isSplit || !effectiveOverflowCategoryId || !user?.householdId) return
     let cancelled = false
     ;(async () => {
       const supabase = createClient()
@@ -284,13 +306,13 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         .from("budget_summary")
         .select("*")
         .eq("household_id", user.householdId)
-        .eq("category_id", capDerivation.overflowCategoryId)
+        .eq("category_id", effectiveOverflowCategoryId)
         .eq("budget_month", budgetMonth)
         .maybeSingle()
       if (!cancelled) setOverflowCategoryBudget(data || null)
     })()
     return () => { cancelled = true }
-  }, [isSplit, capDerivation.overflowCategoryId, user, debouncedBudgetRefreshTick, expenseDate])
+  }, [isSplit, effectiveOverflowCategoryId, user, debouncedBudgetRefreshTick, expenseDate])
 
 
   // Drop the stale overflow-budget snapshot the moment the split is turned off
@@ -298,10 +320,14 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // placeholder on next re-expand.
   const overflowBudgetToShow = isSplit ? overflowCategoryBudget : null
 
-  // Fetch exchange rate for budget preview when currency or date changes
+  // Fetch exchange rate for budget preview when currency or date changes.
+  // Reset to `null` first so the cap toggle hides until the authoritative
+  // rate resolves — prevents flashing wrong amounts for BRL inputs.
   useEffect(() => {
     if (!selectedCurrency || selectedCurrency === "EUR") return
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreviewExchangeRate(null)
     fetchExchangeRateFromAPI(selectedCurrency, expenseDate).then((rate) => {
       if (!cancelled) setPreviewExchangeRate(rate)
     })
@@ -384,6 +410,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       // if the rate changed between render and submit.
       const submitDerivation = deriveCapState(selectedCategoryObj, data.amount, exchangeRate)
       const shouldSplit = submitDerivation.exceedsCap && applyCap
+      // Per-log override takes precedence over the category's configured default.
+      const overflowCategoryIdToUse = overrideOverflowId ?? submitDerivation.overflowCategoryId
 
       let savedRows: Expense[] | null = null
       if (shouldSplit) {
@@ -398,7 +426,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           },
           {
             ...sharedFields,
-            category_id: submitDerivation.overflowCategoryId,
+            category_id: overflowCategoryIdToUse,
             amount: submitDerivation.overflowOriginal,
             converted_amount: submitDerivation.overflowEUR,
             split_group_id: splitGroupId,
@@ -468,9 +496,11 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       setCentsRaw(0)
       setAmount(NaN)
       setDescription("")
-      // Re-arm the cap toggle for the next entry — same category, but the
-      // user's previous OFF state shouldn't silently persist across saves.
+      // Re-arm the cap toggle and clear the per-log overflow override for the
+      // next entry — same category, but the user's previous choices shouldn't
+      // silently persist across saves.
       setApplyCap(true)
+      setOverrideOverflowId(null)
 
       // Focus on amount input for next entry
       if (amountInputRef.current) {
@@ -573,7 +603,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                   dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                   daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                  additionalAmount={debouncedPrimaryPortion > 0 ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
+                  additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
                 />
                 {isSplit && (
@@ -583,7 +613,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                     isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                     dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                     daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                    additionalAmount={debouncedOverflowAmount > 0 ? debouncedOverflowAmount * effectiveExchangeRate : 0}
+                    additionalAmount={debouncedOverflowAmount > 0 && effectiveExchangeRate != null ? debouncedOverflowAmount * effectiveExchangeRate : 0}
                   />
                 )}
               </>
@@ -594,27 +624,53 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
       {/* Cap-with-overflow toggle (JTBD #8). Surfaces only when the selected
           category has a cap configured AND the entered amount exceeds it.
-          The cap value and overflow target are intrinsic to the category. */}
+          Cap value comes from the category; overflow target defaults to the
+          category's configured allowance but can be overridden per-log when
+          there are multiple allowances. */}
       {capDerivation.exceedsCap && !selectedCategoryIsAllowance && (
-        <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 cursor-pointer">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">
-              Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
-              {overflowCategoryName ?? "allowance"}
-            </span>
-          </div>
-          <input
-            type="checkbox"
-            role="switch"
-            checked={applyCap}
-            onChange={(e) => setApplyCap(e.target.checked)}
-            className="h-4 w-4 rounded border-input accent-primary"
-            aria-label="Apply cap"
-          />
-        </label>
+        <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">
+                Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
+                {overflowCategoryName ?? "allowance"}
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={applyCap}
+              onChange={(e) => setApplyCap(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+              aria-label="Apply cap"
+            />
+          </label>
+          {applyCap && allowanceCategories.length > 1 && (
+            <div className="flex gap-1.5">
+              {allowanceCategories.map((a) => {
+                const active = a.id === effectiveOverflowCategoryId
+                return (
+                  <button
+                    type="button"
+                    key={a.id}
+                    onClick={() => setOverrideOverflowId(a.id)}
+                    className={`flex-1 h-8 rounded-md text-xs font-medium border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                    aria-pressed={active}
+                  >
+                    {a.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Date + Cash checkbox inline */}
