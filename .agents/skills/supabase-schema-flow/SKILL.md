@@ -1,6 +1,6 @@
 ---
 name: supabase-schema-flow
-description: How to make database schema changes in this Quick Budget repo — when to edit declarative schemas in `supabase/schemas/` vs hand-author migrations in `supabase/migrations/`, the `apply-to-dev` label flow, the security_invoker view-options pin, RLS helpers in the `private` schema, the auth-hook JWT claim, GRANT/REVOKE quirks, and the generate-migration / migrate-prod / reset-dev workflow loop. Use whenever the user mentions migrations, schemas, RLS, declarative database, supabase db diff, hand-authored migrations, security_invoker, apply-to-dev, or edits any file under `supabase/`.
+description: How to make database schema changes in this Quick Budget repo — when to edit declarative schemas in `supabase/schemas/` vs hand-author migrations in `supabase/migrations/`, the `apply-to-dev` label flow, why views are owned entirely by migrations (not declared declaratively), RLS helpers in the `private` schema, the auth-hook JWT claim, GRANT/REVOKE quirks, and the generate-migration / migrate-prod / reset-dev workflow loop. Use whenever the user mentions migrations, schemas, RLS, declarative database, supabase db diff, hand-authored migrations, security_invoker, apply-to-dev, views, or edits any file under `supabase/`.
 ---
 
 # Supabase schema flow
@@ -39,13 +39,19 @@ Migra (which powers `db diff`) can't reliably track these. Edit `supabase/migrat
 
 - Custom DML that can't be expressed declaratively (backfills, one-shot data corrections, seed corrections that need to survive `db reset`).
 
-### View options on `security_invoker` views
+### Views (`budget_summary` and any future view)
 
-Migra does not read view options back from `pg_class.reloptions` ([supabase/cli#3973](https://github.com/supabase/cli/issues/3973), [#792](https://github.com/supabase/cli/issues/792)). If the option is declared in `supabase/schemas/`, `db diff` thinks it's missing from the source DB on every run and emits a perpetual no-op `DROP VIEW + CREATE OR REPLACE VIEW` to "re-apply" it. Without `security_invoker = true`, the view runs as its owner (postgres → BYPASSRLS) and exposes every household's rows.
+Views are NOT declared in `supabase/schemas/`. The body, options, and grants all live in hand-authored migrations. Migra has too many bugs around views to use the declarative flow productively for them:
 
-Pattern: declare only the view body in `supabase/schemas/04_views.sql` (no `WITH (...)` clause), and put the `ALTER VIEW SET (security_invoker = true)` plus the `GRANT/REVOKE` trio in a hand-authored migration. Canonical example: `supabase/migrations/20260515190000_pin_budget_summary_view_options_and_grants.sql`. Stripping the option from the declarative target was originally intended to kill the loop at the source, but empirically migra still emits a body-only `DROP VIEW + CREATE OR REPLACE` on every run — it always re-emits view DDL when reloptions are set on the source, regardless of target shape. The `generate-migration.yml` workflow detects view-only no-op recreates (body byte-equal to `pg_get_viewdef`) and drops the file before committing, so the chain stays clean.
+- It doesn't read `pg_class.reloptions`, so it never sees `security_invoker = true` on the source and silently strips it on every recreate ([supabase/cli#3973](https://github.com/supabase/cli/issues/3973), [#792](https://github.com/supabase/cli/issues/792)).
+- It doesn't diff `GRANT/REVOKE`, and Postgres drops a view's grants when the view is dropped — so any recreate leaves the view with only the owner's grants.
+- It emits an unconditional `DROP VIEW + CREATE OR REPLACE VIEW` on every `db diff` run regardless of whether anything actually changed, and again whenever a column is added/dropped/renamed on a referenced table (even when Postgres doesn't require the recreate).
 
-Side-effect recreation gotcha: if a future PR adds/drops/renames a column on a table the view references (`categories`, `budget_allocations`, `expenses` for `budget_summary`), migra emits a `DROP VIEW + CREATE OR REPLACE` to update the column dependency. Postgres drops the option and grants with the view, and migra emits neither back. Hand-author a follow-up migration mirroring the four statements in the pinning migration above. Timestamp the follow-up immediately after the auto-generated migration it patches (e.g. `20260515201040` for an auto-migration at `20260515201039`) — not "later today" or a clean round number. Reason: any subsequent push to the PR re-runs `db diff`, which writes a new auto-migration with the current UTC timestamp; if your follow-up is timestamped further in the future than that, `supabase migration up` refuses to apply the new file (version older than head already applied) and the workflow fails. Safety nets: stripped grants surface immediately as `permission denied for view budget_summary` on the next deploy; stripped `security_invoker` is blocked by `Migrate Prod`'s security-advisors gate (`security_definer_view` lint) before reaching Prod.
+`generate-migration.yml` strips any `budget_summary` view DDL migra emits from the auto-migration before counting `REAL_LINES`. For pure no-op emissions, the file becomes empty and gets dropped. For "side-effect" emissions (column add + view recreate), the column add survives but the recreate is removed — Postgres allows `ALTER TABLE ADD COLUMN` without touching dependent views, so skipping the recreate is safe AND preserves the view's options and grants. No manual follow-up migration needed for column adds.
+
+Steady-state options and grants are owned by `supabase/migrations/20260515190000_pin_budget_summary_view_options_and_grants.sql`: an idempotent block that applies `ALTER VIEW SET (security_invoker = true)` and the `GRANT SELECT TO authenticated/service_role`, `REVOKE FROM anon` trio. Run once at chain apply, never touched by migra again.
+
+Real body changes (new columns exposed, join restructured, etc.) are hand-authored: write a migration that does `CREATE OR REPLACE VIEW … WITH (security_invoker = true) AS …` plus the four grant statements. Column drops or renames on view-referenced columns also need a hand-authored migration that drops the view first (or modifies it to no longer reference the column) — Postgres will error during `migration up` if the dependency is left dangling, which is loud and correct.
 
 ## Dogfooding on Dev
 
