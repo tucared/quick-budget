@@ -43,9 +43,11 @@ Migra (which powers `db diff`) can't reliably track these. Edit `supabase/migrat
 
 **Views with `security_invoker = true`** ship declaratively but rely on a workflow safety net. Migra silently strips the option on every drop+create-or-replace ([supabase/cli#3973](https://github.com/supabase/cli/issues/3973), [#792](https://github.com/supabase/cli/issues/792)) — without `security_invoker`, the view runs as its owner (postgres → BYPASSRLS) and exposes every household's rows.
 
-The schema declares the option inline via `WITH (security_invoker = true)` on `CREATE OR REPLACE VIEW`, so `db diff` sees schema and DB as in sync on steady-state runs. When a side-effect recreation happens (e.g. column added to a table the view references forces Postgres to drop+recreate the view), `generate-migration.yml` detects the `drop view if exists "public"."budget_summary";` line migra emits and auto-appends an idempotent `ALTER VIEW public.budget_summary SET (security_invoker = true);` to the file before committing.
+The schema declares the option inline via `WITH (security_invoker = true)` on `CREATE OR REPLACE VIEW`. When a side-effect recreation happens (e.g. column added to a table the view references forces Postgres to drop+recreate the view), `generate-migration.yml` detects the `drop view if exists "public"."budget_summary";` line migra emits and auto-appends an idempotent `ALTER VIEW public.budget_summary SET (security_invoker = true);` to the file before committing.
 
-Net-new views with this option should ship via a hand-authored migration rather than relying on the workflow patch.
+The same migra bug also causes a **perpetual no-op view-recreation diff** even on PRs that don't change anything affecting the view — migra doesn't read view options back from `pg_class.reloptions`, so it always thinks the option needs re-applying and emits a recreate. The workflow detects this case (view-only DDL + body byte-equal to current DB via `pg_get_viewdef`) and drops the migration before committing, so the chain stays clean.
+
+Net-new views with `security_invoker = true` should ship via a hand-authored migration rather than relying on the workflow patch (the no-op detector is hardcoded to `budget_summary`).
 
 ## Dogfooding on Dev
 
