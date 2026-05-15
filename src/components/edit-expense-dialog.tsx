@@ -117,6 +117,13 @@ function EditExpenseForm({
   // Re-arms to ON whenever the category changes (render-time reset below).
   const [applyCap, setApplyCap] = useState(initial.isSplit)
   const [prevCapCategory, setPrevCapCategory] = useState(primaryRow.category_id || "")
+  // Per-log override for the overflow target. Initialised from the existing
+  // overflow row's category (if this was already a split) so the toggle reflects
+  // the actual stored choice. `null` falls back to the category's configured
+  // default. Resets on category change.
+  const [overrideOverflowId, setOverrideOverflowId] = useState<string | null>(
+    initialOverflowRow?.category_id ?? null,
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -139,9 +146,17 @@ function EditExpenseForm({
     [selectedCategoryObj, amount, previewExchangeRate],
   )
 
+  const effectiveOverflowCategoryId = overrideOverflowId ?? capDerivation.overflowCategoryId
   const overflowCategoryName = useMemo(
-    () => categories.find((c) => c.id === capDerivation.overflowCategoryId)?.name,
-    [categories, capDerivation.overflowCategoryId],
+    () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
+    [categories, effectiveOverflowCategoryId],
+  )
+
+  // Allowance categories — used to render the per-log override switch when
+  // the cap toggle is on.
+  const allowanceCategories = useMemo(
+    () => categories.filter((c) => c.exclude_from_budget_total),
+    [categories],
   )
 
   // Render-time reset when the category changes (React's recommended pattern
@@ -149,6 +164,7 @@ function EditExpenseForm({
   if (categoryId !== prevCapCategory) {
     setPrevCapCategory(categoryId)
     setApplyCap(true)
+    setOverrideOverflowId(null)
   }
 
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
@@ -209,6 +225,9 @@ function EditExpenseForm({
       const submitDerivation = deriveCapState(selectedCategoryObj, data.amount, exchangeRate)
       const wantsSplitNow = submitDerivation.exceedsCap && applyCap && !selectedCategoryIsAllowance
       const wasSplit = initial.isSplit
+      // Per-log override for the overflow target takes precedence over the
+      // category's configured default.
+      const overflowCategoryIdToUse = overrideOverflowId ?? submitDerivation.overflowCategoryId
 
       // Case 1: was not split → still not split. Simple update.
       if (!wasSplit && !wantsSplitNow) {
@@ -251,7 +270,7 @@ function EditExpenseForm({
           .insert({
             logged_by_user_id: primaryRow.logged_by_user_id,
             household_id: primaryRow.household_id,
-            category_id: submitDerivation.overflowCategoryId,
+            category_id: overflowCategoryIdToUse,
             amount: submitDerivation.overflowOriginal,
             converted_amount: submitDerivation.overflowEUR,
             split_group_id: splitGroupId,
@@ -285,7 +304,7 @@ function EditExpenseForm({
               ...sharedFields,
               amount: submitDerivation.overflowOriginal,
               converted_amount: submitDerivation.overflowEUR,
-              category_id: submitDerivation.overflowCategoryId,
+              category_id: overflowCategoryIdToUse,
             })
             .eq("id", initialOverflowRow.id)
             .select()
@@ -372,28 +391,53 @@ function EditExpenseForm({
 
         {/* Cap-with-overflow toggle. Same model as the expense form: surfaces
             only when the selected category has a cap configured AND the
-            entered amount exceeds it (EUR-converted). Cap value and overflow
-            target come from the category, not user inputs. */}
+            entered amount exceeds it (EUR-converted). Cap value comes from
+            the category; overflow target defaults to its configured allowance
+            but can be overridden per-log when there are multiple allowances. */}
         {capDerivation.exceedsCap && !selectedCategoryIsAllowance && (
-          <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 cursor-pointer">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">
-                Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
-                {overflowCategoryName ?? "allowance"}
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={applyCap}
-              onChange={(e) => setApplyCap(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-primary"
-              aria-label="Apply cap"
-            />
-          </label>
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">
+                  Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
+                  {overflowCategoryName ?? "allowance"}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={applyCap}
+                onChange={(e) => setApplyCap(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+                aria-label="Apply cap"
+              />
+            </label>
+            {applyCap && allowanceCategories.length > 1 && (
+              <div className="flex gap-1.5">
+                {allowanceCategories.map((a) => {
+                  const active = a.id === effectiveOverflowCategoryId
+                  return (
+                    <button
+                      type="button"
+                      key={a.id}
+                      onClick={() => setOverrideOverflowId(a.id)}
+                      className={`flex-1 h-8 rounded-md text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-pressed={active}
+                    >
+                      {a.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Date + Cash */}
