@@ -10,6 +10,13 @@
 -- recreations triggered by changes to referenced tables still lose the option
 -- on emission (supabase/cli#3973) — the generate-migration workflow appends an
 -- idempotent ALTER VIEW SET as a safety net.
+--
+-- The inline WITH option doesn't fully end the view-recreation loop either:
+-- migra doesn't read view options back from pg_class.reloptions, so it emits
+-- a `drop view if exists` + `create or replace view` on every db diff run
+-- regardless of whether anything changed. The generate-migration workflow
+-- detects this case (view-only DDL + body byte-equal to pg_get_viewdef on
+-- the local DB) and drops the migration before committing.
 CREATE OR REPLACE VIEW budget_summary WITH (security_invoker = true) AS
 WITH category_months AS (
   SELECT household_id, category_id, budget_month
