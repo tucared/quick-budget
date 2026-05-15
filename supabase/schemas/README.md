@@ -21,7 +21,6 @@ See: [Declarative database schemas — Supabase docs](https://supabase.com/docs/
 | `01_functions.sql` | Utility functions (`handle_new_user`, `update_updated_at_column`) used by triggers and RLS. |
 | `02_tables.sql` | All tables (households, users, categories, expenses, budget_allocations, monthly_budget_targets), their indexes/triggers, and the `private` schema's RLS helper + auth hook. |
 | `03_rls.sql` | All RLS policies (uses `private.get_my_household_id()`). |
-| `04_views.sql` | The `budget_summary` view. |
 | `05_rpcs.sql` | Stored procedures called via `supabase.rpc()` (`rebalance_budget`, `top_up_budget`, etc.). |
 
 Order matters: file names are lex-sorted before `supabase db diff` reads them, so dependencies (function before trigger; table before policy) must respect that.
@@ -35,7 +34,7 @@ Order matters: file names are lex-sorted before `supabase db diff` reads them, s
 - **Default privileges** (`ALTER DEFAULT PRIVILEGES`) — known bug: ["grant statements are duplicated from default privileges"](https://github.com/supabase/cli/issues/1864)
 - **`ALTER POLICY`** — only `CREATE` / `DROP` are tracked ([schemainspect note](https://github.com/djrobstep/schemainspect/blob/master/schemainspect/pg/obj.py#L228))
 - **Column-level privileges** — [schemainspect#67](https://github.com/djrobstep/schemainspect/pull/67)
-- **View owner / grants** — [migra#160](https://github.com/djrobstep/migra/issues/160)
+- **Views** — migra can't reliably round-trip view options (`security_invoker`, see [supabase/cli#3973](https://github.com/supabase/cli/issues/3973), [#792](https://github.com/supabase/cli/issues/792)) or grants ([migra#160](https://github.com/djrobstep/migra/issues/160)), and emits unnecessary `DROP + CREATE OR REPLACE` recreates on column adds to referenced tables. We keep `budget_summary` entirely out of `supabase/schemas/` and own the body via migrations; the workflow strips any view DDL migra emits from the auto-migration so options and grants survive column-add cycles.
 - **`ALTER PUBLICATION ADD TABLE`** — [supabase/cli#883](https://github.com/supabase/cli/issues/883)
 - **`REPLICA IDENTITY`** — bundled with publication caveats
 - **Comments, partitions, `CREATE DOMAIN`**

@@ -1,21 +1,26 @@
--- Hand-authored. Migra (which powers `supabase db diff`) does not read view
--- options like `security_invoker` back from pg_class.reloptions
--- (supabase/cli#3973, #792). Declaring the option in supabase/schemas/04_views.sql
--- via `WITH (security_invoker = true)` made `db diff` emit a perpetual no-op
--- view-recreation on every schemas/** PR. Pinning the option here, outside the
--- declarative chain, kills the loop at the source: schemas/04_views.sql now
--- declares only the body, source and target look identical to migra, no diff.
+-- Hand-authored. Pins the steady-state options and grants for budget_summary
+-- once at chain apply. Two migra bugs make declarative ownership of these
+-- impractical:
 --
--- Grants are pinned here for the same reason: Postgres drops grants on view
--- DROP, migra does not diff GRANT/REVOKE, and we no longer want a workflow
--- self-heal block patching it back. If a future PR causes a side-effect
--- recreation (column add/drop/rename on categories/budget_allocations/expenses
--- forces migra to emit `DROP VIEW + CREATE OR REPLACE` for budget_summary),
--- the recreated view will lose both the option and the grants — author a
--- follow-up migration that re-applies these four statements. Safety nets:
--- `Migrate Prod`'s security-advisors gate flags `security_definer_view` and
--- blocks the push; stripped grants surface immediately as `permission denied
--- for view budget_summary` on the next deploy.
+-- 1. Migra does not read view options like `security_invoker` back from
+--    pg_class.reloptions (supabase/cli#3973, #792), so it always thinks the
+--    option needs to be re-applied and emits a `DROP VIEW + CREATE OR
+--    REPLACE VIEW` on every db diff. The recreated view loses the option
+--    on emission, so even if you declare WITH (security_invoker = true) in
+--    a schema file, the auto-migration that lands strips it.
+-- 2. Migra does not diff GRANT/REVOKE, and Postgres drops a view's grants
+--    when the view is dropped — so any recreate leaves the view with only
+--    the owner's grants.
+--
+-- budget_summary is therefore not declared in supabase/schemas/ at all. The
+-- view body lives in the migration chain (baseline + future hand-authored
+-- migrations for body changes). The generate-migration workflow strips any
+-- budget_summary view DDL migra still emits from auto-migrations, which
+-- means side-effect recreates (column adds on referenced tables) preserve
+-- the view's existing options and grants instead of stripping them.
+--
+-- This migration is the one place options and grants get re-asserted, and
+-- it's idempotent — safe to leave in the chain forever.
 
 ALTER VIEW public.budget_summary SET (security_invoker = true);
 
