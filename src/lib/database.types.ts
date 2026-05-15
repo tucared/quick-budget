@@ -84,6 +84,7 @@ export type Database = {
       }
       categories: {
         Row: {
+          cap_amount: number | null
           created_at: string
           exclude_from_budget_total: boolean
           household_id: string
@@ -91,9 +92,11 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          overflow_category_id: string | null
           updated_at: string
         }
         Insert: {
+          cap_amount?: number | null
           created_at?: string
           exclude_from_budget_total?: boolean
           household_id: string
@@ -101,9 +104,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          overflow_category_id?: string | null
           updated_at?: string
         }
         Update: {
+          cap_amount?: number | null
           created_at?: string
           exclude_from_budget_total?: boolean
           household_id?: string
@@ -111,6 +116,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          overflow_category_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -119,6 +125,13 @@ export type Database = {
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categories_overflow_category_id_fkey"
+            columns: ["overflow_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
         ]
