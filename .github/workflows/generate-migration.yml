@@ -15,6 +15,13 @@ name: Generate Migration
 # would run with its owner role (postgres → BYPASSRLS) and leak every
 # household's rows to authenticated callers.
 #
+# Same migra view-options bug causes a related symptom: even when nothing
+# meaningful changed, `db diff` emits a no-op `drop view if exists` +
+# `create or replace view` for budget_summary on every run. The recreated
+# body is byte-identical to what's already in the DB — pure noise on the
+# migration chain. The workflow detects this case (view-only DDL, body
+# unchanged via pg_get_viewdef) and drops the file before committing.
+#
 # The workflow also regenerates `src/lib/database.types.ts` on every run so
 # the committed TypeScript types always reflect the current schema. If a
 # developer forgets `npm run types:generate` locally, the bot commits the
@@ -112,6 +119,57 @@ jobs:
             rm -f "$FILE"
             echo "produced=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+
+          # Detect and drop migra's perpetual no-op view-recreation of
+          # budget_summary (supabase/cli#3973, #792). Even with the option
+          # declared inline via WITH (security_invoker = true) in the schema,
+          # `db diff` emits a `drop view if exists` + `create or replace view`
+          # on every run — migra doesn't read view options back from
+          # pg_class.reloptions, so it always thinks the option needs to be
+          # re-applied via a recreate. When the recreated body is byte-equal
+          # (modulo whitespace) to the current DB view body AND no other DDL
+          # is present, the migration is functionally a no-op and would just
+          # add noise to the migration chain. Drop it.
+          #
+          # Only safe to skip when the migration is view-only. If migra also
+          # emits a column add (side-effect recreation), the recreate is
+          # required to pick up the new column shape — keep those.
+          if grep -q '^drop view if exists "public"\."budget_summary";' "$FILE"; then
+            # Count DDL-starting lines. Migra emits each statement on its own
+            # line starting with a lowercase keyword. View-only means exactly:
+            #   1x  drop view if exists "public"."budget_summary";
+            #   1x  create or replace view "public"."budget_summary" as ...
+            TOTAL_DDL=$(grep -cE '^(create|alter|drop|truncate|grant|revoke) ' "$FILE" || true)
+            VIEW_DDL=$(grep -cE '^(drop view if exists "public"\."budget_summary"|create or replace view "public"\."budget_summary")' "$FILE" || true)
+            if [ "${TOTAL_DDL:-0}" -eq "${VIEW_DDL:-0}" ] && [ "${VIEW_DDL:-0}" -eq 2 ]; then
+              # View-only migration. Compare bodies.
+              # Extract everything from `create or replace view ... as` up to
+              # the closing semicolon. pg_get_viewdef returns just the SELECT
+              # body, so strip the `create or replace view ... as ` prefix
+              # and trailing `;` before comparing.
+              MIGRATION_BODY=$(awk '
+                /^create or replace view "public"\."budget_summary" as/ {capture=1}
+                capture {print}
+                /;$/ && capture {exit}
+              ' "$FILE" | sed -E 's/^create or replace view "public"\."budget_summary" as[[:space:]]*//' | sed 's/;$//')
+              # supabase db start exposes Postgres on 54322 with postgres/postgres.
+              DB_BODY=$(PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -tA -c \
+                "SELECT pg_get_viewdef('public.budget_summary'::regclass, true);" 2>/dev/null || true)
+              # Normalize whitespace for comparison — both bodies come from
+              # migra/pg_get_viewdef so format is consistent modulo spacing.
+              norm() { tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/ +$//'; }
+              NEW_NORM=$(printf '%s' "$MIGRATION_BODY" | norm)
+              DB_NORM=$(printf '%s' "$DB_BODY" | norm)
+              if [ -n "$DB_NORM" ] && [ "$NEW_NORM" = "$DB_NORM" ]; then
+                echo "No-op view recreation (migra view-options loop, supabase/cli#3973):"
+                echo "  body matches current DB view; dropping $FILE"
+                rm -f "$FILE"
+                echo "produced=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "View body differs from current DB — keeping migration (legitimate body change)"
+            fi
           fi
 
           # Migra cannot track view options like security_invoker
