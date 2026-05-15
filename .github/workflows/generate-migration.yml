@@ -1,10 +1,12 @@
-name: Generate Migration from Schema
+name: Generate Migration
 
 # When a PR changes a declarative schema file (`supabase/schemas/**`), this
-# workflow boots a local Supabase stack, runs `supabase db diff` against the
-# already-applied migration chain, and auto-commits the generated migration
-# back to the PR branch — but only if the diff has real DDL. A comment-only
-# or empty diff is treated as a no-op so this is safe to run on every PR.
+# workflow boots a local Postgres (via `supabase db start` — just the DB,
+# not the full auth/storage/realtime stack), runs `supabase db diff` against
+# the already-applied migration chain, and auto-commits the generated
+# migration back to the PR branch — but only if the diff has real DDL. A
+# comment-only or empty diff is treated as a no-op so this is safe to run on
+# every PR.
 #
 # Migrations that recreate `budget_summary` get an idempotent
 # `ALTER VIEW public.budget_summary SET (security_invoker = true)` appended,
@@ -18,11 +20,10 @@ name: Generate Migration from Schema
 # developer forgets `npm run types:generate` locally, the bot commits the
 # updated file alongside (or instead of) the migration.
 #
-# If the PR carries the `apply-to-dev` label, the `apply-to-dev` job (which
-# runs after `generate`) pushes the resulting migration chain to the Dev
-# Supabase project so an agent can dogfood the schema change without an
-# extra MCP round-trip. Labeling fires the workflow even when no code
-# changed.
+# If the PR carries the `apply-to-dev` label, the final step pushes the
+# resulting migration chain to the Dev Supabase project (via `supabase db
+# push`), so an agent can dogfood the schema change without an extra MCP
+# round-trip. Labeling fires the workflow even when no code changed.
 #
 # Why: lets agents (Claude Code on the web, etc.) iterate on schemas without
 # needing local Docker for `supabase start`. The CLI-generated migration is
@@ -67,13 +68,14 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # supabase/setup-cli@v2 auto-detects the version from package-lock.json
+      # (the `supabase` devDependency is the single source of truth — bump it
+      # via `npm install supabase@<version> --save-dev` to upgrade).
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2
-        with:
-          version: 2.98.2
 
-      - name: Start local Supabase stack
-        run: supabase start
+      - name: Start local Postgres
+        run: supabase db start
 
       - name: Generate migration from schema diff
         id: gen
@@ -160,9 +162,9 @@ jobs:
           fi
 
       # GitHub suppresses workflow re-triggers when an action pushes with the
-      # default GITHUB_TOKEN, so test.yml does not re-run on the bot's commit.
-      # Verify the regenerated types/migrations against the codebase here,
-      # before committing, so the bot can't push a broken state.
+      # default GITHUB_TOKEN, so checks.yml does not re-run on the bot's
+      # commit. Verify the regenerated types/migrations against the codebase
+      # here, before committing, so the bot can't push a broken state.
       - name: Set up Node.js (for verification)
         if: steps.regen.outputs.has_changes == 'true'
         uses: actions/setup-node@v6
@@ -208,31 +210,12 @@ jobs:
               body: `Bot committed ${items.join(' + ')}.\n\nReview before merging — pull the bot's commit if you have a local checkout.`
             });
 
-  # `db push` is idempotent (tracks applied versions in supabase_migrations)
-  # so this safely no-ops if the migration chain already matches Dev. Multiple
-  # labeled PRs open at once will share Dev — daily reset-dev.yml at 05:00 UTC
-  # cleans up. The job-level `if:` keeps this off unless the PR carries the
-  # label; `needs: [generate]` means the bot's migration commit (if any) is on
-  # the branch by the time we checkout.
-  apply-to-dev:
-    needs: [generate]
-    if: |
-      github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout PR branch (post-bot-commit)
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2
-        with:
-          version: 2.98.2
-
-      - name: Push migration chain to Dev
+      # `db push` is idempotent (tracks applied versions in supabase_migrations)
+      # so this safely no-ops if the migration chain already matches Dev.
+      # Multiple labeled PRs open at once will share Dev — daily reset-dev.yml
+      # at 05:00 UTC cleans up.
+      - name: Push migration chain to Dev (label-gated)
+        if: contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DEV_DB_PASSWORD }}

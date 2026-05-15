@@ -72,9 +72,9 @@ To make a schema change:
 
 1. Edit files in `supabase/schemas/`
 2. Verify locally: `supabase db reset` (regenerates from migrations + seeds; your unstaged schema edits won't apply until step 4 produces a migration)
-3. Open a PR — the **Generate Migration from Schema** workflow runs `supabase db diff` and auto-commits the generated migration to your branch
+3. Open a PR — the **Generate Migration** workflow runs `supabase db diff` and auto-commits the generated migration to your branch
 4. Pull the bot's commit, run `supabase db reset` again to verify
-5. Merge to `main` — the **Apply Database Migrations to Prod** workflow pushes to prod automatically
+5. Merge to `main` — the **Migrate Prod** workflow pushes to prod automatically
 
 To dogfood a schema change on the Dev Supabase project before merging, add the `apply-to-dev` label to your PR. See [DEPLOYMENT.md](./DEPLOYMENT.md) for full details.
 

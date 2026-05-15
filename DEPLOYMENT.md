@@ -59,9 +59,9 @@ Click **Enable Customize Access Token (JWT) Claims hook**, then:
 
 Save.
 
-**Prerequisite**: the function must exist in the project's database before the dropdown can show it. The function lives in [`supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql`](./supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql) and ships with the regular migration chain — it lands on Prod via `migrate.yml` on merge to `main`, and on Dev via either the `apply-to-dev` label or the daily 05:00 UTC `reset-dev.yml` cron.
+**Prerequisite**: the function must exist in the project's database before the dropdown can show it. The function lives in [`supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql`](./supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql) and ships with the regular migration chain — it lands on Prod via `migrate-prod.yml` on merge to `main`, and on Dev via either the `apply-to-dev` label or the daily 05:00 UTC `reset-dev.yml` cron.
 
-> If the "Select a function" dropdown says **"No function with a single JSON/B argument and JSON/B return type found in this schema"**, the migration hasn't been applied to that project yet. Trigger `reset-dev.yml` from **Actions → Reset Dev Database → Run workflow** for Dev, or merge to `main` for Prod.
+> If the "Select a function" dropdown says **"No function with a single JSON/B argument and JSON/B return type found in this schema"**, the migration hasn't been applied to that project yet. Trigger `reset-dev.yml` from **Actions → Reset Dev → Run workflow** for Dev, or merge to `main` for Prod.
 
 **What the hook does**: injects `household_id` into the JWT's `app_metadata`, so server- and client-side code read it from the token instead of hitting `public.users`, and the `private.get_my_household_id()` RLS helper skips its DB lookup on every household-scoped query.
 
@@ -77,12 +77,12 @@ Every PR goes through the following gates before it can deploy:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `test.yml` | PR touching `src/**` or config; push to `main` | `npm run lint` + `npm run typecheck` + `npm test` (Vitest) |
-| `audit.yml` | PR touching `package.json`/`package-lock.json`; push to `main` | `npm audit --omit=dev --audit-level=high` (fails on high/critical CVEs in prod deps; devDeps intentionally excluded) |
-| `generate-migration.yml` | PR touching `supabase/schemas/**` | Boots a local Supabase stack, runs `supabase db diff`, auto-commits the generated migration back to the PR branch. No-op if schemas are in sync. |
-| `migrate.yml` | Push to `main` touching `supabase/migrations/**` | `supabase db push` to prod, then `supabase db advisors --level error --fail-on error` to catch missing RLS |
+| `checks.yml` | PR touching `src/**` or config; push to `main` | `npm run lint` + `npm run typecheck` + `npm test` (Vitest) |
+| `audit-packages.yml` | PR touching `package.json`/`package-lock.json`; push to `main` | `npm audit --omit=dev --audit-level=high` (fails on high/critical CVEs in prod deps; devDeps intentionally excluded) |
+| `generate-migration.yml` | PR touching `supabase/schemas/**` | Boots a local Postgres (via `supabase db start`), runs `supabase db diff`, auto-commits the generated migration back to the PR branch. No-op if schemas are in sync. |
+| `migrate-prod.yml` | Push to `main` touching `supabase/migrations/**` | `supabase db push` to prod, then `supabase db advisors --level error --fail-on error` to catch missing RLS |
 | `reset-dev.yml` | Daily 05:00 UTC; push to `main` touching `supabase/**` | `supabase db reset --linked` against the Dev project |
-| `backup.yml` | Daily 03:00 UTC | `pg_dump` of prod, uploaded as a GitHub Actions artifact (90-day retention) |
+| `backup-prod.yml` | Daily 03:00 UTC | `pg_dump` of prod, uploaded as a GitHub Actions artifact (90-day retention) |
 
 ## Supabase Setup
 
@@ -123,7 +123,7 @@ Schemas are **declarative**. You never hand-write SQL in `supabase/migrations/` 
 2. Open a PR
 3. `generate-migration.yml` runs `supabase db diff` and auto-commits the generated migration to your PR branch. Pull the bot's commit before continuing local work.
 4. Review the SQL the bot produced (especially RLS coverage on any new public-schema table)
-5. Merge to `main` → `migrate.yml` pushes to prod and runs the security advisors
+5. Merge to `main` → `migrate-prod.yml` pushes to prod and runs the security advisors
 
 ### Dogfooding a schema change on Dev before merge
 
@@ -137,12 +137,12 @@ Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs 
 
 | Secret | Used by | What |
 |---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | migrate, reset-dev, generate-migration | Personal access token (from step 1) |
-| `SUPABASE_PROD_PROJECT_REF` | migrate | Prod project ref (Supabase Dashboard → Project Settings) |
-| `SUPABASE_DB_PASSWORD` | migrate | Prod database password |
+| `SUPABASE_ACCESS_TOKEN` | migrate-prod, reset-dev, generate-migration | Personal access token (from step 1) |
+| `SUPABASE_PROD_PROJECT_REF` | migrate-prod | Prod project ref (Supabase Dashboard → Project Settings) |
+| `SUPABASE_DB_PASSWORD` | migrate-prod | Prod database password |
 | `SUPABASE_DEV_PROJECT_REF` | reset-dev, generate-migration (apply-to-dev) | Dev project ref |
 | `SUPABASE_DEV_DB_PASSWORD` | reset-dev, generate-migration (apply-to-dev) | Dev database password |
-| `SUPABASE_DB_URL` | backup | Prod pooler connection string (see Backups below) |
+| `SUPABASE_DB_URL` | backup-prod | Prod pooler connection string (see Backups below) |
 
 ### Manually resetting Dev
 
@@ -151,11 +151,11 @@ Outside the daily cron:
 supabase link --project-ref <dev-project-ref>
 supabase db reset --linked
 ```
-Or trigger `reset-dev.yml` from **Actions → Reset Dev Database → Run workflow**.
+Or trigger `reset-dev.yml` from **Actions → Reset Dev → Run workflow**.
 
 ## Backups
 
-Supabase Free tier has **no built-in backups**. `backup.yml` runs `pg_dump` daily and stores the result as a GitHub Actions artifact (retained 90 days).
+Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump` daily and stores the result as a GitHub Actions artifact (retained 90 days).
 
 ### Setup (one-time, after creating Supabase project)
 
@@ -165,11 +165,11 @@ Supabase Free tier has **no built-in backups**. `backup.yml` runs `pg_dump` dail
    - **Name**: `SUPABASE_DB_URL`
    - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
    - **Important**: If your database password contains special characters, URL-encode them (e.g., `!` → `%21`, `@` → `%40`, `#` → `%23`)
-4. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Daily Database Backup → Run workflow**.
+4. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Backup Prod → Run workflow**.
 
 ### Restoring from backup
 
-1. Go to **Actions → Daily Database Backup** and download the artifact for the desired date
+1. Go to **Actions → Backup Prod** and download the artifact for the desired date
 2. Unzip it to get the `.sql` file
 3. Run against your database:
    ```bash

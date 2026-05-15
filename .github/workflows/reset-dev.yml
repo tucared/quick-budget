@@ -1,4 +1,4 @@
-name: Reset Dev Database
+name: Reset Dev
 
 on:
   schedule:
@@ -20,8 +20,6 @@ jobs:
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2
-        with:
-          version: 2.98.2
 
       - name: Reset linked dev database
         env:
