@@ -5,7 +5,7 @@
 -- event-trigger safety net. Per Supabase's docs
 -- (https://supabase.com/docs/guides/database/postgres/row-level-security),
 -- explicit enablement is the recommended approach. The CI gate in
--- `.github/workflows/migrate.yml` runs after every prod push and fails if
+-- `.github/workflows/migrate-prod.yml` runs after every prod push and fails if
 -- any `public` table has `relrowsecurity = false`, so a new table missing
 -- its RLS line cannot ship.
 

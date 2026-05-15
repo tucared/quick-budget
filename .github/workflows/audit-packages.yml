@@ -1,4 +1,4 @@
-name: Dependency Audit
+name: Audit Packages
 
 # Fails the PR if any production dependency has a high or critical CVE.
 # devDependencies are intentionally excluded — the agent-browser / selenium
@@ -9,7 +9,7 @@ on:
     paths:
       - "package.json"
       - "package-lock.json"
-      - ".github/workflows/audit.yml"
+      - ".github/workflows/audit-packages.yml"
   push:
     branches: [main]
     paths:

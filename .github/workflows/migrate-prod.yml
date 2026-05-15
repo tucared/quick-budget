@@ -1,4 +1,4 @@
-name: Apply Database Migrations to Prod
+name: Migrate Prod
 
 on:
   push:
@@ -18,8 +18,6 @@ jobs:
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2
-        with:
-          version: 2.98.2
 
       - name: Push migrations to prod
         env:

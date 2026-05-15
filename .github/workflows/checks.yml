@@ -1,4 +1,4 @@
-name: Test
+name: Code Checks
 
 # Runs lint, typecheck, and Vitest on every PR that touches code or its
 # config. Closes the gap left by previously relying only on Vercel's build
@@ -13,7 +13,7 @@ on:
       - "vitest.config.ts"
       - "tsconfig.json"
       - "eslint.config.js"
-      - ".github/workflows/test.yml"
+      - ".github/workflows/checks.yml"
   push:
     branches: [main]
   workflow_dispatch:

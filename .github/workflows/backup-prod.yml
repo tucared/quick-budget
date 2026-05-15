@@ -1,4 +1,4 @@
-name: Daily Database Backup
+name: Backup Prod
 
 # Runs every day at 03:00 UTC (05:00 CET)
 on:
