@@ -49,6 +49,14 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
     fi
   fi
 
+  # Install gh CLI so we can read GitHub Actions logs (the Anthropic-hosted
+  # GitHub MCP server doesn't expose workflow run tools). Auth is picked up
+  # from the GH_TOKEN env var set in the Claude Code web environment config.
+  if ! command -v gh > /dev/null 2>&1; then
+    echo "Installing gh CLI..."
+    apt-get install -y gh > /dev/null 2>&1 || echo "gh install failed (continuing)"
+  fi
+
   if [ -x "$RTK_BIN" ]; then
     # Register the Claude Code PreToolUse hook so rtk stops warning on every git call.
     "$RTK_BIN" init -g --auto-patch > /dev/null 2>&1 || true
