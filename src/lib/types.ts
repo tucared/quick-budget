@@ -28,6 +28,19 @@ export interface ExpenseWithDetails extends Expense {
   category?: Category
 }
 
+// Two sibling expense rows linked by a shared split_group_id (see JTBD #8).
+// The list view collapses each pair into a single visual card.
+export interface SplitGroup {
+  splitGroupId: string
+  siblings: [ExpenseWithDetails, ExpenseWithDetails]
+}
+
+export type ExpenseListItem = ExpenseWithDetails | SplitGroup
+
+export function isSplitGroup(item: ExpenseListItem): item is SplitGroup {
+  return (item as SplitGroup).splitGroupId !== undefined
+}
+
 // Local storage keys for remembering defaults, namespaced by household
 export function getStorageKeys(householdId: string) {
   const prefix = `qb:${householdId}`

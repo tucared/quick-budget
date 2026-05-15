@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check } from "lucide-react"
+import { Check, X } from "lucide-react"
 import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { fetchExchangeRateFromAPI } from "@/lib/currency"
+import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,7 +19,7 @@ import { useUser } from "@/lib/contexts/user-context"
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 
 interface ExpenseFormProps {
-  onExpenseSaved?: (expense: Expense) => void
+  onExpenseSaved?: (expense: Expense | Expense[]) => void
   initialCategories?: Category[]
   initialTopCategoryIds?: string[]
   /**
@@ -46,6 +46,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   const [showSuccess, setShowSuccess] = useState(false)
   const [topCategoryIds, setTopCategoryIds] = useState<string[]>(initialTopCategoryIds ?? [])
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
+  const [overflowCategoryBudget, setOverflowCategoryBudget] = useState<BudgetSummary | null>(null)
   const [loadingBudget, setLoadingBudget] = useState(false)
   const [budgetRefreshTick, setBudgetRefreshTick] = useState(0)
   const [previewExchangeRate, setPreviewExchangeRate] = useState<number>(1.0)
@@ -53,6 +54,13 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
+
+  // Cap-with-overflow split state (JTBD #8). When `splitExpanded` is on and
+  // capCentsRaw < total amount and overflowCategoryId is set, save inserts
+  // two sibling rows sharing a split_group_id (cap → primary, rest → overflow).
+  const [splitExpanded, setSplitExpanded] = useState(false)
+  const [capCentsRaw, setCapCentsRaw] = useState(0)
+  const [overflowCategoryId, setOverflowCategoryId] = useState<string>("")
 
   // Ref for the amount input — used to refocus after currency toggles
   const amountInputRef = useRef<AmountInputHandle | null>(null)
@@ -77,9 +85,28 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   const selectedCurrency = currency
   const expenseAmount = amount
 
-  // Debounce the amount for budget calculations to avoid re-rendering on every keystroke
-  const debouncedAmount = useDebouncedValue(expenseAmount, 300)
   const effectiveExchangeRate = (!selectedCurrency || selectedCurrency === "EUR") ? 1.0 : previewExchangeRate
+
+  const selectedCategoryIsAllowance = useMemo(() => {
+    const c = categories.find((cat) => cat.id === selectedCategory)
+    return c?.exclude_from_budget_total === true
+  }, [categories, selectedCategory])
+
+  const capAmount = capCentsRaw > 0 ? capCentsRaw / 100 : 0
+  const overflowAmount =
+    Number.isFinite(expenseAmount) && expenseAmount > 0 && capAmount > 0 && capAmount < expenseAmount
+      ? expenseAmount - capAmount
+      : 0
+  // A split actually happens only when the disclosure is open, the cap is
+  // strictly less than the total, and an overflow category is chosen.
+  const isSplit =
+    splitExpanded &&
+    overflowAmount > 0 &&
+    overflowCategoryId !== "" &&
+    overflowCategoryId !== selectedCategory
+  const primaryPortion = isSplit ? capAmount : expenseAmount
+  const debouncedPrimaryPortion = useDebouncedValue(primaryPortion, 300)
+  const debouncedOverflowAmount = useDebouncedValue(overflowAmount, 300)
 
   // Convert string date to Date object for DatePicker
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
@@ -230,6 +257,30 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // eslint-disable-next-line react-hooks/exhaustive-deps -- categoryBudget intentionally excluded to avoid refetch loop
   }, [selectedCategory, user, categories, debouncedBudgetRefreshTick, expenseDate])
 
+  // Mirror the above for the overflow category when a split is active.
+  useEffect(() => {
+    if (!isSplit || !overflowCategoryId || !user?.householdId) return
+    let cancelled = false
+    ;(async () => {
+      const supabase = createClient()
+      const budgetMonth = format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd')
+      const { data } = await supabase
+        .from("budget_summary")
+        .select("*")
+        .eq("household_id", user.householdId)
+        .eq("category_id", overflowCategoryId)
+        .eq("budget_month", budgetMonth)
+        .maybeSingle()
+      if (!cancelled) setOverflowCategoryBudget(data || null)
+    })()
+    return () => { cancelled = true }
+  }, [isSplit, overflowCategoryId, user, debouncedBudgetRefreshTick, expenseDate])
+
+  // Drop the stale overflow-budget snapshot the moment the split is turned off
+  // so the second CategoryBudgetCard doesn't render with a "no budget set"
+  // placeholder on next re-expand.
+  const overflowBudgetToShow = isSplit ? overflowCategoryBudget : null
+
   // Fetch exchange rate for budget preview when currency or date changes
   useEffect(() => {
     if (!selectedCurrency || selectedCurrency === "EUR") return
@@ -291,6 +342,14 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       return
     }
 
+    // Pre-flight: if the user expanded the split disclosure but didn't pick an
+    // overflow category, surface that as a field error rather than silently
+    // saving a single row.
+    if (splitExpanded && overflowAmount > 0 && !overflowCategoryId) {
+      setFormErrors({ overflow_category_id: "Pick an overflow category" })
+      return
+    }
+
     try {
       const supabase = createClient()
 
@@ -299,32 +358,69 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
       // Fetch exchange rate from API (with database caching)
       const exchangeRate = await fetchExchangeRateFromAPI(cur, data.expense_date)
-      const convertedAmount = data.amount * exchangeRate
-
-      // Insert expense and return the saved row
-      const { data: savedExpense, error: insertError } = await supabase.from("expenses").insert({
+      const sharedFields = {
         logged_by_user_id: user.id,
         household_id: user.householdId,
-        category_id: data.category_id,
         is_cash: data.is_cash ?? false,
-        amount: data.amount,
         currency: cur,
-        converted_amount: convertedAmount,
         converted_currency: "EUR",
         exchange_rate: exchangeRate,
         expense_date: data.expense_date,
         description: data.description || null,
-      }).select().single()
+      } as const
 
-      if (insertError) {
-        setError(getErrorMessage(insertError))
-        setLoading(false)
-        return
+      let savedRows: Expense[] | null = null
+      if (isSplit) {
+        const splitGroupId = crypto.randomUUID()
+        const overflow = data.amount - capAmount
+        const rows = [
+          {
+            ...sharedFields,
+            category_id: data.category_id,
+            amount: capAmount,
+            converted_amount: capAmount * exchangeRate,
+            split_group_id: splitGroupId,
+          },
+          {
+            ...sharedFields,
+            category_id: overflowCategoryId,
+            amount: overflow,
+            converted_amount: overflow * exchangeRate,
+            split_group_id: splitGroupId,
+          },
+        ]
+        const { data: inserted, error: insertError } = await supabase
+          .from("expenses")
+          .insert(rows)
+          .select()
+        if (insertError) {
+          setError(getErrorMessage(insertError))
+          setLoading(false)
+          return
+        }
+        savedRows = (inserted ?? []) as Expense[]
+      } else {
+        const { data: savedExpense, error: insertError } = await supabase
+          .from("expenses")
+          .insert({
+            ...sharedFields,
+            category_id: data.category_id,
+            amount: data.amount,
+            converted_amount: data.amount * exchangeRate,
+          })
+          .select()
+          .single()
+        if (insertError) {
+          setError(getErrorMessage(insertError))
+          setLoading(false)
+          return
+        }
+        savedRows = savedExpense ? [savedExpense as Expense] : null
       }
 
       // Notify parent immediately for optimistic list update
-      if (savedExpense && onExpenseSaved) {
-        onExpenseSaved(savedExpense)
+      if (savedRows && savedRows.length > 0 && onExpenseSaved) {
+        onExpenseSaved(savedRows.length === 1 ? savedRows[0] : savedRows)
       }
 
       // Save defaults to localStorage and track usage (namespaced by household)
@@ -357,6 +453,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       setCentsRaw(0)
       setAmount(NaN)
       setDescription("")
+      // Collapse the split disclosure after save so the next entry defaults
+      // back to a normal one-row expense. Keep the cap value in case the user
+      // wants to reuse the same split for the next entry.
+      setSplitExpanded(false)
 
       // Focus on amount input for next entry
       if (amountInputRef.current) {
@@ -451,20 +551,117 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           className="grid transition-[grid-template-rows] duration-200 ease-out"
           style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
         >
-          <div className="overflow-hidden">
+          <div className="overflow-hidden space-y-2">
             {selectedCategory && (
-              <CategoryBudgetCard
-                budget={categoryBudget}
-                isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
-                dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
-                daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                additionalAmount={debouncedAmount > 0 ? debouncedAmount * effectiveExchangeRate : 0}
-                loading={loadingBudget}
-              />
+              <>
+                <CategoryBudgetCard
+                  budget={categoryBudget}
+                  isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
+                  dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
+                  daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
+                  additionalAmount={debouncedPrimaryPortion > 0 ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
+                  loading={loadingBudget}
+                />
+                {isSplit && (
+                  <CategoryBudgetCard
+                    budget={overflowBudgetToShow}
+                    showHeader
+                    isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
+                    dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
+                    daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
+                    additionalAmount={debouncedOverflowAmount > 0 ? debouncedOverflowAmount * effectiveExchangeRate : 0}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
+
+      {/* Cap-with-overflow disclosure (JTBD #8). Only meaningful when the
+          primary category is a shared/spending category — capping an
+          allowance and overflowing to another allowance is not a real use
+          case. The disclosure toggle is hidden until the user has picked a
+          shared category and entered a positive amount. */}
+      {selectedCategory && !selectedCategoryIsAllowance && expenseAmount > 0 && (
+        <div className="space-y-2">
+          {!splitExpanded ? (
+            <button
+              type="button"
+              onClick={() => setSplitExpanded(true)}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Cap &amp; send overflow to allowance…
+            </button>
+          ) : (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Split this expense</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitExpanded(false)
+                    setFormErrors((prev) => {
+                      const { overflow_category_id: _, ...rest } = prev
+                      return rest
+                    })
+                  }}
+                  aria-label="Cancel split"
+                  className="p-0.5 text-muted-foreground hover:text-foreground rounded"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm">
+                <label htmlFor="cap-amount" className="text-muted-foreground shrink-0">Cap at</label>
+                <input
+                  id="cap-amount"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={capCentsRaw > 0 ? (capCentsRaw / 100).toString() : ""}
+                  onChange={(e) => {
+                    const parsed = parseFloat(e.target.value)
+                    setCapCentsRaw(Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) : 0)
+                  }}
+                  className="flex-1 h-8 rounded-md border border-input bg-background px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <span className="text-xs text-muted-foreground">{selectedCurrency}</span>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Overflow to</p>
+                <CategoryTileSelector
+                  categories={categories.filter((c) => c.exclude_from_budget_total)}
+                  topCategoryIds={categories.filter((c) => c.exclude_from_budget_total).slice(0, 7).map((c) => c.id)}
+                  value={overflowCategoryId}
+                  onValueChange={setOverflowCategoryId}
+                  allOptions={buildCategoryOptions(categories.filter((c) => c.exclude_from_budget_total))}
+                />
+                {formErrors.overflow_category_id && (
+                  <p className="text-sm text-destructive">{formErrors.overflow_category_id}</p>
+                )}
+              </div>
+
+              {isSplit && (() => {
+                const primaryCat = categories.find((c) => c.id === selectedCategory)
+                const overflowCat = categories.find((c) => c.id === overflowCategoryId)
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(capAmount, 2, selectedCurrency)} → {primaryCat?.name || "primary"}, {formatCurrency(overflowAmount, 2, selectedCurrency)} → {overflowCat?.name || "overflow"}
+                  </p>
+                )
+              })()}
+              {splitExpanded && overflowAmount === 0 && capAmount > 0 && expenseAmount > 0 && capAmount >= expenseAmount && (
+                <p className="text-xs text-muted-foreground">Cap covers the full amount — no overflow.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Date + Cash checkbox inline */}
       <div>

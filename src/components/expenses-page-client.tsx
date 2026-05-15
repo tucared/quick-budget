@@ -29,14 +29,29 @@ export function ExpensesPageClient({
 
   // Same pattern for edit — replace in place. Realtime UPDATE is unreliable
   // on this project, so the dialog's onSaved callback drives the refresh.
-  const handleExpenseUpdated = useCallback((updated: Expense) => {
-    setExpenses((prev) =>
-      prev.map((exp) => (exp.id === updated.id ? (updated as ExpenseWithDetails) : exp))
-    )
+  // Accepts a single expense or an array (split-edit returns both siblings).
+  // Brand-new rows (split conversion can insert a new sibling row) are
+  // unshifted onto the list rather than dropped.
+  const handleExpenseUpdated = useCallback((updated: Expense | Expense[]) => {
+    const rows = Array.isArray(updated) ? updated : [updated]
+    setExpenses((prev) => {
+      const byId = new Map(prev.map((e) => [e.id, e] as const))
+      const fresh: ExpenseWithDetails[] = []
+      for (const row of rows) {
+        if (byId.has(row.id)) {
+          byId.set(row.id, row as ExpenseWithDetails)
+        } else {
+          fresh.push(row as ExpenseWithDetails)
+        }
+      }
+      const merged = prev.map((e) => byId.get(e.id) ?? e)
+      return fresh.length > 0 ? [...fresh, ...merged] : merged
+    })
   }, [])
 
-  const handleExpenseDeleted = useCallback((id: string) => {
-    setExpenses((prev) => prev.filter((exp) => exp.id !== id))
+  const handleExpenseDeleted = useCallback((ids: string[]) => {
+    const toRemove = new Set(ids)
+    setExpenses((prev) => prev.filter((exp) => !toRemove.has(exp.id)))
   }, [])
 
   // Handle realtime events for all inserts (own + partner) and deletes/updates

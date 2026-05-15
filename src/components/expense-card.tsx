@@ -16,6 +16,7 @@ interface ExpenseCardExpense {
   currency: string
   converted_amount: number
   expense_date: string
+  split_group_id: string | null
 }
 
 interface ExpenseCardProps {
@@ -25,6 +26,8 @@ interface ExpenseCardProps {
   isDeleting: boolean
   /** Show date + cash inline below description (dialog view). Default: show cash-only badge (list view). */
   showDate?: boolean
+  /** When inside a per-category drill-down, surface the split membership. */
+  showSplitBadge?: boolean
   onCardClick: (id: string) => void
   onEdit?: (id: string, e: React.MouseEvent) => void
   onDelete: (id: string, e: React.MouseEvent) => void
@@ -36,6 +39,7 @@ function ExpenseCardImpl({
   isShowingDelete,
   isDeleting,
   showDate = false,
+  showSplitBadge = false,
   onCardClick,
   onEdit,
   onDelete,
@@ -65,6 +69,11 @@ function ExpenseCardImpl({
                   <span className="font-medium">
                     {category?.name || "Uncategorized"}
                   </span>
+                  {showSplitBadge && expense.split_group_id && (
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                      Part of a split
+                    </span>
+                  )}
                 </div>
                 {expense.description && (
                   <p className="text-sm text-muted-foreground truncate">
@@ -137,3 +146,127 @@ function ExpenseCardImpl({
 }
 
 export const ExpenseCard = memo(ExpenseCardImpl)
+
+interface SplitExpenseCardProps {
+  primary: ExpenseCardExpense
+  overflow: ExpenseCardExpense
+  primaryCategory: Category | null | undefined
+  overflowCategory: Category | null | undefined
+  isShowingDelete: boolean
+  isDeleting: boolean
+  onCardClick: (id: string) => void
+  onEdit?: (id: string, e: React.MouseEvent) => void
+  onDelete: (id: string, e: React.MouseEvent) => void
+}
+
+function SplitExpenseCardImpl({
+  primary,
+  overflow,
+  primaryCategory,
+  overflowCategory,
+  isShowingDelete,
+  isDeleting,
+  onCardClick,
+  onEdit,
+  onDelete,
+}: SplitExpenseCardProps) {
+  const totalConverted = Number(primary.converted_amount) + Number(overflow.converted_amount)
+  const showForeign = primary.currency !== "EUR"
+  const foreignTotal = showForeign ? Number(primary.amount) + Number(overflow.amount) : 0
+  // The two siblings share description, date, cash flag, currency — read them
+  // from the primary row.
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-300 ${
+        isDeleting ? "max-h-0 opacity-0 mb-0" : "max-h-[24rem] opacity-100"
+      }`}
+    >
+      <div
+        className={`transition-all duration-300 ${
+          isDeleting ? "scale-95 -translate-x-4" : "scale-100 translate-x-0"
+        }`}
+      >
+        <div
+          className="group cursor-pointer md:cursor-default py-3 px-1"
+          onClick={() => onCardClick(primary.id)}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                  Split
+                </span>
+                {primary.description && (
+                  <span className="text-sm font-medium truncate">{primary.description}</span>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {primaryCategory?.icon && <span className="text-base">{primaryCategory.icon}</span>}
+                    <span className="truncate">{primaryCategory?.name || "Uncategorized"}</span>
+                  </div>
+                  <span className="font-medium tabular-nums shrink-0">
+                    {formatCurrency(primary.converted_amount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {overflowCategory?.icon && <span className="text-base">{overflowCategory.icon}</span>}
+                    <span className="truncate">{overflowCategory?.name || "Uncategorized"}</span>
+                  </div>
+                  <span className="font-medium tabular-nums shrink-0">
+                    {formatCurrency(overflow.converted_amount)}
+                  </span>
+                </div>
+              </div>
+              {primary.is_cash && (
+                <p className="text-xs text-muted-foreground mt-1">Cash</p>
+              )}
+            </div>
+            <div className="relative flex items-start">
+              <div
+                className={`text-right transition-all ${
+                  isShowingDelete ? "mr-[4.5rem]" : "md:group-hover:mr-[4.5rem]"
+                }`}
+              >
+                <div className="font-semibold text-lg">{formatCurrency(totalConverted)}</div>
+                {showForeign && (
+                  <div className="text-xs text-muted-foreground">
+                    {formatCurrency(foreignTotal, 2, primary.currency)}
+                  </div>
+                )}
+              </div>
+              <div
+                className={`absolute right-0 top-0 flex items-center gap-0.5 transition-opacity ${
+                  isShowingDelete
+                    ? "opacity-100 pointer-events-auto"
+                    : "opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto"
+                }`}
+              >
+                {onEdit && (
+                  <button
+                    onClick={(e) => onEdit(primary.id, e)}
+                    className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground"
+                    aria-label="Edit split expense"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => onDelete(primary.id, e)}
+                  className="p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive"
+                  aria-label="Delete split expense"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const SplitExpenseCard = memo(SplitExpenseCardImpl)

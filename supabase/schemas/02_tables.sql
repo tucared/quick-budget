@@ -208,6 +208,13 @@ CREATE TABLE expenses (
   exchange_rate DECIMAL(12, 6) NOT NULL DEFAULT 1.0 CHECK (exchange_rate > 0),
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
   description TEXT,
+  -- App-managed correlation id for the cap-with-overflow split flow (JTBD #8):
+  -- a single user-facing purchase is stored as two sibling rows sharing this id,
+  -- one in the capped primary category and one in the overflow category. NULL
+  -- means a normal single-row expense. Not an FK — the value is minted
+  -- client-side with crypto.randomUUID() and pair invariants are enforced by
+  -- the app (see src/lib/split-utils.ts).
+  split_group_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -216,6 +223,9 @@ CREATE INDEX idx_expenses_household_date ON expenses(household_id, expense_date 
 CREATE INDEX idx_expenses_logged_by ON expenses(logged_by_user_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
 CREATE INDEX idx_expenses_category ON expenses(category_id);
+-- Partial index: only the small fraction of rows that are split members are
+-- indexed. Used to fetch the sibling row when editing or deleting a split.
+CREATE INDEX idx_expenses_split_group ON expenses(split_group_id) WHERE split_group_id IS NOT NULL;
 
 CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

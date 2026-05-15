@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useExpenseDelete } from "@/lib/hooks/use-expense-delete"
+import { useExpenseDelete, type DeletableExpense } from "@/lib/hooks/use-expense-delete"
 import { ExpenseCard } from "@/components/expense-card"
 import { EditExpenseDialog } from "@/components/edit-expense-dialog"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
@@ -33,7 +33,7 @@ export function CategoryExpenseDialog({
   allExpenses,
   categories,
 }: CategoryExpenseDialogProps) {
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [editingExpenses, setEditingExpenses] = useState<Expense[] | null>(null)
 
   // Optimistic delete: track IDs removed in this session so they disappear immediately
   // before the parent's reloadExpenses() finishes. Safe to keep across category/open changes
@@ -46,13 +46,24 @@ export function CategoryExpenseDialog({
     deleteError,
     handleCardClick,
     handleDelete: handleDeleteBase,
-  } = useExpenseDelete()
+  } = useExpenseDelete((ids) => {
+    setDeletedIds((prev) => {
+      const next = new Set(prev)
+      ids.forEach((id) => next.add(id))
+      return next
+    })
+  })
 
-  // Wrap delete to mark as deleted immediately (optimistic UI)
-  const handleDelete = useCallback((expenseId: string, e: React.MouseEvent) => {
-    setDeletedIds((prev) => new Set([...prev, expenseId]))
-    handleDeleteBase(expenseId, e)
-  }, [handleDeleteBase])
+  // Wrap delete to mark as deleted immediately (optimistic UI). When the row is
+  // part of a split, the hook deletes both siblings; mark the clicked id here
+  // and rely on the onDeleted callback above to mark the sibling once known.
+  const handleDelete = useCallback(
+    (expense: DeletableExpense, e: React.MouseEvent) => {
+      setDeletedIds((prev) => new Set([...prev, expense.id]))
+      handleDeleteBase(expense, e)
+    },
+    [handleDeleteBase],
+  )
 
   // Latest-allExpenses ref so handleEdit's identity stays stable across renders.
   const allExpensesRef = useRef(allExpenses)
@@ -61,7 +72,15 @@ export function CategoryExpenseDialog({
   const handleEdit = useCallback((expenseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const exp = allExpensesRef.current.find((ex) => ex.id === expenseId)
-    if (exp) setEditingExpense(exp)
+    if (!exp) return
+    if (exp.split_group_id) {
+      const siblings = allExpensesRef.current.filter(
+        (ex) => ex.split_group_id === exp.split_group_id,
+      )
+      setEditingExpenses(siblings.length >= 2 ? siblings.slice(0, 2) : [exp])
+    } else {
+      setEditingExpenses([exp])
+    }
   }, [])
 
   const categoryMap = useMemo(() => {
@@ -136,9 +155,10 @@ export function CategoryExpenseDialog({
                   isShowingDelete={showingDeleteId === expense.id}
                   isDeleting={deletingIds.has(expense.id)}
                   showDate
+                  showSplitBadge
                   onCardClick={handleCardClick}
                   onEdit={handleEdit}
-                  onDelete={handleDelete}
+                  onDelete={(_id, e) => handleDelete(expense, e)}
                 />
               ))}
             </div>
@@ -146,9 +166,9 @@ export function CategoryExpenseDialog({
         </div>
 
         <EditExpenseDialog
-          open={editingExpense !== null}
-          onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
-          expense={editingExpense}
+          open={editingExpenses !== null}
+          onOpenChange={(open) => { if (!open) setEditingExpenses(null) }}
+          siblings={editingExpenses}
           categories={categories}
         />
       </DialogContent>
