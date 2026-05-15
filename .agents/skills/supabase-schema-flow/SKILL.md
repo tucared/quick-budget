@@ -1,6 +1,6 @@
 ---
 name: supabase-schema-flow
-description: How to make database schema changes in this Quick Budget repo — when to edit declarative schemas in `supabase/schemas/` vs hand-author migrations in `supabase/migrations/`, the `apply-to-dev` label flow, the migra view-options workaround, the security_invoker view, RLS helpers in the `private` schema, the auth-hook JWT claim, GRANT/REVOKE quirks, and the generate-migration / migrate-prod / reset-dev workflow loop. Use whenever the user mentions migrations, schemas, RLS, declarative database, supabase db diff, hand-authored migrations, security_invoker, apply-to-dev, or edits any file under `supabase/`.
+description: How to make database schema changes in this Quick Budget repo — when to edit declarative schemas in `supabase/schemas/` vs hand-author migrations in `supabase/migrations/`, the `apply-to-dev` label flow, the security_invoker view-options pin, RLS helpers in the `private` schema, the auth-hook JWT claim, GRANT/REVOKE quirks, and the generate-migration / migrate-prod / reset-dev workflow loop. Use whenever the user mentions migrations, schemas, RLS, declarative database, supabase db diff, hand-authored migrations, security_invoker, apply-to-dev, or edits any file under `supabase/`.
 ---
 
 # Supabase schema flow
@@ -39,15 +39,13 @@ Migra (which powers `db diff`) can't reliably track these. Edit `supabase/migrat
 
 - Custom DML that can't be expressed declaratively (backfills, one-shot data corrections, seed corrections that need to survive `db reset`).
 
-## Hybrid: declarative + workflow self-heal
+### View options on `security_invoker` views
 
-**Views with `security_invoker = true`** ship declaratively but rely on a workflow safety net. Migra silently strips the option on every drop+create-or-replace ([supabase/cli#3973](https://github.com/supabase/cli/issues/3973), [#792](https://github.com/supabase/cli/issues/792)) — without `security_invoker`, the view runs as its owner (postgres → BYPASSRLS) and exposes every household's rows.
+Migra does not read view options back from `pg_class.reloptions` ([supabase/cli#3973](https://github.com/supabase/cli/issues/3973), [#792](https://github.com/supabase/cli/issues/792)). If the option is declared in `supabase/schemas/`, `db diff` thinks it's missing from the source DB on every run and emits a perpetual no-op `DROP VIEW + CREATE OR REPLACE VIEW` to "re-apply" it. Without `security_invoker = true`, the view runs as its owner (postgres → BYPASSRLS) and exposes every household's rows.
 
-The schema declares the option inline via `WITH (security_invoker = true)` on `CREATE OR REPLACE VIEW`. When a side-effect recreation happens (e.g. column added to a table the view references forces Postgres to drop+recreate the view), `generate-migration.yml` detects the `drop view if exists "public"."budget_summary";` line migra emits and auto-appends an idempotent `ALTER VIEW public.budget_summary SET (security_invoker = true);` to the file before committing.
+Pattern: declare only the view body in `supabase/schemas/04_views.sql` (no `WITH (...)` clause), and put the `ALTER VIEW SET (security_invoker = true)` plus the `GRANT/REVOKE` trio in a hand-authored migration. Canonical example: `supabase/migrations/20260515190000_pin_budget_summary_view_options_and_grants.sql`. With both source and target looking option-less to migra, the no-op loop dies at the source.
 
-The same migra bug also causes a **perpetual no-op view-recreation diff** even on PRs that don't change anything affecting the view — migra doesn't read view options back from `pg_class.reloptions`, so it always thinks the option needs re-applying and emits a recreate. The workflow detects this case (view-only DDL + body byte-equal to current DB via `pg_get_viewdef`) and drops the migration before committing, so the chain stays clean.
-
-Net-new views with `security_invoker = true` should ship via a hand-authored migration rather than relying on the workflow patch (the no-op detector is hardcoded to `budget_summary`).
+Side-effect recreation gotcha: if a future PR adds/drops/renames a column on a table the view references (`categories`, `budget_allocations`, `expenses` for `budget_summary`), migra emits a `DROP VIEW + CREATE OR REPLACE` to update the column dependency. Postgres drops the option and grants with the view, and migra emits neither back. Hand-author a follow-up migration mirroring the four statements in the pinning migration above. Safety nets: stripped grants surface immediately as `permission denied for view budget_summary` on the next deploy; stripped `security_invoker` is blocked by `Migrate Prod`'s security-advisors gate (`security_definer_view` lint) before reaching Prod.
 
 ## Dogfooding on Dev
 
