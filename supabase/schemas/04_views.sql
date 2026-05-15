@@ -6,6 +6,7 @@
 -- (supabase/cli#3973, #792) and silently drops GRANT/REVOKE diffs. Keeping
 -- them out of this file is what stops `db diff` from emitting a perpetual
 -- no-op view recreation on every schemas/** PR. See the schema-flow skill.
+
 CREATE OR REPLACE VIEW budget_summary AS
 WITH category_months AS (
   SELECT household_id, category_id, budget_month
