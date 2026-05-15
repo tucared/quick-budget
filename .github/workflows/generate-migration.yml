@@ -12,8 +12,12 @@ name: Generate Migration
 # migration chain (supabase/migrations/*_pin_budget_summary_view_options_and_grants.sql)
 # rather than in supabase/schemas/04_views.sql, because migra does not read
 # view options back from pg_class.reloptions or diff GRANT/REVOKE
-# (supabase/cli#3973, #792). Pinning them outside the declarative target is
-# what keeps `db diff` from emitting a perpetual no-op view recreation here.
+# (supabase/cli#3973, #792). Even with the option stripped from the
+# declarative target, `db diff` still emits a no-op `drop view if exists +
+# create or replace view` pair on every run — migra always re-emits view
+# DDL when reloptions are set on the source, regardless of target shape.
+# The `gen` step below detects this case (view-only DDL + body byte-equal
+# to pg_get_viewdef) and drops the file before committing.
 #
 # The workflow also regenerates `src/lib/database.types.ts` on every run so
 # the committed TypeScript types always reflect the current schema. If a
@@ -112,6 +116,48 @@ jobs:
             rm -f "$FILE"
             echo "produced=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+
+          # Detect and drop migra's no-op view-recreation of budget_summary
+          # (supabase/cli#3973, #792). Even with the WITH (security_invoker)
+          # option stripped from supabase/schemas/04_views.sql and the option
+          # pinned via 20260515190000_pin_budget_summary_view_options_and_grants.sql,
+          # `db diff` still emits a `drop view if exists` + `create or replace
+          # view` pair on every run — migra can't reconcile pg_class.reloptions
+          # state with the absence of an option declaration and emits a recreate
+          # to "normalize". When the recreated body is byte-equal (modulo
+          # whitespace) to the current DB view body AND no other DDL is
+          # present, the migration is a no-op and would just pollute the
+          # chain — and worse, strip security_invoker/grants on every commit.
+          #
+          # Only safe to skip when the migration is view-only. If migra also
+          # emits a column add (real side-effect recreation), the recreate
+          # picks up the new column shape — keep those and use a hand-authored
+          # follow-up migration to re-apply the options + grants. See the
+          # schema-flow skill section "View options on security_invoker views".
+          if grep -q '^drop view if exists "public"\."budget_summary";' "$FILE"; then
+            TOTAL_DDL=$(grep -cE '^(create|alter|drop|truncate|grant|revoke) ' "$FILE" || true)
+            VIEW_DDL=$(grep -cE '^(drop view if exists "public"\."budget_summary"|create or replace view "public"\."budget_summary")' "$FILE" || true)
+            if [ "${TOTAL_DDL:-0}" -eq "${VIEW_DDL:-0}" ] && [ "${VIEW_DDL:-0}" -eq 2 ]; then
+              MIGRATION_BODY=$(awk '
+                /^create or replace view "public"\."budget_summary" as/ {capture=1}
+                capture {print}
+                /;$/ && capture {exit}
+              ' "$FILE" | sed -E 's/^create or replace view "public"\."budget_summary" as[[:space:]]*//' | sed 's/;$//')
+              DB_BODY=$(PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -tA -c \
+                "SELECT pg_get_viewdef('public.budget_summary'::regclass, true);" 2>/dev/null || true)
+              norm() { tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/ +$//'; }
+              NEW_NORM=$(printf '%s' "$MIGRATION_BODY" | norm)
+              DB_NORM=$(printf '%s' "$DB_BODY" | norm)
+              if [ -n "$DB_NORM" ] && [ "$NEW_NORM" = "$DB_NORM" ]; then
+                echo "No-op view recreation (migra view-options loop, supabase/cli#3973):"
+                echo "  body matches current DB view; dropping $FILE"
+                rm -f "$FILE"
+                echo "produced=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "View body differs from current DB — keeping migration (legitimate body change)"
+            fi
           fi
 
           echo "Generated migration with $REAL_LINES non-comment lines: $FILE"
