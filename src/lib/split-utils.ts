@@ -1,7 +1,80 @@
-import type { ExpenseListItem, ExpenseWithDetails, SplitGroup } from "./types"
+import type { Category, ExpenseListItem, ExpenseWithDetails, SplitGroup } from "./types"
 import { isSplitGroup } from "./types"
 
 export const isSplitGroupItem = isSplitGroup
+
+// Cap-with-overflow derivation (JTBD #8). Given the selected category's
+// configuration and the entered amount + exchange rate, returns whether the
+// expense exceeds the configured cap and — if so — the exact original- and
+// EUR-currency amounts that should be written to the primary (capped) and
+// overflow (allowance) sibling rows.
+//
+// Invariants on the returned values when exceedsCap is true:
+//   - primaryEUR === capEUR (no rounding loss on the budget side)
+//   - primaryOriginal + overflowOriginal === amountOriginal (input sum preserved)
+//   - exchange_rate is unchanged; both siblings use the same rate
+//
+// Pure / no side effects — safe to call in render. Used by the expense form,
+// edit dialog, and the matching tests.
+export interface CapDerivation {
+  exceedsCap: boolean
+  capEUR: number
+  overflowCategoryId: string
+  primaryOriginal: number
+  primaryEUR: number
+  overflowOriginal: number
+  overflowEUR: number
+}
+
+type CapConfigInput = Pick<
+  Category,
+  "cap_amount" | "overflow_category_id" | "exclude_from_budget_total"
+>
+
+const EMPTY_DERIVATION: CapDerivation = {
+  exceedsCap: false,
+  capEUR: 0,
+  overflowCategoryId: "",
+  primaryOriginal: 0,
+  primaryEUR: 0,
+  overflowOriginal: 0,
+  overflowEUR: 0,
+}
+
+export function deriveCapState(
+  category: CapConfigInput | null | undefined,
+  amountOriginal: number,
+  exchangeRate: number,
+): CapDerivation {
+  if (!category) return EMPTY_DERIVATION
+  if (category.exclude_from_budget_total) return EMPTY_DERIVATION
+  if (category.cap_amount == null || !category.overflow_category_id) return EMPTY_DERIVATION
+  if (!Number.isFinite(amountOriginal) || amountOriginal <= 0) return EMPTY_DERIVATION
+  if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return EMPTY_DERIVATION
+
+  const capEUR = Number(category.cap_amount)
+  const overflowCategoryId = category.overflow_category_id
+  const totalEUR = amountOriginal * exchangeRate
+
+  if (totalEUR <= capEUR) {
+    return { ...EMPTY_DERIVATION, capEUR, overflowCategoryId }
+  }
+
+  const overflowEUR = +(totalEUR - capEUR).toFixed(2)
+  const primaryOriginal =
+    exchangeRate === 1 ? capEUR : +(capEUR / exchangeRate).toFixed(2)
+  const overflowOriginal = +(amountOriginal - primaryOriginal).toFixed(2)
+
+  return {
+    exceedsCap: true,
+    capEUR,
+    overflowCategoryId,
+    primaryOriginal,
+    primaryEUR: capEUR,
+    overflowOriginal,
+    overflowEUR,
+  }
+}
 
 // Collapse adjacent sibling expense rows (same split_group_id) into a single
 // SplitGroup item, preserving the original order. Rows without a

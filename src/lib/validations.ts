@@ -30,13 +30,3 @@ export const expenseSchema = z.object({
 })
 
 export type ExpenseFormValues = z.infer<typeof expenseSchema>
-
-// Cap-with-overflow split parameters (JTBD #8). The form layer enforces
-// `cap_amount < total_amount` and that overflow_category_id differs from the
-// primary; this schema only validates the raw shape.
-export const splitSchema = z.object({
-  cap_amount: z.number().positive("Cap must be greater than 0"),
-  overflow_category_id: z.string().uuid("Invalid overflow category"),
-})
-
-export type SplitFormValues = z.infer<typeof splitSchema>

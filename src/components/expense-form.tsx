@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, X } from "lucide-react"
+import { Check } from "lucide-react"
 import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
 import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
+import { deriveCapState } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -55,12 +56,16 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
 
-  // Cap-with-overflow split state (JTBD #8). When `splitExpanded` is on and
-  // capCentsRaw < total amount and overflowCategoryId is set, save inserts
-  // two sibling rows sharing a split_group_id (cap → primary, rest → overflow).
-  const [splitExpanded, setSplitExpanded] = useState(false)
-  const [capCentsRaw, setCapCentsRaw] = useState(0)
-  const [overflowCategoryId, setOverflowCategoryId] = useState<string>("")
+  // Cap-with-overflow toggle (JTBD #8). The cap amount and overflow target
+  // come from the selected category's configured `cap_amount` /
+  // `overflow_category_id`; this boolean is just "apply the cap or not".
+  // Defaults ON; re-arms to ON whenever the category changes (see the
+  // render-time reset below) so a stale OFF state from a different category
+  // doesn't carry across. Persists across amount changes within the same
+  // category — once the user flips OFF, that intent sticks until they pick a
+  // different category.
+  const [applyCap, setApplyCap] = useState(true)
+  const [prevCapCategory, setPrevCapCategory] = useState("")
 
   // Ref for the amount input — used to refocus after currency toggles
   const amountInputRef = useRef<AmountInputHandle | null>(null)
@@ -87,26 +92,37 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   const effectiveExchangeRate = (!selectedCurrency || selectedCurrency === "EUR") ? 1.0 : previewExchangeRate
 
-  const selectedCategoryIsAllowance = useMemo(() => {
-    const c = categories.find((cat) => cat.id === selectedCategory)
-    return c?.exclude_from_budget_total === true
-  }, [categories, selectedCategory])
+  const selectedCategoryObj = useMemo(
+    () => categories.find((c) => c.id === selectedCategory) ?? null,
+    [categories, selectedCategory],
+  )
+  const selectedCategoryIsAllowance = selectedCategoryObj?.exclude_from_budget_total === true
 
-  const capAmount = capCentsRaw > 0 ? capCentsRaw / 100 : 0
-  const overflowAmount =
-    Number.isFinite(expenseAmount) && expenseAmount > 0 && capAmount > 0 && capAmount < expenseAmount
-      ? expenseAmount - capAmount
-      : 0
-  // A split actually happens only when the disclosure is open, the cap is
-  // strictly less than the total, and an overflow category is chosen.
-  const isSplit =
-    splitExpanded &&
-    overflowAmount > 0 &&
-    overflowCategoryId !== "" &&
-    overflowCategoryId !== selectedCategory
-  const primaryPortion = isSplit ? capAmount : expenseAmount
+  // Render-time reset of the cap toggle when the category changes — keeps the
+  // "default ON, respect user override within the same category" semantics
+  // without a useEffect (React's recommended pattern for derived state).
+  if (selectedCategory !== prevCapCategory) {
+    setPrevCapCategory(selectedCategory)
+    setApplyCap(true)
+  }
+
+  // Derive cap-split values from the category's configured cap_amount +
+  // overflow_category_id. `exceedsCap` is true only when the configured cap
+  // is strictly less than the EUR-converted total.
+  const capDerivation = useMemo(
+    () => deriveCapState(selectedCategoryObj, expenseAmount, effectiveExchangeRate),
+    [selectedCategoryObj, expenseAmount, effectiveExchangeRate],
+  )
+  const isSplit = capDerivation.exceedsCap && applyCap
+  const overflowCategoryName = useMemo(
+    () => categories.find((c) => c.id === capDerivation.overflowCategoryId)?.name,
+    [categories, capDerivation.overflowCategoryId],
+  )
+
+  const primaryPortion = isSplit ? capDerivation.primaryOriginal : expenseAmount
+  const overflowPortion = isSplit ? capDerivation.overflowOriginal : 0
   const debouncedPrimaryPortion = useDebouncedValue(primaryPortion, 300)
-  const debouncedOverflowAmount = useDebouncedValue(overflowAmount, 300)
+  const debouncedOverflowAmount = useDebouncedValue(overflowPortion, 300)
 
   // Convert string date to Date object for DatePicker
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
@@ -259,7 +275,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   // Mirror the above for the overflow category when a split is active.
   useEffect(() => {
-    if (!isSplit || !overflowCategoryId || !user?.householdId) return
+    if (!isSplit || !capDerivation.overflowCategoryId || !user?.householdId) return
     let cancelled = false
     ;(async () => {
       const supabase = createClient()
@@ -268,13 +284,14 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         .from("budget_summary")
         .select("*")
         .eq("household_id", user.householdId)
-        .eq("category_id", overflowCategoryId)
+        .eq("category_id", capDerivation.overflowCategoryId)
         .eq("budget_month", budgetMonth)
         .maybeSingle()
       if (!cancelled) setOverflowCategoryBudget(data || null)
     })()
     return () => { cancelled = true }
-  }, [isSplit, overflowCategoryId, user, debouncedBudgetRefreshTick, expenseDate])
+  }, [isSplit, capDerivation.overflowCategoryId, user, debouncedBudgetRefreshTick, expenseDate])
+
 
   // Drop the stale overflow-budget snapshot the moment the split is turned off
   // so the second CategoryBudgetCard doesn't render with a "no budget set"
@@ -342,14 +359,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       return
     }
 
-    // Pre-flight: if the user expanded the split disclosure but didn't pick an
-    // overflow category, surface that as a field error rather than silently
-    // saving a single row.
-    if (splitExpanded && overflowAmount > 0 && !overflowCategoryId) {
-      setFormErrors({ overflow_category_id: "Pick an overflow category" })
-      return
-    }
-
     try {
       const supabase = createClient()
 
@@ -369,23 +378,29 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         description: data.description || null,
       } as const
 
+      // Recompute the cap derivation with the authoritative exchange rate
+      // (the form-state derivation used `previewExchangeRate` which may be
+      // mid-fetch). Re-evaluating here also guards against a stale `isSplit`
+      // if the rate changed between render and submit.
+      const submitDerivation = deriveCapState(selectedCategoryObj, data.amount, exchangeRate)
+      const shouldSplit = submitDerivation.exceedsCap && applyCap
+
       let savedRows: Expense[] | null = null
-      if (isSplit) {
+      if (shouldSplit) {
         const splitGroupId = crypto.randomUUID()
-        const overflow = data.amount - capAmount
         const rows = [
           {
             ...sharedFields,
             category_id: data.category_id,
-            amount: capAmount,
-            converted_amount: capAmount * exchangeRate,
+            amount: submitDerivation.primaryOriginal,
+            converted_amount: submitDerivation.primaryEUR,
             split_group_id: splitGroupId,
           },
           {
             ...sharedFields,
-            category_id: overflowCategoryId,
-            amount: overflow,
-            converted_amount: overflow * exchangeRate,
+            category_id: submitDerivation.overflowCategoryId,
+            amount: submitDerivation.overflowOriginal,
+            converted_amount: submitDerivation.overflowEUR,
             split_group_id: splitGroupId,
           },
         ]
@@ -453,10 +468,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       setCentsRaw(0)
       setAmount(NaN)
       setDescription("")
-      // Collapse the split disclosure after save so the next entry defaults
-      // back to a normal one-row expense. Keep the cap value in case the user
-      // wants to reuse the same split for the next entry.
-      setSplitExpanded(false)
+      // Re-arm the cap toggle for the next entry — same category, but the
+      // user's previous OFF state shouldn't silently persist across saves.
+      setApplyCap(true)
 
       // Focus on amount input for next entry
       if (amountInputRef.current) {
@@ -578,89 +592,29 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         </div>
       </div>
 
-      {/* Cap-with-overflow disclosure (JTBD #8). Only meaningful when the
-          primary category is a shared/spending category — capping an
-          allowance and overflowing to another allowance is not a real use
-          case. The disclosure toggle is hidden until the user has picked a
-          shared category and entered a positive amount. */}
-      {selectedCategory && !selectedCategoryIsAllowance && expenseAmount > 0 && (
-        <div className="space-y-2">
-          {!splitExpanded ? (
-            <button
-              type="button"
-              onClick={() => setSplitExpanded(true)}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-2"
-            >
-              Cap &amp; send overflow to allowance…
-            </button>
-          ) : (
-            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Split this expense</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSplitExpanded(false)
-                    setFormErrors((prev) => {
-                      const { overflow_category_id: _, ...rest } = prev
-                      return rest
-                    })
-                  }}
-                  aria-label="Cancel split"
-                  className="p-0.5 text-muted-foreground hover:text-foreground rounded"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 text-sm">
-                <label htmlFor="cap-amount" className="text-muted-foreground shrink-0">Cap at</label>
-                <input
-                  id="cap-amount"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={capCentsRaw > 0 ? (capCentsRaw / 100).toString() : ""}
-                  onChange={(e) => {
-                    const parsed = parseFloat(e.target.value)
-                    setCapCentsRaw(Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) : 0)
-                  }}
-                  className="flex-1 h-8 rounded-md border border-input bg-background px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-                <span className="text-xs text-muted-foreground">{selectedCurrency}</span>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Overflow to</p>
-                <CategoryTileSelector
-                  categories={categories.filter((c) => c.exclude_from_budget_total)}
-                  topCategoryIds={categories.filter((c) => c.exclude_from_budget_total).slice(0, 7).map((c) => c.id)}
-                  value={overflowCategoryId}
-                  onValueChange={setOverflowCategoryId}
-                  allOptions={buildCategoryOptions(categories.filter((c) => c.exclude_from_budget_total))}
-                />
-                {formErrors.overflow_category_id && (
-                  <p className="text-sm text-destructive">{formErrors.overflow_category_id}</p>
-                )}
-              </div>
-
-              {isSplit && (() => {
-                const primaryCat = categories.find((c) => c.id === selectedCategory)
-                const overflowCat = categories.find((c) => c.id === overflowCategoryId)
-                return (
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(capAmount, 2, selectedCurrency)} → {primaryCat?.name || "primary"}, {formatCurrency(overflowAmount, 2, selectedCurrency)} → {overflowCat?.name || "overflow"}
-                  </p>
-                )
-              })()}
-              {splitExpanded && overflowAmount === 0 && capAmount > 0 && expenseAmount > 0 && capAmount >= expenseAmount && (
-                <p className="text-xs text-muted-foreground">Cap covers the full amount — no overflow.</p>
-              )}
-            </div>
-          )}
-        </div>
+      {/* Cap-with-overflow toggle (JTBD #8). Surfaces only when the selected
+          category has a cap configured AND the entered amount exceeds it.
+          The cap value and overflow target are intrinsic to the category. */}
+      {capDerivation.exceedsCap && !selectedCategoryIsAllowance && (
+        <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 cursor-pointer">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">
+              Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
+              {overflowCategoryName ?? "allowance"}
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={applyCap}
+            onChange={(e) => setApplyCap(e.target.checked)}
+            className="h-4 w-4 rounded border-input accent-primary"
+            aria-label="Apply cap"
+          />
+        </label>
       )}
 
       {/* Date + Cash checkbox inline */}

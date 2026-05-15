@@ -36,5 +36,23 @@ BEGIN
     (shared_household_id, 'User One Allowance', '👤', TRUE, TRUE),
     (shared_household_id, 'User Two Allowance', '👤', TRUE, TRUE);
 
+  -- Illustrative caps for JTBD #8. The expense form surfaces an inline toggle
+  -- when a logged amount exceeds these. Caps are EUR-denominated.
+  UPDATE public.categories SET
+    cap_amount = 10.00,
+    overflow_category_id = (
+      SELECT id FROM public.categories
+       WHERE household_id = shared_household_id AND name = 'User One Allowance'
+    )
+   WHERE household_id = shared_household_id AND name = 'Dining Out';
+
+  UPDATE public.categories SET
+    cap_amount = 15.00,
+    overflow_category_id = (
+      SELECT id FROM public.categories
+       WHERE household_id = shared_household_id AND name = 'User Two Allowance'
+    )
+   WHERE household_id = shared_household_id AND name = 'Entertainment';
+
   RAISE NOTICE '  ✓ Created categories';
 END $$;

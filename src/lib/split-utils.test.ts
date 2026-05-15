@@ -1,7 +1,23 @@
 import { describe, it, expect } from "vitest"
-import type { ExpenseWithDetails, SplitGroup } from "./types"
-import { groupSplitSiblings, partitionSplitSiblings, isSplitGroupItem } from "./split-utils"
+import type { Category, ExpenseWithDetails, SplitGroup } from "./types"
+import { deriveCapState, groupSplitSiblings, partitionSplitSiblings, isSplitGroupItem } from "./split-utils"
 import { isSplitGroup } from "./types"
+
+function makeCategory(overrides: Partial<Category> = {}): Category {
+  return {
+    id: "cat-primary",
+    household_id: "hh-1",
+    name: "Dining Out",
+    exclude_from_budget_total: false,
+    icon: null,
+    is_active: true,
+    cap_amount: null,
+    overflow_category_id: null,
+    created_at: "2026-05-15T00:00:00Z",
+    updated_at: "2026-05-15T00:00:00Z",
+    ...overrides,
+  }
+}
 
 function makeExpense(overrides: Partial<ExpenseWithDetails> & { id: string }): ExpenseWithDetails {
   return {
@@ -106,6 +122,76 @@ describe("partitionSplitSiblings", () => {
     const { primary, overflow } = partitionSplitSiblings(group, flags)
     expect(primary.id).toBe("b")
     expect(overflow.id).toBe("a")
+  })
+})
+
+describe("deriveCapState", () => {
+  it("returns exceedsCap=false when no category is provided", () => {
+    expect(deriveCapState(null, 25, 1).exceedsCap).toBe(false)
+    expect(deriveCapState(undefined, 25, 1).exceedsCap).toBe(false)
+  })
+
+  it("returns exceedsCap=false when the category has no cap configured", () => {
+    const cat = makeCategory()
+    const result = deriveCapState(cat, 25, 1)
+    expect(result.exceedsCap).toBe(false)
+    expect(result.capEUR).toBe(0)
+  })
+
+  it("returns exceedsCap=false when the category is an allowance", () => {
+    const cat = makeCategory({
+      exclude_from_budget_total: true,
+      cap_amount: 10,
+      overflow_category_id: "cat-other",
+    })
+    expect(deriveCapState(cat, 25, 1).exceedsCap).toBe(false)
+  })
+
+  it("returns exceedsCap=false when amount equals the cap (no strict overflow)", () => {
+    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const result = deriveCapState(cat, 10, 1)
+    expect(result.exceedsCap).toBe(false)
+    expect(result.capEUR).toBe(10)
+    expect(result.overflowCategoryId).toBe("cat-allow")
+  })
+
+  it("splits cleanly in EUR when amount > cap", () => {
+    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const result = deriveCapState(cat, 25, 1)
+    expect(result.exceedsCap).toBe(true)
+    expect(result.capEUR).toBe(10)
+    expect(result.primaryOriginal).toBe(10)
+    expect(result.primaryEUR).toBe(10)
+    expect(result.overflowOriginal).toBe(15)
+    expect(result.overflowEUR).toBe(15)
+  })
+
+  it("splits BRL into primary cap-in-EUR + overflow with input sum preserved", () => {
+    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const rate = 0.189
+    const amountBRL = 55.55
+    const result = deriveCapState(cat, amountBRL, rate)
+
+    expect(result.exceedsCap).toBe(true)
+    expect(result.primaryEUR).toBe(10)
+    expect(result.primaryOriginal + result.overflowOriginal).toBeCloseTo(amountBRL, 2)
+    expect(result.overflowEUR).toBeCloseTo(amountBRL * rate - 10, 2)
+  })
+
+  it("excludes allowance overflow when total just barely crosses cap (sub-cent)", () => {
+    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const result = deriveCapState(cat, 10.005, 1)
+    expect(result.exceedsCap).toBe(true)
+    expect(result.primaryEUR).toBe(10)
+    expect(result.overflowEUR).toBeCloseTo(0.01, 2)
+  })
+
+  it("returns exceedsCap=false for zero/negative/NaN inputs", () => {
+    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    expect(deriveCapState(cat, 0, 1).exceedsCap).toBe(false)
+    expect(deriveCapState(cat, NaN, 1).exceedsCap).toBe(false)
+    expect(deriveCapState(cat, 25, 0).exceedsCap).toBe(false)
+    expect(deriveCapState(cat, 25, NaN).exceedsCap).toBe(false)
   })
 })
 
