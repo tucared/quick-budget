@@ -56,6 +56,11 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
     echo "Installing gh CLI..."
     apt-get install -y gh > /dev/null 2>&1 || echo "gh install failed (continuing)"
   fi
+  # The cloud env rewrites the git remote to a local proxy, so gh can't
+  # auto-detect owner/repo. Pin it via GH_REPO so `-R` isn't needed.
+  if [ -n "$CLAUDE_ENV_FILE" ]; then
+    echo "GH_REPO=tucared/quick-budget" >> "$CLAUDE_ENV_FILE"
+  fi
 
   if [ -x "$RTK_BIN" ]; then
     # Register the Claude Code PreToolUse hook so rtk stops warning on every git call.
