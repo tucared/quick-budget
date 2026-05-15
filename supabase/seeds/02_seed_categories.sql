@@ -38,21 +38,30 @@ BEGIN
 
   -- Illustrative caps for JTBD #8. The expense form surfaces an inline toggle
   -- when a logged amount exceeds these. Caps are EUR-denominated.
-  UPDATE public.categories SET
-    cap_amount = 10.00,
-    overflow_category_id = (
-      SELECT id FROM public.categories
-       WHERE household_id = shared_household_id AND name = 'User One Allowance'
-    )
-   WHERE household_id = shared_household_id AND name = 'Dining Out';
+  --
+  -- Guarded by a column-existence check because `supabase db start` runs
+  -- seeds AFTER existing migrations but BEFORE `supabase db diff` generates
+  -- the schema-delta migration. On a clean checkout where the cap columns
+  -- exist only in `supabase/schemas/02_tables.sql`, this branch no-ops on
+  -- the first pass and applies once the auto-generated migration lands.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'categories'
+       AND column_name = 'cap_amount'
+  ) THEN
+    UPDATE public.categories SET
+      cap_amount = 10.00,
+      overflow_category_id = (SELECT id FROM public.categories
+                              WHERE household_id = shared_household_id AND name = 'User One Allowance')
+     WHERE household_id = shared_household_id AND name = 'Dining Out';
 
-  UPDATE public.categories SET
-    cap_amount = 15.00,
-    overflow_category_id = (
-      SELECT id FROM public.categories
-       WHERE household_id = shared_household_id AND name = 'User Two Allowance'
-    )
-   WHERE household_id = shared_household_id AND name = 'Entertainment';
+    UPDATE public.categories SET
+      cap_amount = 15.00,
+      overflow_category_id = (SELECT id FROM public.categories
+                              WHERE household_id = shared_household_id AND name = 'User Two Allowance')
+     WHERE household_id = shared_household_id AND name = 'Entertainment';
+  END IF;
 
   RAISE NOTICE '  ✓ Created categories';
 END $$;
