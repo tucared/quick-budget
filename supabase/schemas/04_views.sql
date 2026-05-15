@@ -1,6 +1,16 @@
 -- Views
 
-CREATE OR REPLACE VIEW budget_summary AS
+-- security_invoker = true: RLS on the underlying tables is evaluated using
+-- the calling user's role. Without this, the view runs as its owner
+-- (postgres, superuser), which bypasses RLS and would expose every
+-- household's data to any authenticated caller. Declared via the WITH option
+-- on CREATE OR REPLACE VIEW so `supabase db diff` sees DB and schema in sync
+-- on the option (a separate `ALTER VIEW SET` statement is parsed independently
+-- by migra and emits a perpetual no-op view-recreation diff). Side-effect
+-- recreations triggered by changes to referenced tables still lose the option
+-- on emission (supabase/cli#3973) — the generate-migration workflow appends an
+-- idempotent ALTER VIEW SET as a safety net.
+CREATE OR REPLACE VIEW budget_summary WITH (security_invoker = true) AS
 WITH category_months AS (
   SELECT household_id, category_id, budget_month
   FROM budget_allocations
@@ -46,8 +56,6 @@ GROUP BY
   c.exclude_from_budget_total,
   ba.allocated_amount,
   ba.currency;
-
-ALTER VIEW budget_summary SET (security_invoker = true);
 
 GRANT SELECT ON public.budget_summary TO authenticated;
 GRANT SELECT ON public.budget_summary TO service_role;

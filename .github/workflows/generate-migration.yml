@@ -11,18 +11,18 @@ name: Generate Migration from Schema
 # working around a documented migra limitation (supabase/cli#3973, #792) that
 # silently strips view options on every drop+create. Without this, the view
 # would run with its owner role (postgres → BYPASSRLS) and leak every
-# household's rows to authenticated callers. See the inline comment in the
-# "Generate migration" step for details.
+# household's rows to authenticated callers.
 #
 # The workflow also regenerates `src/lib/database.types.ts` on every run so
 # the committed TypeScript types always reflect the current schema. If a
 # developer forgets `npm run types:generate` locally, the bot commits the
 # updated file alongside (or instead of) the migration.
 #
-# If the PR carries the `apply-to-dev` label, the final step pushes the
-# resulting migration chain to the Dev Supabase project (via `supabase db
-# push`), so an agent can dogfood the schema change without an extra MCP
-# round-trip. Labeling fires the workflow even when no code changed.
+# If the PR carries the `apply-to-dev` label, the `apply-to-dev` job (which
+# runs after `generate`) pushes the resulting migration chain to the Dev
+# Supabase project so an agent can dogfood the schema change without an
+# extra MCP round-trip. Labeling fires the workflow even when no code
+# changed.
 #
 # Why: lets agents (Claude Code on the web, etc.) iterate on schemas without
 # needing local Docker for `supabase start`. The CLI-generated migration is
@@ -36,9 +36,9 @@ on:
   workflow_dispatch:
 
 # When a PR is opened already carrying `apply-to-dev`, GitHub fires `opened`
-# and `labeled` near-simultaneously and both pass the job-level filter below.
-# Two concurrent runs would each generate a migration and race to push to the
-# PR branch. Serialize per-PR so newer events cancel older runs cleanly.
+# and `labeled` near-simultaneously. Two concurrent workflow runs would each
+# generate a migration and race to push to the PR branch. Serialize per-PR so
+# newer events cancel older runs cleanly.
 concurrency:
   group: generate-migration-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -114,11 +114,11 @@ jobs:
 
           # Migra cannot track view options like security_invoker
           # (supabase/cli#3973, #792): it strips them on every drop+create
-          # and doesn't read schema-level ALTER VIEW SET declarations. The
-          # supabase docs recommend hand-authored migrations for views with
-          # this option; until budget_summary is migrated out of
-          # supabase/schemas/, self-heal by appending an idempotent
-          # ALTER VIEW SET whenever the diff recreates the view.
+          # even when the schema declares the option inline. Side-effect
+          # recreations (e.g. adding a column to a table the view references)
+          # still emit a `create or replace view` without the WITH clause, so
+          # self-heal by appending an idempotent ALTER VIEW SET whenever the
+          # diff recreates the view.
           if grep -q '^drop view if exists "public"\."budget_summary";' "$FILE"; then
             {
               echo ""
@@ -139,43 +139,50 @@ jobs:
         if: steps.gen.outputs.produced == 'true'
         run: supabase migration up
 
+      # Combined output `has_changes` collapses the
+      # `produced == 'true' || types_updated == 'true'` condition that every
+      # downstream step previously repeated. Subsequent steps gate on this
+      # single output.
       - name: Regenerate TypeScript types
         id: regen
         run: |
           set -euo pipefail
           supabase gen types typescript --local > src/lib/database.types.ts
-          if git diff --quiet src/lib/database.types.ts; then
-            echo "types_updated=false" >> "$GITHUB_OUTPUT"
+          types_updated=false
+          if ! git diff --quiet src/lib/database.types.ts; then
+            types_updated=true
+          fi
+          echo "types_updated=$types_updated" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.gen.outputs.produced }}" = "true" ] || [ "$types_updated" = "true" ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "types_updated=true" >> "$GITHUB_OUTPUT"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
       # GitHub suppresses workflow re-triggers when an action pushes with the
       # default GITHUB_TOKEN, so test.yml does not re-run on the bot's commit.
       # Verify the regenerated types/migrations against the codebase here,
-      # before committing, so the bot can't push a broken state. Gated on the
-      # same condition as the commit step — no point installing Node when the
-      # diff is a no-op.
+      # before committing, so the bot can't push a broken state.
       - name: Set up Node.js (for verification)
-        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        if: steps.regen.outputs.has_changes == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
-        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        if: steps.regen.outputs.has_changes == 'true'
         run: npm ci
 
       - name: Lint, typecheck, and test
-        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        if: steps.regen.outputs.has_changes == 'true'
         run: |
           npm run lint
           npm run typecheck
           npm test
 
       - name: Commit and push
-        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        if: steps.regen.outputs.has_changes == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -185,7 +192,7 @@ jobs:
           git push
 
       - name: Comment on PR
-        if: steps.gen.outputs.produced == 'true' || steps.regen.outputs.types_updated == 'true'
+        if: steps.regen.outputs.has_changes == 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -201,13 +208,31 @@ jobs:
               body: `Bot committed ${items.join(' + ')}.\n\nReview before merging — pull the bot's commit if you have a local checkout.`
             });
 
-      # Only when the PR carries the `apply-to-dev` label. `db push` is
-      # idempotent (tracks applied versions in supabase_migrations) so this
-      # safely no-ops if the migration chain already matches Dev. Multiple
-      # labeled PRs open at once will share Dev — daily reset-dev.yml at
-      # 05:00 UTC cleans up.
-      - name: Apply migrations to Dev (label-gated)
-        if: contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
+  # `db push` is idempotent (tracks applied versions in supabase_migrations)
+  # so this safely no-ops if the migration chain already matches Dev. Multiple
+  # labeled PRs open at once will share Dev — daily reset-dev.yml at 05:00 UTC
+  # cleans up. The job-level `if:` keeps this off unless the PR carries the
+  # label; `needs: [generate]` means the bot's migration commit (if any) is on
+  # the branch by the time we checkout.
+  apply-to-dev:
+    needs: [generate]
+    if: |
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR branch (post-bot-commit)
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.98.2
+
+      - name: Push migration chain to Dev
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DEV_DB_PASSWORD }}
