@@ -1,10 +1,5 @@
 # Development Progress
 
-## Legend
-- `[ ]` Not started
-- `[~]` In progress
-- `[x]` Complete
-
 ---
 
 ## Monthly Planning & Budget Setting
@@ -46,16 +41,13 @@ When I've spent money (whether just now or earlier today), I want to log it in s
 ### [x] JTBD #8: Cap a shared category, overflow to allowance
 When I make a purchase where we've agreed to cap the shared portion at a specific amount (like a €30 lunch alone where shared "Dining Out" is capped at €10), I want to log the full purchase and have anything over the cap automatically count against my allowance, so each budget reflects only what we agreed
 
-### [ ] JTBD #9: Stay accountable to each other
-When either of us hasn't logged any expenses in several days, we want to be notified, so we know our shared financial picture might be incomplete and trigger a catch up
-
-### [x] JTBD #10: Enter foreign currency naturally
+### [x] JTBD #9: Enter foreign currency naturally
 When logging an expense in BRL, I want to enter the amount I actually paid, so I don't have to calculate conversions or delay entering it
 
 ---
 
 ## Data Migration & Import
 
-### [x] JTBD #11: Import historical data from current app
+### [x] JTBD #10: Import historical data from current app
 When setting up the new system, I want to import my expense and budget data from CSV exports of my current app, so I have continuity of my financial history and can see trends without starting from zero
 
