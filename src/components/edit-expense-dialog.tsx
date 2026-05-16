@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
-import type { Category, Expense } from "@/lib/types"
+import { getStorageKeys, type Category, type Expense } from "@/lib/types"
 import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState, partitionSplitSiblings } from "@/lib/split-utils"
@@ -117,13 +117,19 @@ function EditExpenseForm({
   // Re-arms to ON whenever the category changes (render-time reset below).
   const [applyCap, setApplyCap] = useState(initial.isSplit)
   const [prevCapCategory, setPrevCapCategory] = useState(primaryRow.category_id || "")
-  // Per-log override for the overflow target. Initialised from the existing
-  // overflow row's category (if this was already a split) so the toggle reflects
-  // the actual stored choice. `null` falls back to the category's configured
-  // default. Resets on category change.
-  const [overrideOverflowId, setOverrideOverflowId] = useState<string | null>(
-    initialOverflowRow?.category_id ?? null,
-  )
+  // The allowance the overflow portion lands in. For an existing split, seeded
+  // from the existing overflow row's category. For not-yet-split rows, seeded
+  // from the user's last pick in localStorage (falls back to the first
+  // allowance at render time). Sticky across category changes.
+  const [selectedOverflowId, setSelectedOverflowId] = useState<string | null>(() => {
+    if (initialOverflowRow?.category_id) return initialOverflowRow.category_id
+    if (typeof window === "undefined") return null
+    try {
+      return localStorage.getItem(getStorageKeys(primaryRow.household_id).LAST_OVERFLOW)
+    } catch {
+      return null
+    }
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -146,25 +152,32 @@ function EditExpenseForm({
     [selectedCategoryObj, amount, previewExchangeRate],
   )
 
-  const effectiveOverflowCategoryId = overrideOverflowId ?? capDerivation.overflowCategoryId
-  const overflowCategoryName = useMemo(
-    () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
-    [categories, effectiveOverflowCategoryId],
-  )
-
-  // Allowance categories — used to render the per-log override switch when
-  // the cap toggle is on.
+  // Allowance categories — used to render the per-log picker switch when the
+  // cap toggle is on.
   const allowanceCategories = useMemo(
     () => categories.filter((c) => c.exclude_from_budget_total),
     [categories],
   )
 
-  // Render-time reset when the category changes (React's recommended pattern
-  // for derived state — see expense-form.tsx for the matching logic).
+  // Effective overflow target: the user's stored pick if it still matches an
+  // active allowance, else the first allowance.
+  const effectiveOverflowCategoryId = useMemo(() => {
+    const stored = selectedOverflowId
+      ? allowanceCategories.find((c) => c.id === selectedOverflowId)?.id
+      : undefined
+    return stored ?? allowanceCategories[0]?.id ?? null
+  }, [selectedOverflowId, allowanceCategories])
+  const overflowCategoryName = useMemo(
+    () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
+    [categories, effectiveOverflowCategoryId],
+  )
+
+  // Render-time reset of the cap toggle when the category changes. The
+  // overflow allowance pick is sticky — it's a user preference, not a per-
+  // category default.
   if (categoryId !== prevCapCategory) {
     setPrevCapCategory(categoryId)
     setApplyCap(true)
-    setOverrideOverflowId(null)
   }
 
   const dateAsObject = expenseDate ? new Date(expenseDate + "T00:00:00") : undefined
@@ -223,11 +236,13 @@ function EditExpenseForm({
       // from the form's `wantsSplit` if the rate moved between render and save
       // (e.g., overnight rate refresh).
       const submitDerivation = deriveCapState(selectedCategoryObj, data.amount, exchangeRate)
-      const wantsSplitNow = submitDerivation.exceedsCap && applyCap && !selectedCategoryIsAllowance
+      const wantsSplitNow =
+        submitDerivation.exceedsCap &&
+        applyCap &&
+        !selectedCategoryIsAllowance &&
+        !!effectiveOverflowCategoryId
       const wasSplit = initial.isSplit
-      // Per-log override for the overflow target takes precedence over the
-      // category's configured default.
-      const overflowCategoryIdToUse = overrideOverflowId ?? submitDerivation.overflowCategoryId
+      const overflowCategoryIdToUse = effectiveOverflowCategoryId
 
       // Case 1: was not split → still not split. Simple update.
       if (!wasSplit && !wantsSplitNow) {
@@ -283,8 +298,8 @@ function EditExpenseForm({
       }
 
       // Case 3: was split → still split. Update both siblings in parallel.
-      // The overflow row's category_id may change if the user picked a new
-      // primary category whose configured overflow target differs.
+      // The overflow row's category_id may change if the user picks a
+      // different allowance via the pill picker.
       else if (wasSplit && wantsSplitNow && initialOverflowRow) {
         const [primaryRes, overflowRes] = await Promise.all([
           supabase
@@ -340,6 +355,20 @@ function EditExpenseForm({
         onDeleted?.([initialOverflowRow.id])
       }
 
+      // Remember the chosen allowance for the next split entry. Only fires
+      // when this save actually wrote a split — case 1 and case 4 don't
+      // express any allowance choice.
+      if (wantsSplitNow && overflowCategoryIdToUse) {
+        try {
+          localStorage.setItem(
+            getStorageKeys(primaryRow.household_id).LAST_OVERFLOW,
+            overflowCategoryIdToUse,
+          )
+        } catch {
+          // localStorage might be disabled
+        }
+      }
+
       setSaving(false)
       onOpenChange(false)
     } catch (err) {
@@ -391,10 +420,10 @@ function EditExpenseForm({
 
         {/* Cap-with-overflow toggle. Same model as the expense form: surfaces
             only when the selected category has a cap configured AND the
-            entered amount exceeds it (EUR-converted). Cap value comes from
-            the category; overflow target defaults to its configured allowance
-            but can be overridden per-log when there are multiple allowances. */}
-        {capDerivation.exceedsCap && !selectedCategoryIsAllowance && (
+            entered amount exceeds it (EUR-converted) AND there's at least
+            one allowance to overflow into. The allowance is picked at log
+            time. */}
+        {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
           <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <div className="flex flex-col">
@@ -423,7 +452,7 @@ function EditExpenseForm({
                     <button
                       type="button"
                       key={a.id}
-                      onClick={() => setOverrideOverflowId(a.id)}
+                      onClick={() => setSelectedOverflowId(a.id)}
                       className={`flex-1 h-8 rounded-md text-xs font-medium border transition-colors ${
                         active
                           ? "bg-primary text-primary-foreground border-primary"

@@ -178,24 +178,17 @@ CREATE TABLE categories (
   exclude_from_budget_total BOOLEAN NOT NULL DEFAULT FALSE,
   icon TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  -- Optional cap configuration (JTBD #8). When both are set, expenses logged
-  -- against this category in amounts exceeding `cap_amount` (EUR-equivalent)
-  -- surface an inline toggle in the expense form: ON splits into two sibling
-  -- rows (cap → this category, overflow → `overflow_category_id`), OFF logs a
-  -- single row at the full amount. Stored EUR-denominated regardless of the
-  -- expense's input currency. Cross-row guards ("overflow target must be an
-  -- allowance in the same household") are not CHECK-able and currently
-  -- enforced only by the seed; admin UI is deferred.
+  -- Optional cap configuration (JTBD #8). When set, expenses logged against
+  -- this category in amounts exceeding `cap_amount` (EUR-equivalent) surface
+  -- an inline toggle in the expense form: ON splits into two sibling rows
+  -- (cap → this category, overflow → an allowance the user picks at log
+  -- time), OFF logs a single row at the full amount. Stored EUR-denominated
+  -- regardless of the expense's input currency.
   cap_amount DECIMAL(12, 2),
-  overflow_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT categories_cap_both_or_neither CHECK (
-    (cap_amount IS NULL AND overflow_category_id IS NULL)
-    OR (cap_amount IS NOT NULL AND overflow_category_id IS NOT NULL AND cap_amount > 0)
-  ),
-  CONSTRAINT categories_no_self_overflow CHECK (
-    overflow_category_id IS NULL OR overflow_category_id <> id
+  CONSTRAINT categories_cap_positive CHECK (
+    cap_amount IS NULL OR cap_amount > 0
   )
 );
 
