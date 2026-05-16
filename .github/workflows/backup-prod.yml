@@ -12,6 +12,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Install PostgreSQL 17 client
         run: |
           sudo apt-get update -qq
@@ -22,12 +25,24 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-17
 
-      - name: Run pg_dump
+      # apt ships age 1.1.x on ubuntu-latest, which doesn't handle PQ-hybrid
+      # recipients (`age1pq1...`) natively. Native ML-KEM-768 + X25519 support
+      # landed in age v1.3.0, so install that binary directly.
+      - name: Install age 1.3+ (PQ-capable)
+        run: |
+          AGE_VERSION=v1.3.0
+          curl -sSL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin --strip-components=1 age/age
+          age --version
+
+      - name: Run pg_dump and encrypt
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          set -euo pipefail
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           BACKUP_FILE="quick-budget-${TIMESTAMP}.sql"
+          ENCRYPTED_FILE="${BACKUP_FILE}.age"
 
           /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" \
             --no-owner \
@@ -37,7 +52,8 @@ jobs:
             --format=plain \
             > "$BACKUP_FILE"
 
-          # Verify the dump is non-empty and contains expected tables
+          # Verify the dump is non-empty and contains expected tables. Runs on
+          # plaintext before encryption so the per-table grep still works.
           if [ ! -s "$BACKUP_FILE" ]; then
             echo "::error::Backup file is empty"
             exit 1
@@ -50,10 +66,28 @@ jobs:
             fi
           done
 
-          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_ENV"
-          echo "Backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
+          # Encrypt to the committed PQ-hybrid recipient. Private key lives only
+          # in 1Password — this runner cannot decrypt what it produces.
+          age -R .github/backup-recipient.txt -o "$ENCRYPTED_FILE" "$BACKUP_FILE"
 
-      - name: Upload backup artifact
+          # Verify ciphertext is well-formed and non-empty.
+          if [ ! -s "$ENCRYPTED_FILE" ]; then
+            echo "::error::Encrypted file is empty"
+            exit 1
+          fi
+          if ! head -c 21 "$ENCRYPTED_FILE" | grep -q '^age-encryption.org'; then
+            echo "::error::Encryption failed — output missing age header"
+            exit 1
+          fi
+
+          # Defense-in-depth: wipe the plaintext on the ephemeral runner so a
+          # later step in the same job cannot accidentally upload it.
+          shred -u "$BACKUP_FILE"
+
+          echo "backup_file=$ENCRYPTED_FILE" >> "$GITHUB_ENV"
+          echo "Encrypted backup size: $(du -h "$ENCRYPTED_FILE" | cut -f1)"
+
+      - name: Upload encrypted backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: db-backup-${{ env.backup_file }}
