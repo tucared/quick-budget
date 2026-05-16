@@ -155,7 +155,7 @@ Or trigger `reset-dev.yml` from **Actions → Reset Dev → Run workflow**.
 
 ## Backups
 
-Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump` daily and stores the result as a GitHub Actions artifact (retained 90 days).
+Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump` daily, encrypts the dump with [`age`](https://age-encryption.org) to a post-quantum hybrid (ML-KEM-768 + X25519) recipient committed at `.github/backup-recipient.txt`, and stores the ciphertext as a GitHub Actions artifact (retained 90 days). The matching private key lives only in 1Password — the workflow can produce backups but cannot decrypt them, which is what makes it safe to keep the artifacts in a public repo.
 
 ### Setup (one-time, after creating Supabase project)
 
@@ -165,23 +165,42 @@ Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump`
    - **Name**: `SUPABASE_DB_URL`
    - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
    - **Important**: If your database password contains special characters, URL-encode them (e.g., `!` → `%21`, `@` → `%40`, `#` → `%23`)
-4. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Backup Prod → Run workflow**.
+4. Confirm the recipient public key is in place: `.github/backup-recipient.txt` should contain a single `age1pq1...` line. The matching private key is in 1Password as "Quick Budget backup key" — without it backups cannot be restored.
+5. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Backup Prod → Run workflow**.
 
 ### Restoring from backup
 
+Requires `age` ≥ 1.3.0 on the decrypting machine (native PQ-hybrid support landed in 1.3.0; older versions need the separate `age-plugin-pq`). On macOS: `brew upgrade age`. On Linux: download from <https://github.com/FiloSottile/age/releases>.
+
 1. Go to **Actions → Backup Prod** and download the artifact for the desired date
-2. Unzip it to get the `.sql` file
-3. Run against your database:
+2. Unzip it to get the `.sql.age` file
+3. Decrypt with the private key from 1Password, then restore:
    ```bash
+   age -d -i ~/quick-budget-backup-key.txt \
+     quick-budget-YYYYMMDD-HHMMSS.sql.age \
+     > quick-budget-YYYYMMDD-HHMMSS.sql
    psql "$SUPABASE_DB_URL" < quick-budget-YYYYMMDD-HHMMSS.sql
    ```
 
+### Rotating the backup key
+
+If the private key is suspected compromised or you want to roll it for hygiene:
+
+1. On a trusted laptop with `age` ≥ 1.3.0 installed:
+   ```bash
+   age-keygen -pq -o ~/quick-budget-backup-key.txt
+   ```
+2. Stash the new file in 1Password (replace the previous entry).
+3. Replace the single line in `.github/backup-recipient.txt` with the new `age1pq1...` public key (strip the `# public key: ` prefix from the keygen output).
+4. Commit, push, merge. From the next scheduled run, new backups are encrypted to the new key.
+5. Keep the old private key in 1Password until the 90-day retention window has expired on the last artifact encrypted to it, then delete.
+
 ### Before risky operations
 
-Always run a manual backup before migrations or schema changes:
+Always run a manual backup before migrations or schema changes. Easiest path: trigger the workflow manually from **Actions → Backup Prod → Run workflow** so the ciphertext goes through the same encrypt-and-upload path. For a fully local backup:
 ```bash
-# Trigger backup manually from GitHub Actions UI, or:
-pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists > backup-$(date +%Y%m%d).sql
+pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --clean --if-exists \
+  | age -R .github/backup-recipient.txt -o "backup-$(date +%Y%m%d).sql.age"
 ```
 
 ## Other Notes
