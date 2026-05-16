@@ -96,10 +96,11 @@ jobs:
         id: gen
         run: |
           set -euo pipefail
-          NAME="auto_$(date -u +%Y%m%d%H%M%S)"
-          # `supabase db diff -f <name>` writes the diff to
-          # supabase/migrations/<timestamp>_<name>.sql. If schemas already
-          # match the migration chain, the file body is comment-only.
+          NAME="auto"
+          # `supabase db diff -f auto` writes the diff to
+          # supabase/migrations/<timestamp>_auto.sql (the CLI prepends its
+          # own timestamp). If schemas already match the migration chain,
+          # the file body is comment-only.
           #
           # --schema public restricts migra to the public schema. The realtime
           # broadcast layer (messages policy, trigger function, triggers,
