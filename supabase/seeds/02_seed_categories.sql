@@ -33,8 +33,8 @@ BEGIN
 
   -- Allowance categories (excluded from budget total)
   INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active) VALUES
-    (shared_household_id, 'User One Allowance', '👤', TRUE, TRUE),
-    (shared_household_id, 'User Two Allowance', '👤', TRUE, TRUE);
+    (shared_household_id, 'User One Allowance', '🧑‍🎨', TRUE, TRUE),
+    (shared_household_id, 'User Two Allowance', '🧑‍💼', TRUE, TRUE);
 
   -- Illustrative caps for JTBD #8. The expense form surfaces an inline toggle
   -- when a logged amount exceeds these. Caps are EUR-denominated.

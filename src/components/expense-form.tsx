@@ -647,48 +647,54 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           allowance is picked at log time (sticky across submits via
           localStorage). */}
       {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
-        <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+        <div className="rounded-md border border-border bg-muted/30 p-3">
           <label className="flex items-center justify-between gap-3 cursor-pointer">
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="text-sm font-medium">
                 Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground truncate">
                 Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
                 {overflowCategoryName ?? "allowance"}
               </span>
             </div>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={applyCap}
-              onChange={(e) => setApplyCap(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-primary"
-              aria-label="Apply cap"
-            />
-          </label>
-          {applyCap && allowanceCategories.length > 1 && (
-            <div className="flex gap-1.5">
-              {allowanceCategories.map((a) => {
-                const active = a.id === effectiveOverflowCategoryId
-                return (
-                  <button
-                    type="button"
-                    key={a.id}
-                    onClick={() => setSelectedOverflowId(a.id)}
-                    className={`flex-1 h-8 rounded-md text-xs font-medium border transition-colors ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                    aria-pressed={active}
-                  >
-                    {a.name}
-                  </button>
-                )
-              })}
+            <div className="flex items-center gap-2">
+              {applyCap && allowanceCategories.length > 1 && (
+                <div className="flex gap-1">
+                  {allowanceCategories.map((a) => {
+                    const active = a.id === effectiveOverflowCategoryId
+                    return (
+                      <button
+                        type="button"
+                        key={a.id}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setSelectedOverflowId(a.id)
+                        }}
+                        className={`h-7 w-7 rounded-md text-base border transition-colors flex items-center justify-center ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:border-foreground"
+                        }`}
+                        aria-label={`Send overflow to ${a.name}`}
+                        aria-pressed={active}
+                      >
+                        {a.icon}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              <input
+                type="checkbox"
+                role="switch"
+                checked={applyCap}
+                onChange={(e) => setApplyCap(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+                aria-label="Apply cap"
+              />
             </div>
-          )}
+          </label>
         </div>
       )}
 
