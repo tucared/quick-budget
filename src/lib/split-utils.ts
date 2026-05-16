@@ -3,11 +3,12 @@ import { isSplitGroup } from "./types"
 
 export const isSplitGroupItem = isSplitGroup
 
-// Cap-with-overflow derivation (JTBD #8). Given the selected category's
+// Cap-with-overflow derivation (JTBD #8). Given the selected category's cap
 // configuration and the entered amount + exchange rate, returns whether the
 // expense exceeds the configured cap and — if so — the exact original- and
 // EUR-currency amounts that should be written to the primary (capped) and
-// overflow (allowance) sibling rows.
+// overflow sibling rows. The overflow's target category is picked at log time
+// in the UI; this function only does the math.
 //
 // Invariants on the returned values when exceedsCap is true:
 //   - primaryEUR === capEUR (no rounding loss on the budget side)
@@ -19,22 +20,17 @@ export const isSplitGroupItem = isSplitGroup
 export interface CapDerivation {
   exceedsCap: boolean
   capEUR: number
-  overflowCategoryId: string
   primaryOriginal: number
   primaryEUR: number
   overflowOriginal: number
   overflowEUR: number
 }
 
-type CapConfigInput = Pick<
-  Category,
-  "cap_amount" | "overflow_category_id" | "exclude_from_budget_total"
->
+type CapConfigInput = Pick<Category, "cap_amount" | "exclude_from_budget_total">
 
 const EMPTY_DERIVATION: CapDerivation = {
   exceedsCap: false,
   capEUR: 0,
-  overflowCategoryId: "",
   primaryOriginal: 0,
   primaryEUR: 0,
   overflowOriginal: 0,
@@ -48,16 +44,15 @@ export function deriveCapState(
 ): CapDerivation {
   if (!category) return EMPTY_DERIVATION
   if (category.exclude_from_budget_total) return EMPTY_DERIVATION
-  if (category.cap_amount == null || !category.overflow_category_id) return EMPTY_DERIVATION
+  if (category.cap_amount == null) return EMPTY_DERIVATION
   if (!Number.isFinite(amountOriginal) || amountOriginal <= 0) return EMPTY_DERIVATION
   if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return EMPTY_DERIVATION
 
   const capEUR = Number(category.cap_amount)
-  const overflowCategoryId = category.overflow_category_id
   const totalEUR = amountOriginal * exchangeRate
 
   if (totalEUR <= capEUR) {
-    return { ...EMPTY_DERIVATION, capEUR, overflowCategoryId }
+    return { ...EMPTY_DERIVATION, capEUR }
   }
 
   const overflowEUR = +(totalEUR - capEUR).toFixed(2)
@@ -68,7 +63,6 @@ export function deriveCapState(
   return {
     exceedsCap: true,
     capEUR,
-    overflowCategoryId,
     primaryOriginal,
     primaryEUR: capEUR,
     overflowOriginal,

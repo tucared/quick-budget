@@ -56,9 +56,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
 
-  // Cap-with-overflow toggle (JTBD #8). The cap amount and overflow target
-  // come from the selected category's configured `cap_amount` /
-  // `overflow_category_id`; this boolean is just "apply the cap or not".
+  // Cap-with-overflow toggle (JTBD #8). The cap amount comes from the selected
+  // category's `cap_amount`; this boolean is just "apply the cap or not".
   // Defaults ON; re-arms to ON whenever the category changes (see the
   // render-time reset below) so a stale OFF state from a different category
   // doesn't carry across. Persists across amount changes within the same
@@ -66,10 +65,19 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // different category.
   const [applyCap, setApplyCap] = useState(true)
   const [prevCapCategory, setPrevCapCategory] = useState("")
-  // Per-log override for the overflow target. `null` means "use the category's
-  // configured default" (`overflow_category_id`). Resets on category change so
-  // a stale pick from a different category doesn't carry across.
-  const [overrideOverflowId, setOverrideOverflowId] = useState<string | null>(null)
+  // The allowance the overflow portion lands in when the cap toggle is ON.
+  // Initialised from the last pick stored in localStorage; falls back to the
+  // first allowance at render time. Sticky across category changes and
+  // submits — the user explicitly picks via pill buttons when they want a
+  // different target.
+  const [selectedOverflowId, setSelectedOverflowId] = useState<string | null>(() => {
+    if (typeof window === "undefined" || !householdId) return null
+    try {
+      return localStorage.getItem(getStorageKeys(householdId).LAST_OVERFLOW)
+    } catch {
+      return null
+    }
+  })
 
   // Ref for the amount input — used to refocus after currency toggles
   const amountInputRef = useRef<AmountInputHandle | null>(null)
@@ -114,27 +122,36 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     [categories],
   )
 
-  // Render-time reset of the cap toggle (and overflow override) when the
-  // category changes — React's recommended pattern for derived state.
+  // Render-time reset of the cap toggle when the category changes — React's
+  // recommended pattern for derived state. The overflow allowance pick is
+  // sticky across category changes (it's a user preference, not a per-
+  // category default).
   if (selectedCategory !== prevCapCategory) {
     setPrevCapCategory(selectedCategory)
     setApplyCap(true)
-    setOverrideOverflowId(null)
   }
 
-  // Derive cap-split values from the category's configured cap_amount +
-  // overflow_category_id. `exceedsCap` is true only when the configured cap
-  // is strictly less than the EUR-converted total. When the rate isn't loaded
-  // yet (non-EUR mid-fetch), short-circuit to no-split so the UI doesn't show
-  // misleading preview math.
+  // Derive cap-split values from the category's configured cap_amount.
+  // `exceedsCap` is true only when the configured cap is strictly less than
+  // the EUR-converted total. When the rate isn't loaded yet (non-EUR mid-
+  // fetch), short-circuit to no-split so the UI doesn't show misleading
+  // preview math.
   const capDerivation = useMemo(
     () => effectiveExchangeRate == null
       ? deriveCapState(null, 0, 1)
       : deriveCapState(selectedCategoryObj, expenseAmount, effectiveExchangeRate),
     [selectedCategoryObj, expenseAmount, effectiveExchangeRate],
   )
-  const isSplit = capDerivation.exceedsCap && applyCap
-  const effectiveOverflowCategoryId = overrideOverflowId ?? capDerivation.overflowCategoryId
+  const isSplit = capDerivation.exceedsCap && applyCap && allowanceCategories.length > 0
+  // Effective overflow target: the user's stored pick if it still matches an
+  // active allowance, else the first allowance. Recomputes if allowances
+  // change (e.g., one is deactivated).
+  const effectiveOverflowCategoryId = useMemo(() => {
+    const stored = selectedOverflowId
+      ? allowanceCategories.find((c) => c.id === selectedOverflowId)?.id
+      : undefined
+    return stored ?? allowanceCategories[0]?.id ?? null
+  }, [selectedOverflowId, allowanceCategories])
   const overflowCategoryName = useMemo(
     () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
     [categories, effectiveOverflowCategoryId],
@@ -409,9 +426,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       // mid-fetch). Re-evaluating here also guards against a stale `isSplit`
       // if the rate changed between render and submit.
       const submitDerivation = deriveCapState(selectedCategoryObj, data.amount, exchangeRate)
-      const shouldSplit = submitDerivation.exceedsCap && applyCap
-      // Per-log override takes precedence over the category's configured default.
-      const overflowCategoryIdToUse = overrideOverflowId ?? submitDerivation.overflowCategoryId
+      const shouldSplit =
+        submitDerivation.exceedsCap && applyCap && !!effectiveOverflowCategoryId
+      const overflowCategoryIdToUse = effectiveOverflowCategoryId
 
       let savedRows: Expense[] | null = null
       if (shouldSplit) {
@@ -473,6 +490,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           if (data.currency) {
             localStorage.setItem(storageKeys.LAST_CURRENCY, data.currency)
           }
+          if (shouldSplit && overflowCategoryIdToUse) {
+            localStorage.setItem(storageKeys.LAST_OVERFLOW, overflowCategoryIdToUse)
+          }
           // Track usage frequency
           recordUsage(storageKeys.CATEGORY_USAGE, data.category_id)
         }
@@ -496,11 +516,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       setCentsRaw(0)
       setAmount(NaN)
       setDescription("")
-      // Re-arm the cap toggle and clear the per-log overflow override for the
-      // next entry — same category, but the user's previous choices shouldn't
-      // silently persist across saves.
+      // Re-arm the cap toggle for the next entry. The overflow allowance pick
+      // is intentionally sticky — the user already chose it consciously and
+      // would expect the same target on the next split.
       setApplyCap(true)
-      setOverrideOverflowId(null)
 
       // Focus on amount input for next entry
       if (amountInputRef.current) {
@@ -623,11 +642,11 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       </div>
 
       {/* Cap-with-overflow toggle (JTBD #8). Surfaces only when the selected
-          category has a cap configured AND the entered amount exceeds it.
-          Cap value comes from the category; overflow target defaults to the
-          category's configured allowance but can be overridden per-log when
-          there are multiple allowances. */}
-      {capDerivation.exceedsCap && !selectedCategoryIsAllowance && (
+          category has a cap configured AND the entered amount exceeds it AND
+          the household has at least one allowance to overflow into. The
+          allowance is picked at log time (sticky across submits via
+          localStorage). */}
+      {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
         <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
           <label className="flex items-center justify-between gap-3 cursor-pointer">
             <div className="flex flex-col">
@@ -656,7 +675,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   <button
                     type="button"
                     key={a.id}
-                    onClick={() => setOverrideOverflowId(a.id)}
+                    onClick={() => setSelectedOverflowId(a.id)}
                     className={`flex-1 h-8 rounded-md text-xs font-medium border transition-colors ${
                       active
                         ? "bg-primary text-primary-foreground border-primary"

@@ -12,7 +12,6 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     icon: null,
     is_active: true,
     cap_amount: null,
-    overflow_category_id: null,
     created_at: "2026-05-15T00:00:00Z",
     updated_at: "2026-05-15T00:00:00Z",
     ...overrides,
@@ -142,21 +141,19 @@ describe("deriveCapState", () => {
     const cat = makeCategory({
       exclude_from_budget_total: true,
       cap_amount: 10,
-      overflow_category_id: "cat-other",
     })
     expect(deriveCapState(cat, 25, 1).exceedsCap).toBe(false)
   })
 
   it("returns exceedsCap=false when amount equals the cap (no strict overflow)", () => {
-    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const cat = makeCategory({ cap_amount: 10 })
     const result = deriveCapState(cat, 10, 1)
     expect(result.exceedsCap).toBe(false)
     expect(result.capEUR).toBe(10)
-    expect(result.overflowCategoryId).toBe("cat-allow")
   })
 
   it("splits cleanly in EUR when amount > cap", () => {
-    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const cat = makeCategory({ cap_amount: 10 })
     const result = deriveCapState(cat, 25, 1)
     expect(result.exceedsCap).toBe(true)
     expect(result.capEUR).toBe(10)
@@ -167,7 +164,7 @@ describe("deriveCapState", () => {
   })
 
   it("splits BRL into primary cap-in-EUR + overflow with input sum preserved", () => {
-    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const cat = makeCategory({ cap_amount: 10 })
     const rate = 0.189
     const amountBRL = 55.55
     const result = deriveCapState(cat, amountBRL, rate)
@@ -179,7 +176,7 @@ describe("deriveCapState", () => {
   })
 
   it("excludes allowance overflow when total just barely crosses cap (sub-cent)", () => {
-    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const cat = makeCategory({ cap_amount: 10 })
     const result = deriveCapState(cat, 10.005, 1)
     expect(result.exceedsCap).toBe(true)
     expect(result.primaryEUR).toBe(10)
@@ -187,7 +184,7 @@ describe("deriveCapState", () => {
   })
 
   it("returns exceedsCap=false for zero/negative/NaN inputs", () => {
-    const cat = makeCategory({ cap_amount: 10, overflow_category_id: "cat-allow" })
+    const cat = makeCategory({ cap_amount: 10 })
     expect(deriveCapState(cat, 0, 1).exceedsCap).toBe(false)
     expect(deriveCapState(cat, NaN, 1).exceedsCap).toBe(false)
     expect(deriveCapState(cat, 25, 0).exceedsCap).toBe(false)

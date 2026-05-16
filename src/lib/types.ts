@@ -48,6 +48,7 @@ export function getStorageKeys(householdId: string) {
     LAST_CATEGORY: `${prefix}:last_category`,
     LAST_CURRENCY: `${prefix}:last_currency`,
     CATEGORY_USAGE: `${prefix}:category_usage`,
+    LAST_OVERFLOW: `${prefix}:last_overflow`,
   } as const
 }
 
