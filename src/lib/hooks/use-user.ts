@@ -39,11 +39,12 @@ export function useUser(initialUser?: UserData | null) {
           return
         }
 
-        // Read household_id from the JWT custom claim populated by the
-        // private.custom_access_token_hook auth hook (see
-        // supabase/schemas/02_tables.sql). The claim lives in the encoded
-        // access token, not on authUser.app_metadata — supabase-js
-        // populates that field from the auth.users row, not the JWT.
+        // Intentionally unverified: client-side UI hint only. PostgREST
+        // re-verifies the JWT on every data call and RLS gates by the
+        // verified auth.jwt() context. The server uses verifyAccessToken()
+        // (jwt-verify.ts) for the trusted read.
+        // Claim lives in the encoded token, not authUser.app_metadata —
+        // supabase-js populates that field from auth.users, not the JWT.
         const claimHouseholdId = decodeJwtClaim(session?.access_token, [
           "app_metadata",
           "household_id",
