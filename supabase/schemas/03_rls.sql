@@ -20,7 +20,12 @@ CREATE POLICY "Users can view household members" ON users
   );
 
 CREATE POLICY "Users can update own profile" ON users
-  FOR UPDATE USING (id = (SELECT auth.uid()));
+  FOR UPDATE
+  USING (id = (SELECT auth.uid()))
+  WITH CHECK (
+    id = (SELECT auth.uid())
+    AND household_id = private.get_my_household_id()
+  );
 
 CREATE POLICY "Users can delete own profile" ON users
   FOR DELETE USING (id = (SELECT auth.uid()));
