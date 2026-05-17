@@ -2,7 +2,7 @@ import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, startOfMonth, subDays } from "date-fns"
 import { nextMonthString } from "@/lib/date-utils"
-import { decodeJwtClaim } from "@/lib/jwt-claim"
+import { verifyAccessToken } from "@/lib/server/jwt-verify"
 import type {
   BudgetSummary,
   Category,
@@ -24,22 +24,14 @@ const getSupabase = cache(() => createServerSupabaseClient())
  * Cached per request — safe to call from both layout and page without
  * triggering duplicate auth round-trips.
  *
- * Uses getSession() (a cookie read, no network call) and decodes
- * household_id from the access token JWT, where it's populated by the
- * private.custom_access_token_hook auth hook. The hook is configured in
- * supabase/config.toml for local dev and is enabled in the Supabase
- * dashboard for both Dev and Prod (Authentication → Hooks → Customize
- * Access Token → private.custom_access_token_hook).
+ * Uses getSession() (a cookie read, no network call) then verifies the
+ * access token signature locally via JWKS (no /auth/v1/user round-trip).
+ * Claims are pulled from the verified payload — household_id is populated
+ * by the private.custom_access_token_hook auth hook (see supabase/schemas/
+ * 02_tables.sql and config.toml / Supabase dashboard for enablement).
  *
- * The claim has to be read from the encoded JWT directly, not from
- * `session.user.app_metadata` — supabase-js populates that field from
- * the auth.users row, not the JWT payload.
- *
- * Returns null when the claim is missing (the legacy public.users
- * fallback was dropped in
- * supabase/migrations/20260514163400_drop_users_fallback_from_get_my_household_id.sql).
- * Callers redirect to /login on null; tokens missing the claim refresh
- * on the next /token POST and pick it up.
+ * Returns null on missing session, invalid/expired token, or absent
+ * household_id claim. Callers redirect to /login on null.
  */
 export const getServerUser = cache(async (): Promise<UserData | null> => {
   const supabase = await getSupabase()
@@ -48,25 +40,18 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
     data: { session },
   } = await supabase.auth.getSession()
 
-  const authUser = session?.user
-  if (!authUser) {
-    return null
-  }
+  const verdict = await verifyAccessToken(session?.access_token)
+  if (!verdict.ok) return null
 
-  const claimHouseholdId = decodeJwtClaim(session?.access_token, [
-    "app_metadata",
-    "household_id",
-  ])
-
-  if (!claimHouseholdId) {
-    return null
-  }
+  const { claims } = verdict
+  const householdId = claims.app_metadata?.household_id
+  if (!householdId) return null
 
   return {
-    id: authUser.id,
-    email: authUser.email,
-    fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
-    householdId: claimHouseholdId,
+    id: claims.sub,
+    email: claims.email,
+    fullName: claims.user_metadata?.full_name || claims.email?.split("@")[0] || "User",
+    householdId,
   }
 })
 

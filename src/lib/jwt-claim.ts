@@ -1,16 +1,18 @@
 /**
- * Read a string claim from a JWT's payload without verifying its signature.
+ * Client-only UI hint: read a string claim from a JWT payload without
+ * verifying the signature.
  *
- * The JWT signature is verified upstream — by PostgREST on every API request
- * via the Supabase JWT secret — so reading the claim unverified here is only
- * used as a performance hint (skip a public.users SELECT when the
- * household_id claim is present). RLS still enforces the actual scope server-
- * side using the verified `auth.jwt()` context, so a tampered cookie can't
- * leak another household's data through this path.
+ * This helper is used exclusively by `useUser` (client hook) to bootstrap
+ * the UI from a session cookie without a round-trip. The server has its own
+ * verified path via `src/lib/server/jwt-verify.ts` (`verifyAccessToken`),
+ * which checks the JWKS signature before trusting any claim.
+ *
+ * A tampered cookie can mislabel client UI for one render, but every data
+ * call goes through PostgREST which re-verifies the JWT, and RLS gates by
+ * the verified `auth.jwt()` context — so no data leaks through this path.
  *
  * Returns null when the token is malformed, the path doesn't exist, or the
- * value isn't a string — callers should treat null as "claim absent" and
- * fall back to whatever cold path they have.
+ * value isn't a string.
  */
 export function decodeJwtClaim(
   token: string | null | undefined,
