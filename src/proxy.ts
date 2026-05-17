@@ -10,7 +10,7 @@ export const config = {
 
 const PUBLIC_PATHS = new Set(["/login", "/auth/callback"])
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
