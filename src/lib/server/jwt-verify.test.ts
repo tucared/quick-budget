@@ -1,23 +1,23 @@
 import { vi, describe, it, expect, beforeAll } from "vitest"
-import { generateKeyPair, SignJWT } from "jose"
+import { generateKeyPair, SignJWT, errors as joseErrors } from "jose"
 
-// Set env var before jwt-verify.ts module loads (vi.hoisted runs before imports)
-vi.hoisted(() => {
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321"
-})
+// Env var + server-only mock are wired in vitest.setup.ts so module init succeeds.
 
-vi.mock("server-only", () => ({}))
-
-// Mock createRemoteJWKSet to return a local key resolver instead of fetching a URL.
-// verifyKey is set in beforeAll; the inner async function captures it by reference,
-// so it resolves to the correct key when tests run.
+// Mock createRemoteJWKSet to return a local key resolver instead of fetching a
+// URL. verifyKey is set in beforeAll; the inner async function captures it by
+// reference, so it resolves to the correct key when tests run. Tests that need
+// to simulate JWKS failures override jwksError before calling verifyAccessToken.
 let verifyKey: CryptoKey
+let jwksError: Error | null = null
 
 vi.mock("jose", async (importOriginal) => {
   const actual = await importOriginal<typeof import("jose")>()
   return {
     ...actual,
-    createRemoteJWKSet: () => async () => verifyKey,
+    createRemoteJWKSet: () => async () => {
+      if (jwksError) throw jwksError
+      return verifyKey
+    },
   }
 })
 
@@ -79,5 +79,25 @@ describe("verifyAccessToken", () => {
     expect(await verifyAccessToken(null)).toEqual({ ok: false, reason: "missing" })
     expect(await verifyAccessToken(undefined)).toEqual({ ok: false, reason: "missing" })
     expect(await verifyAccessToken("")).toEqual({ ok: false, reason: "missing" })
+  })
+
+  it("returns reason=transient for a JWKS infrastructure failure", async () => {
+    const token = await mintToken(baseClaims(), signingKey)
+    jwksError = new joseErrors.JWKSTimeout()
+    try {
+      expect(await verifyAccessToken(token)).toEqual({ ok: false, reason: "transient" })
+    } finally {
+      jwksError = null
+    }
+  })
+
+  it("returns reason=transient for a raw network error", async () => {
+    const token = await mintToken(baseClaims(), signingKey)
+    jwksError = new TypeError("fetch failed")
+    try {
+      expect(await verifyAccessToken(token)).toEqual({ ok: false, reason: "transient" })
+    } finally {
+      jwksError = null
+    }
   })
 })
