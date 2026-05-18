@@ -71,6 +71,20 @@ The hook setting is project-level, not schema-level, so the daily Dev reset does
 
 See [Supabase: Custom Access Token Auth Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook) for the full hook contract.
 
+### Signing Keys (asymmetric JWT, manual, both projects)
+
+The app verifies JWT signatures locally against the project's JWKS endpoint (`<project>/auth/v1/.well-known/jwks.json`). This requires asymmetric signing keys (ES256/RS256) — legacy HMAC projects can't expose a public key, so the verifier (`src/lib/server/jwt-verify.ts`) will reject every token.
+
+Dashboard → **Authentication → Signing Keys** → rotate the active key to **ES256** (P-256). The previous HMAC key remains usable until existing tokens expire (≤1h with default `jwt_expiry`), so the cutover is non-disruptive. Verify `https://<project>.supabase.co/auth/v1/.well-known/jwks.json` returns the new public key before merging app-side changes that depend on it.
+
+> **Merge-order requirement.** App code in `main` (after [PR #128](https://github.com/tucared/quick-budget/pull/128)) requires the Prod project to be on asymmetric keys. **Rotate Prod first, then merge** — merging while Prod is still HMAC will lock everyone out until the rotation lands.
+
+Local dev needs the same — see [README: Quick Start](./README.md#quick-start) for the `npm run setup:signing-keys` bootstrap.
+
+### GoTrue 2.189+ `enable_signup` quirk
+
+`supabase/config.toml` keeps `[auth.email] enable_signup = true` even though the global `[auth] enable_signup = false` already blocks new registrations. GoTrue 2.189+ repurposed the per-provider `enable_signup` flag — setting it to `false` disables email **login** entirely, not just signup. If you ever tighten that config, leave the email-scoped flag alone and rely on the global one. The same applies to the dashboard equivalent on Dev/Prod.
+
 ## CI/CD Pipeline
 
 Every PR goes through the following gates before it can deploy:
