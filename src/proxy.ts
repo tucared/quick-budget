@@ -4,11 +4,11 @@ import { verifyAccessToken } from "@/lib/server/jwt-verify"
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
 
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"])
+const PUBLIC_PATHS = new Set(["/login"])
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -46,7 +46,13 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
-  // "invalid" — tampered cookie or JWKS fetch failure
+  // "transient" — JWKS fetch / Supabase auth outage. Don't sign out: real
+  // sessions are still real, just unverifiable right now. Let the request
+  // through; the next navigation re-tries once the JWKS cache cooldown
+  // (30s) clears.
+  if (verdict.reason === "transient") return supabaseResponse
+
+  // "invalid" — tampered cookie or malformed token
   await supabase.auth.signOut()
   if (!PUBLIC_PATHS.has(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone()
