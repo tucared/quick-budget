@@ -34,12 +34,23 @@ This is the third iteration of a personal finance tool:
 ### Quick Start
 
 ```bash
-npm ci                # Strict install from package-lock.json
-supabase start        # First run takes ~3 min to download images
+npm ci                          # Strict install from package-lock.json
+npm run setup:signing-keys      # One-time: generate local JWT signing key (ES256)
+# Then uncomment `signing_keys_path = "./signing_keys.json"` in supabase/config.toml
+supabase start                  # First run takes ~3 min to download images
 npm run dev
 ```
 
 Visit http://localhost:3000 — login with `user1@example.com` / `password1`
+
+> **Why the signing-keys step?** The app verifies JWT signatures locally via
+> JWKS (`src/lib/server/jwt-verify.ts`). Local Supabase defaults to HS256, which
+> the JWKS verifier (`jose`) can't validate — the middleware would reject every
+> session. `npm run setup:signing-keys` writes a gitignored `signing_keys.json`
+> at the repo root that switches local Supabase to ES256 (Dev/Prod use
+> dashboard-managed asymmetric keys). Skip the uncomment step and `supabase
+> start` keeps signing with HS256, so login appears to work then redirects
+> straight back to `/login`.
 
 ### Useful URLs
 
