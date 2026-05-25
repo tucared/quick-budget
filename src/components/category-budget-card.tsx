@@ -114,7 +114,7 @@ function CategoryBudgetCardImpl({
       {/* Spent / allocated + remaining */}
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">
-          {formatCurrency(spent)} <span className="mx-0.5">/</span> {formatCurrency(allocated, 0)}
+          {formatCurrency(spent)} <span className="mx-0.5">/</span> {formatCurrency(allocated)}
         </span>
         <span>
           <span className="font-semibold">{formatCurrency(remaining)} left</span>

@@ -242,19 +242,19 @@ export function BudgetEditDialog({
                 <div className="mt-2 space-y-1 border-t pt-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Allocated</span>
-                    <span className="font-medium">{formatCurrency(regularAllocated, 0)}</span>
+                    <span className="font-medium">{formatCurrency(regularAllocated)}</span>
                   </div>
                   {hasTarget && (
                     overBy > 0 ? (
                       <div className="flex justify-between text-destructive font-medium">
                         <span>Over by</span>
-                        <span>{formatCurrency(overBy, 0)}</span>
+                        <span>{formatCurrency(overBy)}</span>
                       </div>
                     ) : (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Unallocated</span>
                         <span className={unallocated > 0 ? "text-[hsl(160,40%,35%)] font-medium" : "text-muted-foreground"}>
-                          {formatCurrency(unallocated, 0)}
+                          {formatCurrency(unallocated)}
                         </span>
                       </div>
                     )
