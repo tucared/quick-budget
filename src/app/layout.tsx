@@ -11,7 +11,10 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Quick Budget",
+  title: {
+    default: "Quick Budget",
+    template: "%s · Quick Budget",
+  },
   description: "Frictionless expense tracking for couples",
 }
 
