@@ -25,7 +25,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
         <div className="mb-3">
           <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
           <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
-            {formatCurrency(totalRemaining, 0)}
+            {formatCurrency(totalRemaining)}
           </div>
         </div>
 
@@ -40,7 +40,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
         {/* Footer row */}
         <div className="flex justify-between items-center text-xs">
           <span className="text-muted-foreground">
-            {formatCurrency(totalSpent, 0)} of {formatCurrency(paceBaseline, 0)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
+            {formatCurrency(totalSpent)} of {formatCurrency(paceBaseline)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
           </span>
           <span className={`${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)} font-medium`}>
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}

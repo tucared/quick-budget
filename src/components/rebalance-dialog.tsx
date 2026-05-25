@@ -234,7 +234,7 @@ export function RebalanceDialog({
                 </div>
                 {hasTarget && (
                   <span className="text-sm text-[hsl(160,40%,35%)] font-medium">
-                    {formatCurrency(unallocated, 0)} left
+                    {formatCurrency(unallocated)} left
                   </span>
                 )}
               </button>
@@ -256,7 +256,7 @@ export function RebalanceDialog({
                     <span className="text-sm font-medium">{b.category_name}</span>
                   </div>
                   <span className="text-sm text-[hsl(160,40%,35%)] font-medium">
-                    {formatCurrency(Number(b.remaining_amount), 0)} left
+                    {formatCurrency(Number(b.remaining_amount))} left
                   </span>
                 </button>
               ))
@@ -299,7 +299,7 @@ export function RebalanceDialog({
                           <span className="text-sm font-medium">{b.category_name}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {formatCurrency(Number(b.remaining_amount), 0)} left
+                          {formatCurrency(Number(b.remaining_amount))} left
                         </span>
                       </button>
                     ))}
