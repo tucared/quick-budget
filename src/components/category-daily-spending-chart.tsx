@@ -54,8 +54,8 @@ export function CategoryDailySpendingChart({
               tick={{ fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: "var(--border)" }}
-              tickFormatter={(value) => formatCurrency(value).replace(/ /g, " ")}
-              width={56}
+              tickFormatter={(value) => formatCurrency(value, 0)}
+              width={48}
             />
             <Tooltip
               cursor={{ fill: "var(--muted)", opacity: 0.4 }}
