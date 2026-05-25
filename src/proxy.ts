@@ -8,7 +8,7 @@ export const config = {
   ],
 }
 
-const PUBLIC_PATHS = new Set(["/login"])
+const PROTECTED_PATHS = new Set(["/expenses", "/budget"])
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -36,28 +36,56 @@ export async function proxy(request: NextRequest) {
   const {
     data: { session },
   } = await supabase.auth.getSession()
-  if (!session) return supabaseResponse
 
-  const verdict = await verifyAccessToken(session.access_token)
-  if (verdict.ok) return supabaseResponse // hot path — zero network
+  // Resolve a single authoritative auth verdict, mirroring getServerUser:
+  // a session is only "authed" if its token verifies AND carries household_id.
+  let authed = false
+  if (session) {
+    let verdict = await verifyAccessToken(session.access_token)
 
-  if (verdict.reason === "expired") {
-    await supabase.auth.refreshSession() // single /token POST on expiry
-    return supabaseResponse
+    if (!verdict.ok && verdict.reason === "expired") {
+      // single /token POST on expiry, then re-verify the refreshed token
+      const { data } = await supabase.auth.refreshSession()
+      if (data.session) {
+        verdict = await verifyAccessToken(data.session.access_token)
+      }
+    }
+
+    if (verdict.ok) {
+      authed = Boolean(verdict.claims.app_metadata?.household_id)
+    } else if (verdict.reason === "transient") {
+      // JWKS fetch / Supabase auth outage. Don't sign out: real sessions are
+      // still real, just unverifiable right now. Let the request through; the
+      // page-level guard re-verifies once the JWKS cache cooldown (30s) clears.
+      authed = true
+    } else {
+      // "invalid" — tampered cookie or malformed token
+      await supabase.auth.signOut()
+    }
   }
 
-  // "transient" — JWKS fetch / Supabase auth outage. Don't sign out: real
-  // sessions are still real, just unverifiable right now. Let the request
-  // through; the next navigation re-tries once the JWKS cache cooldown
-  // (30s) clears.
-  if (verdict.reason === "transient") return supabaseResponse
+  // Edge auth routing for the known page paths. Other paths (e.g. API routes)
+  // fall through untouched, preserving any refreshed cookies on supabaseResponse.
+  const { pathname } = request.nextUrl
+  let target: string | null = null
+  if (pathname === "/") {
+    target = authed ? "/expenses" : "/login"
+  } else if (pathname === "/login" && authed) {
+    target = "/expenses"
+  } else if (PROTECTED_PATHS.has(pathname) && !authed) {
+    target = "/login"
+  }
 
-  // "invalid" — tampered cookie or malformed token
-  await supabase.auth.signOut()
-  if (!PUBLIC_PATHS.has(request.nextUrl.pathname)) {
+  if (target) {
     const url = request.nextUrl.clone()
-    url.pathname = "/login"
-    return NextResponse.redirect(url)
+    url.pathname = target
+    const redirectResponse = NextResponse.redirect(url)
+    // Carry over any session refresh that happened in this hop.
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((cookie) => redirectResponse.cookies.set(cookie))
+    return redirectResponse
   }
+
   return supabaseResponse
 }
