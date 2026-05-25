@@ -189,8 +189,8 @@ export function BudgetBurndownChartClient({
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: "var(--border)" }}
-                tickFormatter={(value) => formatCurrency(value).replace(/ /g, " ")}
-                width={68}
+                tickFormatter={(value) => formatCurrency(value, 0)}
+                width={60}
                 domain={[(min: number) => Math.min(0, min), paceBaseline]}
               />
               <Tooltip
