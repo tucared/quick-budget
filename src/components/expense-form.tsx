@@ -609,12 +609,44 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             {formErrors.category_id}
           </p>
         )}
+        {/* Budget status preview - compact bar(s) sit directly under the
+            category tiles for immediate feedback. They're small enough that the
+            slight shift when a category is selected stays unobtrusive; the
+            heavier cap toggle and the description still sit below. */}
+        <div
+          className="grid transition-[grid-template-rows] duration-200 ease-out"
+          style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
+        >
+          <div className="overflow-hidden space-y-2 pt-0.5">
+            {selectedCategory && (
+              <>
+                <CategoryBudgetCard
+                  budget={categoryBudget}
+                  compact
+                  isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
+                  dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
+                  daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
+                  additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
+                  loading={loadingBudget}
+                />
+                {isSplit && (
+                  <CategoryBudgetCard
+                    budget={overflowBudgetToShow}
+                    compact
+                    showHeader
+                    isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
+                    dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
+                    daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
+                    additionalAmount={debouncedOverflowAmount > 0 && effectiveExchangeRate != null ? debouncedOverflowAmount * effectiveExchangeRate : 0}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Description (optional) - kept directly under the category selector so
-          its position stays stable when a category is selected. The budget
-          preview and cap toggle below grow downward instead of pushing the
-          description (and the user's next tap target) off behind the keyboard. */}
+      {/* Description (optional) */}
       <div>
         <Textarea
           ref={descriptionRef}
@@ -637,94 +669,75 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         )}
       </div>
 
-      {/* Budget status preview - animated; renders below the description so
-          selecting a category never shifts the description field. */}
-      <div
-        className="grid transition-[grid-template-rows] duration-200 ease-out"
-        style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
-      >
-        <div className="overflow-hidden space-y-2">
-          {selectedCategory && (
-            <>
-              <CategoryBudgetCard
-                budget={categoryBudget}
-                compact
-                isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
-                dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
-                daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
-                loading={loadingBudget}
-              />
-              {isSplit && (
-                <CategoryBudgetCard
-                  budget={overflowBudgetToShow}
-                  compact
-                  showHeader
-                  isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
-                  dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
-                  daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                  additionalAmount={debouncedOverflowAmount > 0 && effectiveExchangeRate != null ? debouncedOverflowAmount * effectiveExchangeRate : 0}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
       {/* Cap-with-overflow toggle (JTBD #8). Surfaces only when the selected
           category has a cap configured AND the entered amount exceeds it AND
           the household has at least one allowance to overflow into. The
           allowance is picked at log time (sticky across submits via
           localStorage). */}
       {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
-        <div className="rounded-md border border-border bg-muted/30 p-3">
-          <label className="flex items-center justify-between gap-3 cursor-pointer">
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium">
-                Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
-              </span>
-              <span className="text-xs text-muted-foreground truncate">
-                Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
-                {overflowCategoryName ?? "allowance"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {applyCap && allowanceCategories.length > 1 && (
-                <div className="flex gap-1">
-                  {allowanceCategories.map((a) => {
-                    const active = a.id === effectiveOverflowCategoryId
-                    return (
-                      <button
-                        type="button"
-                        key={a.id}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setSelectedOverflowId(a.id)
-                        }}
-                        className={`h-7 w-7 rounded-md text-base border transition-colors flex items-center justify-center ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:border-foreground"
-                        }`}
-                        aria-label={`Send overflow to ${a.name}`}
-                        aria-pressed={active}
-                      >
-                        {a.icon}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-              <input
-                type="checkbox"
-                role="switch"
-                checked={applyCap}
-                onChange={(e) => setApplyCap(e.target.checked)}
-                className="h-4 w-4 rounded border-input accent-primary"
-                aria-label="Apply cap"
-              />
-            </div>
-          </label>
+        <div
+          className={`px-2.5 py-1.5 rounded-md border border-border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+            applyCap ? "bg-muted/30" : "bg-transparent"
+          }`}
+          role="switch"
+          aria-checked={applyCap}
+          aria-label="Apply cap"
+          tabIndex={0}
+          onClick={() => setApplyCap(!applyCap)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              setApplyCap(!applyCap)
+            }
+          }}
+        >
+          <span className={`text-xs min-w-0 truncate transition-opacity ${applyCap ? "" : "opacity-60"}`}>
+            <span className="font-medium">Cap {formatCurrency(capDerivation.capEUR, 2, "EUR")}</span>
+            <span className="text-muted-foreground">
+              {" → "}
+              {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to {overflowCategoryName ?? "allowance"}
+            </span>
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {applyCap && allowanceCategories.length > 1 && (
+              <div className="flex gap-1">
+                {allowanceCategories.map((a) => {
+                  const active = a.id === effectiveOverflowCategoryId
+                  return (
+                    <button
+                      type="button"
+                      key={a.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedOverflowId(a.id)
+                      }}
+                      className={`h-6 w-6 rounded text-sm border transition-colors flex items-center justify-center ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border hover:border-foreground"
+                      }`}
+                      aria-label={`Send overflow to ${a.name}`}
+                      aria-pressed={active}
+                    >
+                      {a.icon}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {/* CSS-sized indicator (not a native checkbox, which iOS Safari
+                renders at a fixed oversized default regardless of width/height). */}
+            <span
+              aria-hidden="true"
+              className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                applyCap
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "bg-background border-input"
+              }`}
+            >
+              {applyCap && <Check className="h-3 w-3" />}
+            </span>
+          </div>
         </div>
       )}
 
