@@ -152,10 +152,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       : undefined
     return stored ?? allowanceCategories[0]?.id ?? null
   }, [selectedOverflowId, allowanceCategories])
-  const overflowCategoryName = useMemo(
-    () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
-    [categories, effectiveOverflowCategoryId],
-  )
 
   const primaryPortion = isSplit ? capDerivation.primaryOriginal : expenseAmount
   const overflowPortion = isSplit ? capDerivation.overflowOriginal : 0
@@ -629,6 +625,48 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
                 />
+                {/* Cap-with-overflow toggle (JTBD #8). Sits between the primary
+                    bar and the overflow bar so checking it grows the overflow
+                    bar BELOW the control — the checkbox itself never moves.
+                    Styled like the Cash checkbox: a plain inline control, no
+                    bordered box. Pills (when >1 allowance) pick the destination;
+                    the overflow bar below shows it. */}
+                {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
+                  <div className="flex items-center gap-2 px-0.5">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={applyCap}
+                        onChange={(e) => setApplyCap(e.target.checked)}
+                        className="h-4 w-4 rounded border-input accent-primary"
+                      />
+                      Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
+                    </label>
+                    {applyCap && allowanceCategories.length > 1 && (
+                      <div className="flex gap-1">
+                        {allowanceCategories.map((a) => {
+                          const active = a.id === effectiveOverflowCategoryId
+                          return (
+                            <button
+                              type="button"
+                              key={a.id}
+                              onClick={() => setSelectedOverflowId(a.id)}
+                              className={`h-6 w-6 rounded text-sm border transition-colors flex items-center justify-center ${
+                                active
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-background border-border hover:border-foreground"
+                              }`}
+                              aria-label={`Send overflow to ${a.name}`}
+                              aria-pressed={active}
+                            >
+                              {a.icon}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {isSplit && (
                   <CategoryBudgetCard
                     budget={overflowBudgetToShow}
@@ -668,78 +706,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           </p>
         )}
       </div>
-
-      {/* Cap-with-overflow toggle (JTBD #8). Surfaces only when the selected
-          category has a cap configured AND the entered amount exceeds it AND
-          the household has at least one allowance to overflow into. The
-          allowance is picked at log time (sticky across submits via
-          localStorage). */}
-      {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
-        <div
-          className={`px-2.5 py-1.5 rounded-md border border-border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
-            applyCap ? "bg-muted/30" : "bg-transparent"
-          }`}
-          role="switch"
-          aria-checked={applyCap}
-          aria-label="Apply cap"
-          tabIndex={0}
-          onClick={() => setApplyCap(!applyCap)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault()
-              setApplyCap(!applyCap)
-            }
-          }}
-        >
-          <span className={`text-xs min-w-0 truncate transition-opacity ${applyCap ? "" : "opacity-60"}`}>
-            <span className="font-medium">Cap {formatCurrency(capDerivation.capEUR, 2, "EUR")}</span>
-            <span className="text-muted-foreground">
-              {" → "}
-              {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to {overflowCategoryName ?? "allowance"}
-            </span>
-          </span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {applyCap && allowanceCategories.length > 1 && (
-              <div className="flex gap-1">
-                {allowanceCategories.map((a) => {
-                  const active = a.id === effectiveOverflowCategoryId
-                  return (
-                    <button
-                      type="button"
-                      key={a.id}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedOverflowId(a.id)
-                      }}
-                      className={`h-6 w-6 rounded text-sm border transition-colors flex items-center justify-center ${
-                        active
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background border-border hover:border-foreground"
-                      }`}
-                      aria-label={`Send overflow to ${a.name}`}
-                      aria-pressed={active}
-                    >
-                      {a.icon}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {/* CSS-sized indicator (not a native checkbox, which iOS Safari
-                renders at a fixed oversized default regardless of width/height). */}
-            <span
-              aria-hidden="true"
-              className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                applyCap
-                  ? "bg-primary border-primary text-primary-foreground"
-                  : "bg-background border-input"
-              }`}
-            >
-              {applyCap && <Check className="h-3 w-3" />}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Date + Cash checkbox inline */}
       <div>
