@@ -609,35 +609,63 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             {formErrors.category_id}
           </p>
         )}
-        {/* Budget status preview - animated to prevent jarring layout shift */}
-        <div
-          className="grid transition-[grid-template-rows] duration-200 ease-out"
-          style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
-        >
-          <div className="overflow-hidden space-y-2">
-            {selectedCategory && (
-              <>
+      </div>
+
+      {/* Description (optional) - kept directly under the category selector so
+          its position stays stable when a category is selected. The budget
+          preview and cap toggle below grow downward instead of pushing the
+          description (and the user's next tap target) off behind the keyboard. */}
+      <div>
+        <Textarea
+          ref={descriptionRef}
+          id="description"
+          placeholder="Optional notes about this expense"
+          rows={1}
+          className="min-h-0 resize-none overflow-hidden"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onInput={(e) => {
+            const el = e.currentTarget
+            el.style.height = "auto"
+            el.style.height = `${el.scrollHeight}px`
+          }}
+        />
+        {formErrors.description && (
+          <p className="text-sm text-destructive">
+            {formErrors.description}
+          </p>
+        )}
+      </div>
+
+      {/* Budget status preview - animated; renders below the description so
+          selecting a category never shifts the description field. */}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden space-y-2">
+          {selectedCategory && (
+            <>
+              <CategoryBudgetCard
+                budget={categoryBudget}
+                isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
+                dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
+                daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
+                additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
+                loading={loadingBudget}
+              />
+              {isSplit && (
                 <CategoryBudgetCard
-                  budget={categoryBudget}
+                  budget={overflowBudgetToShow}
+                  showHeader
                   isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                   dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                   daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                  additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
-                  loading={loadingBudget}
+                  additionalAmount={debouncedOverflowAmount > 0 && effectiveExchangeRate != null ? debouncedOverflowAmount * effectiveExchangeRate : 0}
                 />
-                {isSplit && (
-                  <CategoryBudgetCard
-                    budget={overflowBudgetToShow}
-                    showHeader
-                    isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
-                    dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
-                    daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
-                    additionalAmount={debouncedOverflowAmount > 0 && effectiveExchangeRate != null ? debouncedOverflowAmount * effectiveExchangeRate : 0}
-                  />
-                )}
-              </>
-            )}
-          </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -726,29 +754,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         {formErrors.expense_date && (
           <p className="text-sm text-destructive mt-1">
             {formErrors.expense_date}
-          </p>
-        )}
-      </div>
-
-      {/* Description (optional) */}
-      <div>
-        <Textarea
-          ref={descriptionRef}
-          id="description"
-          placeholder="Optional notes about this expense"
-          rows={1}
-          className="min-h-0 resize-none overflow-hidden"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onInput={(e) => {
-            const el = e.currentTarget
-            el.style.height = "auto"
-            el.style.height = `${el.scrollHeight}px`
-          }}
-        />
-        {formErrors.description && (
-          <p className="text-sm text-destructive">
-            {formErrors.description}
           </p>
         )}
       </div>
