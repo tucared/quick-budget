@@ -648,6 +648,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             <>
               <CategoryBudgetCard
                 budget={categoryBudget}
+                compact
                 isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                 dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                 daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
@@ -657,6 +658,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
               {isSplit && (
                 <CategoryBudgetCard
                   budget={overflowBudgetToShow}
+                  compact
                   showHeader
                   isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                   dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}

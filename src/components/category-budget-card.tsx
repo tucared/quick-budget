@@ -16,6 +16,10 @@ interface CategoryBudgetCardProps {
   onAddFunds?: (e: React.MouseEvent, budget: BudgetSummary) => void
   additionalAmount?: number
   loading?: boolean
+  // Single-line variant for the expense form: keeps the progress bar (subtly)
+  // and the projected "X left" figure, dropping the percentage / spent-allocated
+  // rows so budget impact + Save stay reachable with the keyboard up.
+  compact?: boolean
 }
 
 function CategoryBudgetCardImpl({
@@ -28,6 +32,7 @@ function CategoryBudgetCardImpl({
   onAddFunds,
   additionalAmount = 0,
   loading = false,
+  compact = false,
 }: CategoryBudgetCardProps) {
   if (loading) {
     return (
@@ -59,6 +64,36 @@ function CategoryBudgetCardImpl({
   const willOverspend = newRemaining < 0
 
   const isClickable = !!onClick
+
+  // Compact single-line variant: subtle progress bar + the figure that matters
+  // while logging (projected remaining once additionalAmount is known, else the
+  // current remaining). Header icon distinguishes the overflow card.
+  if (compact) {
+    return (
+      <div
+        className={`px-2.5 py-1.5 rounded-md border flex items-center gap-2.5 ${statusColor.bg} ${statusColor.border}`}
+      >
+        {showHeader && budget.category_icon && (
+          <span className="text-sm shrink-0 leading-none">{budget.category_icon}</span>
+        )}
+        <div className="flex-1 min-w-0 h-1 bg-border rounded-full overflow-hidden flex">
+          <div
+            className={`h-full transition-all duration-300 ${statusColor.indicator}`}
+            style={{ width: `${Math.min(currentPercent, 100)}%` }}
+          />
+          {additionalAmount > 0 && (
+            <div
+              className={`h-full transition-all duration-300 ${statusColor.indicator} opacity-50`}
+              style={{ width: `${Math.min(additionalPercent, 100 - Math.min(currentPercent, 100))}%` }}
+            />
+          )}
+        </div>
+        <span className={`text-xs font-semibold shrink-0 ${willOverspend ? "text-destructive" : statusColor.text}`}>
+          {formatCurrency(additionalAmount > 0 ? newRemaining : remaining)} left{willOverspend && " ⚠️"}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div
