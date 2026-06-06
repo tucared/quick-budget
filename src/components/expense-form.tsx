@@ -6,7 +6,7 @@ import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
+import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
@@ -152,6 +152,43 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       : undefined
     return stored ?? allowanceCategories[0]?.id ?? null
   }, [selectedOverflowId, allowanceCategories])
+
+  // The cap is controlled by tapping the category tile itself (JTBD #8): when
+  // the selected category is capped and the amount exceeds the cap, re-tapping
+  // the tile cycles overflow → allowance 1 → … → allowance N → no cap → repeat.
+  const capCycleActive =
+    capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0
+
+  // State shown directly on the selected tile: the overflow allowance's icon
+  // while capping, or a "no cap" marker. Null when the cap doesn't apply.
+  const capBadge = useMemo(() => {
+    if (!capCycleActive || !selectedCategory) return null
+    if (!applyCap) return { categoryId: selectedCategory, mode: "nocap" as const }
+    const allowance = allowanceCategories.find((c) => c.id === effectiveOverflowCategoryId)
+    return { categoryId: selectedCategory, mode: "cap" as const, icon: allowance?.icon ?? null }
+  }, [capCycleActive, selectedCategory, applyCap, allowanceCategories, effectiveOverflowCategoryId])
+
+  // Selecting a different category just selects it (the cap re-arms ON via the
+  // render-time reset above). Re-tapping the already-selected capped category
+  // advances the cap cycle instead.
+  const handleCategorySelect = (value: string) => {
+    if (value !== selectedCategory || !capCycleActive) {
+      setCategoryId(value)
+      return
+    }
+    const ids = allowanceCategories.map((c) => c.id)
+    if (!applyCap) {
+      setApplyCap(true)
+      setSelectedOverflowId(ids[0] ?? null)
+      return
+    }
+    const idx = ids.indexOf(effectiveOverflowCategoryId ?? "")
+    if (idx < ids.length - 1) {
+      setSelectedOverflowId(ids[idx + 1])
+    } else {
+      setApplyCap(false)
+    }
+  }
 
   const primaryPortion = isSplit ? capDerivation.primaryOriginal : expenseAmount
   const overflowPortion = isSplit ? capDerivation.overflowOriginal : 0
@@ -597,8 +634,9 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           categories={categories}
           topCategoryIds={topCategoryIds}
           value={selectedCategory}
-          onValueChange={(value) => setCategoryId(value)}
+          onValueChange={handleCategorySelect}
           allOptions={getCategoryOptions()}
+          capBadge={capBadge}
         />
         {formErrors.category_id && (
           <p className="text-sm text-destructive">
@@ -625,48 +663,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
                 />
-                {/* Cap-with-overflow toggle (JTBD #8). Sits between the primary
-                    bar and the overflow bar so checking it grows the overflow
-                    bar BELOW the control — the checkbox itself never moves.
-                    Styled like the Cash checkbox: a plain inline control, no
-                    bordered box. Pills (when >1 allowance) pick the destination;
-                    the overflow bar below shows it. */}
-                {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
-                  <div className="flex items-center gap-2 px-0.5">
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={applyCap}
-                        onChange={(e) => setApplyCap(e.target.checked)}
-                        className="h-4 w-4 rounded border-input accent-primary"
-                      />
-                      Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
-                    </label>
-                    {applyCap && allowanceCategories.length > 1 && (
-                      <div className="flex gap-1">
-                        {allowanceCategories.map((a) => {
-                          const active = a.id === effectiveOverflowCategoryId
-                          return (
-                            <button
-                              type="button"
-                              key={a.id}
-                              onClick={() => setSelectedOverflowId(a.id)}
-                              className={`h-6 w-6 rounded text-sm border transition-colors flex items-center justify-center ${
-                                active
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-background border-border hover:border-foreground"
-                              }`}
-                              aria-label={`Send overflow to ${a.name}`}
-                              aria-pressed={active}
-                            >
-                              {a.icon}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
                 {isSplit && (
                   <CategoryBudgetCard
                     budget={overflowBudgetToShow}
