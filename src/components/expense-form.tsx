@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
 import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
@@ -634,51 +634,39 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
                 />
-                {/* Cap-with-overflow control (JTBD #8): explicit labelled chips
-                    so the split reads at a glance — what's over the cap, and
-                    where it goes (or "No cap"). */}
+                {/* Cap-with-overflow control (JTBD #8): one readable line — the
+                    amount over the cap, then an inline dropdown that collapses
+                    every choice (each allowance + "Don't cap") into the single
+                    current selection, expanded on demand via the native picker. */}
                 {showCapControl && (
-                  <div className="space-y-1 px-0.5">
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-xs px-0.5">
+                    <span className="text-muted-foreground shrink-0">
                       {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} over the{" "}
-                      {formatCurrency(capDerivation.capEUR, 2, "EUR")} cap — send it to:
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {allowanceCategories.map((a) => {
-                        const active = applyCap && effectiveOverflowCategoryId === a.id
-                        return (
-                          <button
-                            type="button"
-                            key={a.id}
-                            onClick={() => {
-                              setApplyCap(true)
-                              setSelectedOverflowId(a.id)
-                            }}
-                            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
-                              active
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-background border-border hover:border-foreground"
-                            }`}
-                            aria-pressed={active}
-                          >
-                            <span>{a.icon}</span>
-                            <span className="truncate max-w-[7rem]">{a.name}</span>
-                          </button>
-                        )
-                      })}
-                      <button
-                        type="button"
-                        onClick={() => setApplyCap(false)}
-                        className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                          !applyCap
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:border-foreground"
-                        }`}
-                        aria-pressed={!applyCap}
+                      {formatCurrency(capDerivation.capEUR, 2, "EUR")} cap
+                    </span>
+                    <span className="relative inline-flex items-center min-w-0">
+                      <select
+                        value={applyCap ? effectiveOverflowCategoryId ?? "" : "__nocap__"}
+                        onChange={(e) => {
+                          if (e.target.value === "__nocap__") {
+                            setApplyCap(false)
+                          } else {
+                            setApplyCap(true)
+                            setSelectedOverflowId(e.target.value)
+                          }
+                        }}
+                        aria-label="What to do with the amount over the cap"
+                        className="appearance-none bg-transparent font-medium text-foreground max-w-[10.5rem] truncate cursor-pointer rounded pr-4 focus:outline-none focus:ring-1 focus:ring-ring"
                       >
-                        No cap
-                      </button>
-                    </div>
+                        {allowanceCategories.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            → {a.icon} {a.name}
+                          </option>
+                        ))}
+                        <option value="__nocap__">Don&apos;t cap</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-0 h-3 w-3 text-muted-foreground" />
+                    </span>
                   </div>
                 )}
                 {isSplit && (
