@@ -42,12 +42,39 @@ import {
   CommandList,
 } from "@/components/ui/command"
 
+// Cap state shown directly on the selected tile (JTBD #8). `mode: "cap"` shows
+// the overflow allowance's icon; `mode: "nocap"` shows a struck "off" marker.
+export interface CapBadge {
+  categoryId: string
+  mode: "cap" | "nocap"
+  icon?: string | null
+}
+
 interface CategoryTileSelectorProps {
   categories: Category[]
   topCategoryIds: string[]
   value?: string
   onValueChange: (value: string) => void
   allOptions: GroupedOption[]
+  capBadge?: CapBadge | null
+}
+
+// Small corner marker on a capped, selected tile. Re-tapping the tile cycles
+// it (overflow allowance → … → no cap), so it doubles as the affordance hint.
+function CapTileBadge({ badge }: { badge: CapBadge }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 rounded-full border flex items-center justify-center text-[10px] leading-none",
+        badge.mode === "cap"
+          ? "bg-background border-primary"
+          : "bg-muted border-border text-muted-foreground line-through"
+      )}
+    >
+      {badge.mode === "cap" ? badge.icon || "·" : "€"}
+    </span>
+  )
 }
 
 export function CategoryTileSelector({
@@ -56,6 +83,7 @@ export function CategoryTileSelector({
   value,
   onValueChange,
   allOptions,
+  capBadge,
 }: CategoryTileSelectorProps) {
   const [otherOpen, setOtherOpen] = React.useState(false)
 
@@ -95,15 +123,20 @@ export function CategoryTileSelector({
             key={category.id}
             type="button"
             onClick={() => onValueChange(category.id)}
-            title={category.name}
+            title={
+              capBadge?.categoryId === category.id
+                ? `${category.name} — tap again to change cap`
+                : category.name
+            }
             className={cn(
-              "flex items-center justify-center rounded-lg border py-2.5 text-center transition-colors",
+              "relative flex items-center justify-center rounded-lg border py-2.5 text-center transition-colors",
               value === category.id
                 ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
                 : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
             )}
           >
             <span className="text-lg leading-none">{category.icon || "·"}</span>
+            {capBadge && capBadge.categoryId === category.id && <CapTileBadge badge={capBadge} />}
           </button>
         ))}
 
@@ -113,7 +146,7 @@ export function CategoryTileSelector({
           onClick={() => setOtherOpen(true)}
           title={!isSelectedInTiles && selectedCategory ? selectedCategory.name : "Other"}
           className={cn(
-            "flex items-center justify-center rounded-lg border py-2.5 text-center transition-colors",
+            "relative flex items-center justify-center rounded-lg border py-2.5 text-center transition-colors",
             !isSelectedInTiles && value
               ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
               : "border-dashed border-input bg-background hover:bg-accent hover:text-accent-foreground"
@@ -123,6 +156,9 @@ export function CategoryTileSelector({
             <span className="text-lg leading-none">{selectedCategory.icon || "·"}</span>
           ) : (
             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+          )}
+          {!isSelectedInTiles && capBadge && capBadge.categoryId === value && (
+            <CapTileBadge badge={capBadge} />
           )}
         </button>
       </div>
