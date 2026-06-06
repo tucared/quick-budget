@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, MoreHorizontal } from "lucide-react"
+import { Ban, Check, MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Category } from "@/lib/types"
 
@@ -69,10 +69,10 @@ function CapTileBadge({ badge }: { badge: CapBadge }) {
         "absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 rounded-full border flex items-center justify-center text-[10px] leading-none",
         badge.mode === "cap"
           ? "bg-background border-primary"
-          : "bg-muted border-border text-muted-foreground line-through"
+          : "bg-muted border-border text-muted-foreground"
       )}
     >
-      {badge.mode === "cap" ? badge.icon || "·" : "€"}
+      {badge.mode === "cap" ? badge.icon || "·" : <Ban className="h-2.5 w-2.5" />}
     </span>
   )
 }

@@ -78,6 +78,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       return null
     }
   })
+  // The "home" allowance for the cap cycle — the user's usual (sticky) pick,
+  // captured when a category is selected so the cycle order stays stable while
+  // re-tapping. See the cap cycle below.
+  const [capHomeAllowanceId, setCapHomeAllowanceId] = useState<string | null>(null)
 
   // Ref for the amount input — used to refocus after currency toggles
   const amountInputRef = useRef<AmountInputHandle | null>(null)
@@ -129,6 +133,14 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   if (selectedCategory !== prevCapCategory) {
     setPrevCapCategory(selectedCategory)
     setApplyCap(true)
+    // Anchor the cap cycle's "home" to a concrete allowance at selection time
+    // (the sticky pick, else the first allowance) so re-tapping cycles in a
+    // stable order and doesn't drift as the live overflow id changes.
+    setCapHomeAllowanceId(
+      (selectedOverflowId && allowanceCategories.find((c) => c.id === selectedOverflowId)?.id) ||
+        allowanceCategories[0]?.id ||
+        null,
+    )
   }
 
   // Derive cap-split values from the category's configured cap_amount.
@@ -159,6 +171,24 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   const capCycleActive =
     capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0
 
+  // Ordered cap cycle (JTBD #8), by descending frequency: the user's usual
+  // allowance (the sticky "home" pick) first, then no-cap, then the other
+  // allowance(s). Re-tapping the selected capped tile advances through these.
+  const capCycle = useMemo<{ applyCap: boolean; overflow: string | null }[]>(() => {
+    if (!capCycleActive) return []
+    const ids = allowanceCategories.map((c) => c.id)
+    const home =
+      (capHomeAllowanceId && ids.includes(capHomeAllowanceId) && capHomeAllowanceId) ||
+      (effectiveOverflowCategoryId && ids.includes(effectiveOverflowCategoryId) && effectiveOverflowCategoryId) ||
+      ids[0]
+    const others = ids.filter((id) => id !== home)
+    return [
+      { applyCap: true, overflow: home },
+      { applyCap: false, overflow: home },
+      ...others.map((id) => ({ applyCap: true, overflow: id })),
+    ]
+  }, [capCycleActive, allowanceCategories, capHomeAllowanceId, effectiveOverflowCategoryId])
+
   // State shown directly on the selected tile: the overflow allowance's icon
   // while capping, or a "no cap" marker. Null when the cap doesn't apply.
   const capBadge = useMemo(() => {
@@ -172,22 +202,16 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // render-time reset above). Re-tapping the already-selected capped category
   // advances the cap cycle instead.
   const handleCategorySelect = (value: string) => {
-    if (value !== selectedCategory || !capCycleActive) {
+    if (value !== selectedCategory || !capCycleActive || capCycle.length === 0) {
       setCategoryId(value)
       return
     }
-    const ids = allowanceCategories.map((c) => c.id)
-    if (!applyCap) {
-      setApplyCap(true)
-      setSelectedOverflowId(ids[0] ?? null)
-      return
-    }
-    const idx = ids.indexOf(effectiveOverflowCategoryId ?? "")
-    if (idx < ids.length - 1) {
-      setSelectedOverflowId(ids[idx + 1])
-    } else {
-      setApplyCap(false)
-    }
+    const curIdx = capCycle.findIndex(
+      (s) => s.applyCap === applyCap && (!s.applyCap || s.overflow === effectiveOverflowCategoryId),
+    )
+    const next = capCycle[(curIdx + 1) % capCycle.length] ?? capCycle[0]
+    setApplyCap(next.applyCap)
+    setSelectedOverflowId(next.overflow)
   }
 
   const primaryPortion = isSplit ? capDerivation.primaryOriginal : expenseAmount
