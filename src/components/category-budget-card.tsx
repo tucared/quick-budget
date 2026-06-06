@@ -65,18 +65,23 @@ function CategoryBudgetCardImpl({
 
   const isClickable = !!onClick
 
-  // Compact single-line variant: subtle progress bar + the figure that matters
-  // while logging (projected remaining once additionalAmount is known, else the
-  // current remaining). Header icon distinguishes the overflow card.
+  // Compact variant for the expense form: a labelled name + remaining row over
+  // a subtle progress bar. Shows the projected remaining once additionalAmount
+  // is known, else the current remaining — keeping the budget impact legible
+  // without the full card's percentage / spent-allocated rows.
   if (compact) {
     return (
-      <div
-        className={`px-2.5 py-1.5 rounded-md border flex items-center gap-2.5 ${statusColor.bg} ${statusColor.border}`}
-      >
-        {showHeader && budget.category_icon && (
-          <span className="text-sm shrink-0 leading-none">{budget.category_icon}</span>
-        )}
-        <div className="flex-1 min-w-0 h-1 bg-border rounded-full overflow-hidden flex">
+      <div className={`px-2.5 py-1.5 rounded-md border ${statusColor.bg} ${statusColor.border}`}>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="flex items-center gap-1 min-w-0 text-xs font-medium">
+            {budget.category_icon && <span className="shrink-0 leading-none">{budget.category_icon}</span>}
+            <span className="truncate">{budget.category_name}</span>
+          </span>
+          <span className={`text-xs font-semibold shrink-0 ${willOverspend ? "text-destructive" : statusColor.text}`}>
+            {formatCurrency(additionalAmount > 0 ? newRemaining : remaining)} left{willOverspend && " ⚠️"}
+          </span>
+        </div>
+        <div className="h-1 bg-border rounded-full overflow-hidden flex">
           <div
             className={`h-full transition-all duration-300 ${statusColor.indicator}`}
             style={{ width: `${Math.min(currentPercent, 100)}%` }}
@@ -88,9 +93,6 @@ function CategoryBudgetCardImpl({
             />
           )}
         </div>
-        <span className={`text-xs font-semibold shrink-0 ${willOverspend ? "text-destructive" : statusColor.text}`}>
-          {formatCurrency(additionalAmount > 0 ? newRemaining : remaining)} left{willOverspend && " ⚠️"}
-        </span>
       </div>
     )
   }

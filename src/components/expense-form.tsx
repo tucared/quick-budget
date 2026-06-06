@@ -6,7 +6,7 @@ import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { fetchExchangeRateFromAPI } from "@/lib/currency"
+import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
@@ -78,10 +78,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       return null
     }
   })
-  // The "home" allowance for the cap cycle — the user's usual (sticky) pick,
-  // captured when a category is selected so the cycle order stays stable while
-  // re-tapping. See the cap cycle below.
-  const [capHomeAllowanceId, setCapHomeAllowanceId] = useState<string | null>(null)
 
   // Ref for the amount input — used to refocus after currency toggles
   const amountInputRef = useRef<AmountInputHandle | null>(null)
@@ -133,14 +129,6 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   if (selectedCategory !== prevCapCategory) {
     setPrevCapCategory(selectedCategory)
     setApplyCap(true)
-    // Anchor the cap cycle's "home" to a concrete allowance at selection time
-    // (the sticky pick, else the first allowance) so re-tapping cycles in a
-    // stable order and doesn't drift as the live overflow id changes.
-    setCapHomeAllowanceId(
-      (selectedOverflowId && allowanceCategories.find((c) => c.id === selectedOverflowId)?.id) ||
-        allowanceCategories[0]?.id ||
-        null,
-    )
   }
 
   // Derive cap-split values from the category's configured cap_amount.
@@ -168,51 +156,11 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // The cap is controlled by tapping the category tile itself (JTBD #8): when
   // the selected category is capped and the amount exceeds the cap, re-tapping
   // the tile cycles overflow → allowance 1 → … → allowance N → no cap → repeat.
-  const capCycleActive =
+  // Show the cap control when the selected category is capped, the amount
+  // exceeds the cap, and the household has at least one allowance to overflow
+  // into (JTBD #8).
+  const showCapControl =
     capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0
-
-  // Ordered cap cycle (JTBD #8), by descending frequency: the user's usual
-  // allowance (the sticky "home" pick) first, then no-cap, then the other
-  // allowance(s). Re-tapping the selected capped tile advances through these.
-  const capCycle = useMemo<{ applyCap: boolean; overflow: string | null }[]>(() => {
-    if (!capCycleActive) return []
-    const ids = allowanceCategories.map((c) => c.id)
-    const home =
-      (capHomeAllowanceId && ids.includes(capHomeAllowanceId) && capHomeAllowanceId) ||
-      (effectiveOverflowCategoryId && ids.includes(effectiveOverflowCategoryId) && effectiveOverflowCategoryId) ||
-      ids[0]
-    const others = ids.filter((id) => id !== home)
-    return [
-      { applyCap: true, overflow: home },
-      { applyCap: false, overflow: home },
-      ...others.map((id) => ({ applyCap: true, overflow: id })),
-    ]
-  }, [capCycleActive, allowanceCategories, capHomeAllowanceId, effectiveOverflowCategoryId])
-
-  // State shown directly on the selected tile: the overflow allowance's icon
-  // while capping, or a "no cap" marker. Null when the cap doesn't apply.
-  const capBadge = useMemo(() => {
-    if (!capCycleActive || !selectedCategory) return null
-    if (!applyCap) return { categoryId: selectedCategory, mode: "nocap" as const }
-    const allowance = allowanceCategories.find((c) => c.id === effectiveOverflowCategoryId)
-    return { categoryId: selectedCategory, mode: "cap" as const, icon: allowance?.icon ?? null }
-  }, [capCycleActive, selectedCategory, applyCap, allowanceCategories, effectiveOverflowCategoryId])
-
-  // Selecting a different category just selects it (the cap re-arms ON via the
-  // render-time reset above). Re-tapping the already-selected capped category
-  // advances the cap cycle instead.
-  const handleCategorySelect = (value: string) => {
-    if (value !== selectedCategory || !capCycleActive || capCycle.length === 0) {
-      setCategoryId(value)
-      return
-    }
-    const curIdx = capCycle.findIndex(
-      (s) => s.applyCap === applyCap && (!s.applyCap || s.overflow === effectiveOverflowCategoryId),
-    )
-    const next = capCycle[(curIdx + 1) % capCycle.length] ?? capCycle[0]
-    setApplyCap(next.applyCap)
-    setSelectedOverflowId(next.overflow)
-  }
 
   const primaryPortion = isSplit ? capDerivation.primaryOriginal : expenseAmount
   const overflowPortion = isSplit ? capDerivation.overflowOriginal : 0
@@ -658,19 +606,18 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           categories={categories}
           topCategoryIds={topCategoryIds}
           value={selectedCategory}
-          onValueChange={handleCategorySelect}
+          onValueChange={(value) => setCategoryId(value)}
           allOptions={getCategoryOptions()}
-          capBadge={capBadge}
         />
         {formErrors.category_id && (
           <p className="text-sm text-destructive">
             {formErrors.category_id}
           </p>
         )}
-        {/* Budget status preview - compact bar(s) sit directly under the
-            category tiles for immediate feedback. They're small enough that the
-            slight shift when a category is selected stays unobtrusive; the
-            heavier cap toggle and the description still sit below. */}
+        {/* Budget status preview - compact, labelled bar(s) sit directly under
+            the category tiles for immediate feedback. When the amount exceeds a
+            category's cap, an explicit labelled control between the bars lets
+            the user pick where the overflow goes (or skip the cap). */}
         <div
           className="grid transition-[grid-template-rows] duration-200 ease-out"
           style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
@@ -687,6 +634,53 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
                 />
+                {/* Cap-with-overflow control (JTBD #8): explicit labelled chips
+                    so the split reads at a glance — what's over the cap, and
+                    where it goes (or "No cap"). */}
+                {showCapControl && (
+                  <div className="space-y-1 px-0.5">
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} over the{" "}
+                      {formatCurrency(capDerivation.capEUR, 2, "EUR")} cap — send it to:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allowanceCategories.map((a) => {
+                        const active = applyCap && effectiveOverflowCategoryId === a.id
+                        return (
+                          <button
+                            type="button"
+                            key={a.id}
+                            onClick={() => {
+                              setApplyCap(true)
+                              setSelectedOverflowId(a.id)
+                            }}
+                            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background border-border hover:border-foreground"
+                            }`}
+                            aria-pressed={active}
+                          >
+                            <span>{a.icon}</span>
+                            <span className="truncate max-w-[7rem]">{a.name}</span>
+                          </button>
+                        )
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setApplyCap(false)}
+                        className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                          !applyCap
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:border-foreground"
+                        }`}
+                        aria-pressed={!applyCap}
+                      >
+                        No cap
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {isSplit && (
                   <CategoryBudgetCard
                     budget={overflowBudgetToShow}
