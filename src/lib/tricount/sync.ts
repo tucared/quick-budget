@@ -129,7 +129,8 @@ export async function runSync(
     manual
   )
   const householdIdSet = new Set(householdMemberIds)
-  const unmatchedMembers = resolved.filter((r) => !r.userId).map((r) => r.name)
+  // Members still awaiting an explicit decision (not counted until mapped).
+  const unmatchedMembers = resolved.filter((r) => r.status === "unset").map((r) => r.name)
 
   // Desired state: tricountEntryId -> { mapped fields, final description, hash }.
   const desired = new Map<

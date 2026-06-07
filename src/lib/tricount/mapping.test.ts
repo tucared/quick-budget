@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest"
 import {
-  normalizeName,
-  autoMatchUserId,
   resolveMembers,
   parseDecimalToCents,
   householdShareCents,
@@ -50,42 +48,33 @@ function entry(overrides: Partial<Entry> = {}): Entry {
   } as Entry
 }
 
-describe("normalizeName", () => {
-  it("lowercases, trims, collapses whitespace", () => {
-    expect(normalizeName("  User   One ")).toBe("user one")
-  })
-})
-
-describe("autoMatchUserId", () => {
-  it("matches by name and email local-part, null otherwise", () => {
-    expect(autoMatchUserId("User one", USERS)).toBe("u1")
-    expect(autoMatchUserId("user2", USERS)).toBe("u2")
-    expect(autoMatchUserId("Nobody", USERS)).toBeNull()
-  })
-})
-
-describe("resolveMembers", () => {
-  it("auto-matches household members and flags outsiders", () => {
+describe("resolveMembers (explicit only — no auto-match)", () => {
+  it("treats members absent from the map as unset (not counted)", () => {
     const { resolved, householdMemberIds } = resolveMembers(MEMBERS, USERS, {})
+    expect(householdMemberIds).toEqual([])
+    for (const r of resolved) expect(r.status).toBe("unset")
+  })
+
+  it("counts only explicitly mapped members", () => {
+    const { resolved, householdMemberIds } = resolveMembers(MEMBERS, USERS, {
+      "1": "u1",
+      "2": "u2",
+    })
     expect(householdMemberIds.sort()).toEqual([1, 2])
-    expect(resolved.find((r) => r.id === 3)).toMatchObject({ userId: null, source: "auto" })
-    expect(resolved.find((r) => r.id === 1)).toMatchObject({ userId: "u1", source: "auto" })
+    expect(resolved.find((r) => r.id === 1)).toMatchObject({ userId: "u1", status: "mapped" })
+    expect(resolved.find((r) => r.id === 3)).toMatchObject({ userId: null, status: "unset" })
   })
 
-  it("manual override assigns an unmatched member", () => {
-    const { householdMemberIds, resolved } = resolveMembers(MEMBERS, USERS, { "3": "u1" })
-    expect(householdMemberIds.sort()).toEqual([1, 2, 3])
-    expect(resolved.find((r) => r.id === 3)).toMatchObject({ userId: "u1", source: "manual" })
+  it("null maps to an explicit exclude", () => {
+    const { resolved, householdMemberIds } = resolveMembers(MEMBERS, USERS, { "1": null })
+    expect(householdMemberIds).toEqual([])
+    expect(resolved.find((r) => r.id === 1)).toMatchObject({ status: "excluded" })
   })
 
-  it("manual null override excludes an auto-matched member", () => {
-    const { householdMemberIds } = resolveMembers(MEMBERS, USERS, { "1": null })
-    expect(householdMemberIds.sort()).toEqual([2])
-  })
-
-  it("ignores overrides pointing at a non-household user", () => {
-    const { householdMemberIds } = resolveMembers(MEMBERS, USERS, { "3": "ghost" })
-    expect(householdMemberIds.sort()).toEqual([1, 2])
+  it("treats a stale id (non-household user) as excluded", () => {
+    const { householdMemberIds, resolved } = resolveMembers(MEMBERS, USERS, { "3": "ghost" })
+    expect(householdMemberIds).toEqual([])
+    expect(resolved.find((r) => r.id === 3)).toMatchObject({ status: "excluded" })
   })
 })
 

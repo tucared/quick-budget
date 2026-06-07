@@ -6,6 +6,15 @@ import type { TricountRegistryEntry } from "./types"
 
 type Entry = TricountRegistryEntry["RegistryEntry"]
 
+// Manual membership→user mapping stored on tricount_links.member_map.
+// Keyed by Tricount membership id (string). Value = QB user id (counts toward
+// the household share), or null (explicitly excluded — outsider). A membership
+// ABSENT from the map is "unset": it is not counted and is surfaced in the UI
+// as needing a decision. Mapping is always explicit — there is no name-based
+// auto-match — so a member only contributes once a person has deliberately
+// assigned them.
+export type MemberMap = Record<string, string | null>
+
 export interface HouseholdUser {
   id: string
   full_name: string | null
@@ -17,47 +26,20 @@ export interface RegistryMember {
   name: string
 }
 
-// Manual membership→user overrides stored on tricount_links.member_map.
-// Keyed by Tricount membership id (string). Value = QB user id, or null to
-// force "exclude" (treat as outsider). A membership absent from the map is
-// auto-matched by name, so renames self-heal while explicit picks persist.
-export type MemberMap = Record<string, string | null>
-
-/** Lowercase, trim, collapse internal whitespace — for tolerant name matching. */
-export function normalizeName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ")
-}
-
-/** Index household users by normalized full name and email local-part. */
-function userNameIndex(users: HouseholdUser[]): Map<string, string> {
-  const byName = new Map<string, string>()
-  for (const u of users) {
-    if (u.full_name) byName.set(normalizeName(u.full_name), u.id)
-    const local = u.email.split("@")[0]
-    if (local && !byName.has(normalizeName(local))) {
-      byName.set(normalizeName(local), u.id)
-    }
-  }
-  return byName
-}
-
-/** Auto-match a Tricount member name to a household user id, or null if none. */
-export function autoMatchUserId(name: string, users: HouseholdUser[]): string | null {
-  return userNameIndex(users).get(normalizeName(name)) ?? null
-}
+export type MemberStatus = "mapped" | "excluded" | "unset"
 
 export interface ResolvedMember {
   id: number
   name: string
-  userId: string | null // resolved QB user id, or null = excluded (outsider)
-  source: "manual" | "auto"
+  userId: string | null // resolved QB user id when mapped, else null
+  status: MemberStatus
 }
 
 /**
- * Resolve every registry member to a household user (or excluded), applying
- * manual overrides first and falling back to name auto-match. Returns the
+ * Resolve every registry member from the explicit manual map only. Returns the
  * per-member resolution (for the editor) and the set of membership ids that
- * count toward the household share (those mapped to a valid household user).
+ * count toward the household share (those explicitly mapped to a household
+ * user). Members absent from the map are "unset" and never counted.
  */
 export function resolveMembers(
   members: RegistryMember[],
@@ -70,19 +52,22 @@ export function resolveMembers(
 
   for (const m of members) {
     const key = String(m.id)
-    let userId: string | null
-    let source: "manual" | "auto"
+    let userId: string | null = null
+    let status: MemberStatus
     if (Object.prototype.hasOwnProperty.call(manual, key)) {
-      userId = manual[key]
-      source = "manual"
+      const v = manual[key]
+      if (v && userIds.has(v)) {
+        userId = v
+        status = "mapped"
+      } else {
+        // null override, or a stale id pointing at a non-household user.
+        status = "excluded"
+      }
     } else {
-      userId = autoMatchUserId(m.name, users)
-      source = "auto"
+      status = "unset"
     }
-    // Guard against stale overrides pointing at a user no longer in the household.
-    if (userId && !userIds.has(userId)) userId = null
-    resolved.push({ id: m.id, name: m.name, userId, source })
-    if (userId) householdMemberIds.push(m.id)
+    resolved.push({ id: m.id, name: m.name, userId, status })
+    if (status === "mapped") householdMemberIds.push(m.id)
   }
 
   return { resolved, householdMemberIds }
