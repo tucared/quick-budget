@@ -175,8 +175,9 @@ export function TricountSyncClient({
         <h2 className="text-sm font-medium">Tricount sync</h2>
         <p className="text-xs text-muted-foreground">
           Mirror your household&apos;s share of one or more Tricount ledgers into Quick
-          Budget. Each expense&apos;s share is the sum of allocations for members matched to
-          this household; outsiders are excluded. Synced rows land in the{" "}
+          Budget. Each expense&apos;s share is the sum of allocations for the members you
+          assign to a household person (via the people icon) — everyone else is excluded,
+          and unassigned members don&apos;t count until you map them. Synced rows land in the{" "}
           <span className="font-medium">Tricount</span> category, named after their tricount.
         </p>
       </div>
@@ -266,8 +267,9 @@ function LinkCard({
   const members = (link.members ?? []) as unknown as RegistryMember[]
   const manual = (link.member_map ?? {}) as MemberMap
   const { resolved } = resolveMembers(members, householdUsers, manual)
-  const mapped = resolved.filter((r) => r.userId).length
-  const excluded = resolved.length - mapped
+  const mapped = resolved.filter((r) => r.status === "mapped").length
+  const excluded = resolved.filter((r) => r.status === "excluded").length
+  const needsMapping = resolved.filter((r) => r.status === "unset").length
 
   return (
     <div className="rounded-md border bg-card p-3 space-y-3">
@@ -311,6 +313,14 @@ function LinkCard({
       {members.length > 0 && (
         <div className="text-xs text-muted-foreground">
           {mapped} mapped · {excluded} excluded
+          {needsMapping > 0 && (
+            <button
+              onClick={onToggleEdit}
+              className="ml-1 text-accent font-medium underline-offset-2 hover:underline"
+            >
+              · {needsMapping} need mapping
+            </button>
+          )}
         </div>
       )}
 
@@ -358,10 +368,13 @@ function MappingEditor({
   onSave: (m: MemberMap) => void
 }) {
   const { resolved } = resolveMembers(members, householdUsers, manual)
-  // Controlled selection per membership id; "__exclude__" means outsider.
+  // Controlled selection per membership id: a user id, "__exclude__" (outsider),
+  // or "" (unset — not yet decided).
   const [draft, setDraft] = useState<Record<string, string>>(() => {
     const d: Record<string, string> = {}
-    for (const r of resolved) d[String(r.id)] = r.userId ?? EXCLUDE
+    for (const r of resolved) {
+      d[String(r.id)] = r.status === "mapped" ? r.userId! : r.status === "excluded" ? EXCLUDE : ""
+    }
     return d
   })
   const [dirty, setDirty] = useState<Set<string>>(new Set())
@@ -372,11 +385,13 @@ function MappingEditor({
   }
 
   function save() {
-    // Preserve existing manual overrides; apply only what the user changed, so
-    // untouched members keep auto-matching on future syncs.
+    // Preserve existing decisions; apply only what the user changed. "" clears
+    // the entry back to unset; otherwise store the user id or null (exclude).
     const next: MemberMap = { ...manual }
     for (const id of dirty) {
-      next[id] = draft[id] === EXCLUDE ? null : draft[id]
+      const v = draft[id]
+      if (v === "") delete next[id]
+      else next[id] = v === EXCLUDE ? null : v
     }
     onSave(next)
   }
@@ -389,10 +404,11 @@ function MappingEditor({
           <div key={m.id} className="flex items-center justify-between gap-3">
             <span className="text-sm truncate">{m.name}</span>
             <select
-              value={draft[String(m.id)] ?? EXCLUDE}
+              value={draft[String(m.id)] ?? ""}
               onChange={(e) => change(String(m.id), e.target.value)}
               className="h-8 rounded-md border border-input bg-background px-2 text-xs shrink-0"
             >
+              <option value="">— Choose person —</option>
               {householdUsers.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.full_name || u.email}
