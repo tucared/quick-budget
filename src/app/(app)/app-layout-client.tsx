@@ -36,10 +36,11 @@ function useTricountAutoSync() {
         const res = await fetch("/api/tricount/sync", { method: "POST" })
         if (!res.ok) return
         const data = await res.json()
-        const r = data?.result
-        if (r && (r.created > 0 || r.updated > 0 || r.deleted > 0)) {
-          router.refresh()
-        }
+        const changed = (data?.results ?? []).some(
+          (r: { result?: { created: number; updated: number; deleted: number } }) =>
+            r.result && (r.result.created > 0 || r.result.updated > 0 || r.result.deleted > 0)
+        )
+        if (changed) router.refresh()
       } catch {
         // Best-effort background sync; ignore failures.
       }

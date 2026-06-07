@@ -2,10 +2,16 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { RefreshCw, Link2, Unlink, AlertTriangle, Check } from "lucide-react"
+import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { TricountLink } from "@/lib/types"
+import {
+  resolveMembers,
+  type HouseholdUser,
+  type RegistryMember,
+  type MemberMap,
+} from "@/lib/tricount/mapping"
 
 interface SyncResult {
   title: string
@@ -15,41 +21,83 @@ interface SyncResult {
   skipped: number
   unmatchedMembers: string[]
 }
+type LinkResult = { linkId: string; title: string; result?: SyncResult; error?: string }
 
-export function TricountSyncClient({ initialLink }: { initialLink: TricountLink | null }) {
+const EXCLUDE = "__exclude__"
+
+export function TricountSyncClient({
+  initialLinks,
+  householdUsers,
+}: {
+  initialLinks: TricountLink[]
+  householdUsers: HouseholdUser[]
+}) {
   const router = useRouter()
-  const [link, setLink] = useState<TricountLink | null>(initialLink)
+  const [links, setLinks] = useState<TricountLink[]>(initialLinks)
   const [url, setUrl] = useState("")
-  const [busy, setBusy] = useState<"connect" | "sync" | "disconnect" | null>(null)
+  const [busy, setBusy] = useState<string | null>(null) // "add" | "all" | linkId | `map:${id}`
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<SyncResult | null>(null)
+  const [results, setResults] = useState<Record<string, LinkResult>>({})
+  const [editing, setEditing] = useState<string | null>(null)
 
-  async function runSync() {
-    setBusy("sync")
+  async function refetchLinks() {
+    const res = await fetch("/api/tricount/link")
+    if (res.ok) {
+      const data = await res.json()
+      setLinks(data.links as TricountLink[])
+    }
+  }
+
+  function recordResults(rs: LinkResult[]) {
+    setResults((prev) => {
+      const next = { ...prev }
+      for (const r of rs) next[r.linkId] = r
+      return next
+    })
+  }
+
+  async function syncRequest(linkId?: string) {
+    const res = await fetch("/api/tricount/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(linkId ? { linkId } : {}),
+    })
+    const data = await res.json()
+    if (!res.ok || data.error) throw new Error(data.error || "Sync failed")
+    recordResults((data.results ?? []) as LinkResult[])
+  }
+
+  async function syncOne(linkId: string) {
+    setBusy(linkId)
     setError(null)
     try {
-      const res = await fetch("/api/tricount/sync", { method: "POST" })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setError(data.error || "Sync failed")
-        return
-      }
-      if (data.result) {
-        setResult(data.result as SyncResult)
-        // Reflect new/updated/removed expenses elsewhere in the app.
-        router.refresh()
-      }
-    } catch {
-      setError("Sync failed — network error")
+      await syncRequest(linkId)
+      await refetchLinks()
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Sync failed")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function syncAll() {
+    setBusy("all")
+    setError(null)
+    try {
+      await syncRequest()
+      await refetchLinks()
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Sync failed")
     } finally {
       setBusy(null)
     }
   }
 
   async function connect() {
-    setBusy("connect")
+    setBusy("add")
     setError(null)
-    setResult(null)
     try {
       const res = await fetch("/api/tricount/link", {
         method: "POST",
@@ -61,10 +109,13 @@ export function TricountSyncClient({ initialLink }: { initialLink: TricountLink 
         setError(data.error || "Could not connect that link")
         return
       }
-      setLink(data.link as TricountLink)
       setUrl("")
-      // Immediately pull the ledger so the user sees results without a second tap.
-      await runSync()
+      const newId = (data.link as TricountLink).id
+      await refetchLinks()
+      // Immediately pull the ledger so members + expenses populate.
+      await syncRequest(newId)
+      await refetchLinks()
+      router.refresh()
     } catch {
       setError("Could not connect — network error")
     } finally {
@@ -72,20 +123,47 @@ export function TricountSyncClient({ initialLink }: { initialLink: TricountLink 
     }
   }
 
-  async function disconnect() {
-    setBusy("disconnect")
+  async function disconnect(linkId: string) {
+    setBusy(linkId)
     setError(null)
     try {
-      const res = await fetch("/api/tricount/link", { method: "DELETE" })
+      const res = await fetch(`/api/tricount/link?id=${encodeURIComponent(linkId)}`, {
+        method: "DELETE",
+      })
       const data = await res.json()
       if (!res.ok || data.error) {
         setError(data.error || "Could not disconnect")
         return
       }
-      setLink(null)
-      setResult(null)
+      await refetchLinks()
     } catch {
       setError("Could not disconnect — network error")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function saveMapping(linkId: string, memberMap: MemberMap) {
+    setBusy(`map:${linkId}`)
+    setError(null)
+    try {
+      const res = await fetch("/api/tricount/link", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: linkId, member_map: memberMap }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || "Could not save mapping")
+        return
+      }
+      setEditing(null)
+      // Re-sync so the new mapping reshapes shares/expenses immediately.
+      await syncRequest(linkId)
+      await refetchLinks()
+      router.refresh()
+    } catch {
+      setError("Could not save mapping — network error")
     } finally {
       setBusy(null)
     }
@@ -96,89 +174,63 @@ export function TricountSyncClient({ initialLink }: { initialLink: TricountLink 
       <div className="space-y-1">
         <h2 className="text-sm font-medium">Tricount sync</h2>
         <p className="text-xs text-muted-foreground">
-          Mirror your household&apos;s share of a Tricount ledger into Quick Budget. Your
-          share is the sum of allocations for members matched to this household — amounts
-          shared with outsiders are left out. Synced expenses land in the{" "}
-          <span className="font-medium">Tricount</span> category.
+          Mirror your household&apos;s share of one or more Tricount ledgers into Quick
+          Budget. Each expense&apos;s share is the sum of allocations for members matched to
+          this household; outsiders are excluded. Synced rows land in the{" "}
+          <span className="font-medium">Tricount</span> category, named after their tricount.
         </p>
       </div>
 
-      {!link ? (
+      {/* Connected tricounts */}
+      {links.length > 0 && (
         <div className="space-y-3">
-          <label htmlFor="tricount-url" className="text-xs font-medium text-foreground">
-            Tricount share link
-          </label>
-          <Input
-            id="tricount-url"
-            placeholder="https://tricount.com/…"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            inputMode="url"
-            autoComplete="off"
-          />
-          <Button onClick={connect} disabled={!url.trim() || busy !== null} className="gap-2">
-            {busy === "connect" || busy === "sync" ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Link2 className="h-4 w-4" />
-            )}
-            Connect &amp; sync
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3 border-b pb-3">
-            <div className="min-w-0">
-              <div className="text-sm font-medium truncate">
-                {link.title || "Connected tricount"}
-              </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {link.last_synced_at
-                  ? `Last synced ${new Date(link.last_synced_at).toLocaleString()}`
-                  : "Not synced yet"}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button onClick={runSync} disabled={busy !== null} size="sm" className="gap-2">
-                <RefreshCw className={`h-4 w-4 ${busy === "sync" ? "animate-spin" : ""}`} />
-                Sync now
-              </Button>
-              <Button
-                onClick={disconnect}
-                disabled={busy !== null}
-                size="sm"
-                variant="ghost"
-                className="gap-2 text-muted-foreground"
-                aria-label="Disconnect tricount"
-              >
-                <Unlink className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium">Connected ({links.length})</span>
+            <Button onClick={syncAll} disabled={busy !== null} size="sm" className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${busy === "all" ? "animate-spin" : ""}`} />
+              Sync all
+            </Button>
           </div>
 
-          {result && (
-            <div className="rounded-md border bg-card p-3 text-xs space-y-2">
-              <div className="flex items-center gap-2 font-medium">
-                <Check className="h-4 w-4" />
-                Synced “{result.title}”
-              </div>
-              <div className="text-muted-foreground">
-                {result.created} added · {result.updated} updated · {result.deleted} removed ·{" "}
-                {result.skipped} unchanged
-              </div>
-              {result.unmatchedMembers.length > 0 && (
-                <div className="flex items-start gap-2 text-muted-foreground">
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-accent" />
-                  <span>
-                    Not matched to a household member (their share is excluded):{" "}
-                    {result.unmatchedMembers.join(", ")}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
+          {links.map((link) => (
+            <LinkCard
+              key={link.id}
+              link={link}
+              householdUsers={householdUsers}
+              result={results[link.id]}
+              busy={busy}
+              editing={editing === link.id}
+              onToggleEdit={() => setEditing(editing === link.id ? null : link.id)}
+              onSync={() => syncOne(link.id)}
+              onDisconnect={() => disconnect(link.id)}
+              onSaveMapping={(m) => saveMapping(link.id, m)}
+            />
+          ))}
         </div>
       )}
+
+      {/* Add a tricount */}
+      <div className="space-y-3 border-t pt-4">
+        <label htmlFor="tricount-url" className="text-xs font-medium text-foreground">
+          {links.length > 0 ? "Add another tricount" : "Connect a tricount"}
+        </label>
+        <Input
+          id="tricount-url"
+          placeholder="https://tricount.com/…"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          inputMode="url"
+          autoComplete="off"
+        />
+        <Button onClick={connect} disabled={!url.trim() || busy !== null} className="gap-2">
+          {busy === "add" ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <Link2 className="h-4 w-4" />
+          )}
+          Connect &amp; sync
+        </Button>
+      </div>
 
       {error && (
         <div className="flex items-start gap-2 text-xs text-destructive">
@@ -186,6 +238,180 @@ export function TricountSyncClient({ initialLink }: { initialLink: TricountLink 
           <span>{error}</span>
         </div>
       )}
+    </div>
+  )
+}
+
+function LinkCard({
+  link,
+  householdUsers,
+  result,
+  busy,
+  editing,
+  onToggleEdit,
+  onSync,
+  onDisconnect,
+  onSaveMapping,
+}: {
+  link: TricountLink
+  householdUsers: HouseholdUser[]
+  result?: LinkResult
+  busy: string | null
+  editing: boolean
+  onToggleEdit: () => void
+  onSync: () => void
+  onDisconnect: () => void
+  onSaveMapping: (m: MemberMap) => void
+}) {
+  const members = (link.members ?? []) as unknown as RegistryMember[]
+  const manual = (link.member_map ?? {}) as MemberMap
+  const { resolved } = resolveMembers(members, householdUsers, manual)
+  const mapped = resolved.filter((r) => r.userId).length
+  const excluded = resolved.length - mapped
+
+  return (
+    <div className="rounded-md border bg-card p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{link.title || "Connected tricount"}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {link.last_synced_at
+              ? `Last synced ${new Date(link.last_synced_at).toLocaleString()}`
+              : "Not synced yet"}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button onClick={onSync} disabled={busy !== null} size="sm" className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${busy === link.id ? "animate-spin" : ""}`} />
+            Sync
+          </Button>
+          <Button
+            onClick={onToggleEdit}
+            disabled={busy !== null || members.length === 0}
+            size="sm"
+            variant="ghost"
+            className="gap-1 text-muted-foreground"
+            aria-label="Edit member mapping"
+          >
+            <Users className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={onDisconnect}
+            disabled={busy !== null}
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            aria-label="Disconnect tricount"
+          >
+            <Unlink className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {members.length > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {mapped} mapped · {excluded} excluded
+        </div>
+      )}
+
+      {result?.result && (
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <Check className="h-3.5 w-3.5" />
+          {result.result.created} added · {result.result.updated} updated ·{" "}
+          {result.result.deleted} removed · {result.result.skipped} unchanged
+        </div>
+      )}
+      {result?.error && (
+        <div className="text-xs text-destructive flex items-start gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          {result.error}
+        </div>
+      )}
+
+      {editing && (
+        <MappingEditor
+          members={members}
+          householdUsers={householdUsers}
+          manual={manual}
+          saving={busy === `map:${link.id}`}
+          onCancel={onToggleEdit}
+          onSave={onSaveMapping}
+        />
+      )}
+    </div>
+  )
+}
+
+function MappingEditor({
+  members,
+  householdUsers,
+  manual,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  members: RegistryMember[]
+  householdUsers: HouseholdUser[]
+  manual: MemberMap
+  saving: boolean
+  onCancel: () => void
+  onSave: (m: MemberMap) => void
+}) {
+  const { resolved } = resolveMembers(members, householdUsers, manual)
+  // Controlled selection per membership id; "__exclude__" means outsider.
+  const [draft, setDraft] = useState<Record<string, string>>(() => {
+    const d: Record<string, string> = {}
+    for (const r of resolved) d[String(r.id)] = r.userId ?? EXCLUDE
+    return d
+  })
+  const [dirty, setDirty] = useState<Set<string>>(new Set())
+
+  function change(id: string, value: string) {
+    setDraft((prev) => ({ ...prev, [id]: value }))
+    setDirty((prev) => new Set(prev).add(id))
+  }
+
+  function save() {
+    // Preserve existing manual overrides; apply only what the user changed, so
+    // untouched members keep auto-matching on future syncs.
+    const next: MemberMap = { ...manual }
+    for (const id of dirty) {
+      next[id] = draft[id] === EXCLUDE ? null : draft[id]
+    }
+    onSave(next)
+  }
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <div className="text-xs font-medium">Who is who?</div>
+      <div className="space-y-2">
+        {members.map((m) => (
+          <div key={m.id} className="flex items-center justify-between gap-3">
+            <span className="text-sm truncate">{m.name}</span>
+            <select
+              value={draft[String(m.id)] ?? EXCLUDE}
+              onChange={(e) => change(String(m.id), e.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+            >
+              {householdUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name || u.email}
+                </option>
+              ))}
+              <option value={EXCLUDE}>Exclude (outsider)</option>
+            </select>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <Button onClick={save} disabled={saving} size="sm" className="gap-2">
+          {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
+          Save &amp; re-sync
+        </Button>
+        <Button onClick={onCancel} disabled={saving} size="sm" variant="ghost">
+          Cancel
+        </Button>
+      </div>
     </div>
   )
 }

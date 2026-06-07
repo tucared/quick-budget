@@ -5,7 +5,15 @@ import type { Database } from "@/lib/database.types"
 import { fetchExchangeRate } from "@/lib/exchange-rate-api"
 import { FALLBACK_RATES_TO_EUR } from "@/lib/currency"
 import { fetchRegistry } from "./client"
-import { matchMembers, mapEntry, type HouseholdUser, type MappedEntry } from "./mapping"
+import {
+  resolveMembers,
+  mapEntry,
+  contentHash,
+  composeDescription,
+  type HouseholdUser,
+  type MemberMap,
+  type MappedEntry,
+} from "./mapping"
 
 type DB = SupabaseClient<Database>
 type TricountLink = Database["public"]["Tables"]["tricount_links"]["Row"]
@@ -66,7 +74,12 @@ async function getRateToEur(
 }
 
 /** Build the expense column values for a mapped entry at a resolved rate. */
-function expenseFields(m: MappedEntry, rate: number, categoryId: string | null) {
+function expenseFields(
+  m: MappedEntry,
+  description: string | null,
+  rate: number,
+  categoryId: string | null
+) {
   const amount = round2(m.shareCents / 100)
   const convertedAmount = round2(amount * rate)
   return {
@@ -76,20 +89,23 @@ function expenseFields(m: MappedEntry, rate: number, categoryId: string | null) 
     converted_currency: "EUR",
     exchange_rate: rate,
     expense_date: m.expenseDate,
-    description: m.description,
+    description,
     category_id: categoryId,
     is_cash: false,
   }
 }
 
 /**
- * Reconcile a household's linked tricount into Quick Budget expenses.
+ * Reconcile one linked tricount into Quick Budget expenses.
  *
- * Pulls the full registry (all months), computes each entry's household share,
- * and upserts one expense per entry via the tricount_entry_map idempotency
- * ledger: new entries are inserted, changed ones updated, and entries that
- * disappeared (deleted, became settlements, or dropped to a zero household
- * share) have their mirrored expense removed. Runs in the caller's session, so
+ * Pulls the full registry (all months), resolves each member to a household
+ * user (manual overrides on `link.member_map`, else name auto-match), computes
+ * each entry's household share, and upserts one expense per entry via the
+ * tricount_entry_map idempotency ledger: new entries are inserted, changed ones
+ * updated, and entries that disappeared (deleted, became settlements, dropped to
+ * a zero household share, or whose member was un-mapped) have their mirrored
+ * expense removed. Synced rows land in the shared Tricount category with their
+ * description prefixed by the tricount title. Runs in the caller's session, so
  * RLS scopes every write to their household.
  */
 export async function runSync(
@@ -106,17 +122,31 @@ export async function runSync(
     .eq("household_id", householdId)
   if (usersError) throw new Error(`Failed to load household users: ${usersError.message}`)
 
-  const { memberMap, householdMemberIds, unmatched } = matchMembers(
+  const manual = (link.member_map ?? {}) as MemberMap
+  const { resolved, householdMemberIds } = resolveMembers(
     registry.members,
-    (users ?? []) as HouseholdUser[]
+    (users ?? []) as HouseholdUser[],
+    manual
   )
   const householdIdSet = new Set(householdMemberIds)
+  const unmatchedMembers = resolved.filter((r) => !r.userId).map((r) => r.name)
 
-  // Desired state: tricountEntryId -> mapped fields.
-  const desired = new Map<number, MappedEntry>()
+  // Desired state: tricountEntryId -> { mapped fields, final description, hash }.
+  const desired = new Map<
+    number,
+    { m: MappedEntry; description: string | null; hash: string }
+  >()
   for (const entry of registry.entries) {
     const m = mapEntry(entry, householdIdSet)
-    if (m) desired.set(m.tricountEntryId, m)
+    if (!m) continue
+    const description = composeDescription(registry.title, m.description)
+    const hash = contentHash({
+      shareCents: m.shareCents,
+      currency: m.currency,
+      expenseDate: m.expenseDate,
+      description,
+    })
+    desired.set(m.tricountEntryId, { m, description, hash })
   }
 
   // Current state from the idempotency ledger.
@@ -141,16 +171,16 @@ export async function runSync(
   let deleted = 0
   let skipped = 0
 
-  for (const [entryId, m] of desired) {
+  for (const [entryId, { m, description, hash }] of desired) {
     const prior = existing.get(entryId)
 
-    if (prior && prior.content_hash === m.hash) {
+    if (prior && prior.content_hash === hash) {
       skipped++
       continue
     }
 
     const rate = await getRateToEur(supabase, m.currency, m.expenseDate, rateCache)
-    const fields = expenseFields(m, rate, link.default_category_id)
+    const fields = expenseFields(m, description, rate, link.default_category_id)
 
     if (prior) {
       // Changed entry — update the mirrored expense in place.
@@ -162,7 +192,7 @@ export async function runSync(
 
       const { error: mapUpdErr } = await supabase
         .from("tricount_entry_map")
-        .update({ content_hash: m.hash })
+        .update({ content_hash: hash })
         .eq("id", prior.id)
       if (mapUpdErr) throw new Error(`Failed to update sync map: ${mapUpdErr.message}`)
       updated++
@@ -182,7 +212,7 @@ export async function runSync(
         link_id: link.id,
         tricount_entry_id: entryId,
         expense_id: expenseId,
-        content_hash: m.hash,
+        content_hash: hash,
       })
       if (mapInsErr) {
         // Likely a concurrent sync already claimed this entry — roll back the
@@ -195,7 +225,7 @@ export async function runSync(
     }
   }
 
-  // Reconcile removals: ledger entries no longer present in the registry.
+  // Reconcile removals: ledger entries no longer present in the desired set.
   for (const [entryId, prior] of existing) {
     if (desired.has(entryId)) continue
     // Deleting the expense cascades the map row away (FK ON DELETE CASCADE).
@@ -204,14 +234,43 @@ export async function runSync(
     deleted++
   }
 
+  // Refresh cached title + member list (for the mapping editor) and timestamp.
+  // member_map is left untouched so manual overrides persist.
   await supabase
     .from("tricount_links")
     .update({
       title: registry.title,
-      member_map: memberMap,
+      members: registry.members,
       last_synced_at: new Date().toISOString(),
     })
     .eq("id", link.id)
 
-  return { title: registry.title, created, updated, deleted, skipped, unmatchedMembers: unmatched }
+  return { title: registry.title, created, updated, deleted, skipped, unmatchedMembers }
+}
+
+/** Reconcile every tricount linked to a household. */
+export async function runSyncAll(
+  supabase: DB,
+  opts: { userId: string; householdId: string }
+): Promise<{ linkId: string; title: string; result?: SyncResult; error?: string }[]> {
+  const { data: links, error } = await supabase
+    .from("tricount_links")
+    .select("*")
+    .eq("household_id", opts.householdId)
+  if (error) throw new Error(`Failed to load tricount links: ${error.message}`)
+
+  const out: { linkId: string; title: string; result?: SyncResult; error?: string }[] = []
+  for (const link of links ?? []) {
+    try {
+      const result = await runSync(supabase, { ...opts, link })
+      out.push({ linkId: link.id, title: result.title, result })
+    } catch (e) {
+      out.push({
+        linkId: link.id,
+        title: link.title ?? "tricount",
+        error: e instanceof Error ? e.message : "Sync failed",
+      })
+    }
+  }
+  return out
 }

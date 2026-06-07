@@ -3,10 +3,11 @@ import { createServerSupabaseClient } from "@/lib/supabase"
 import { getServerUser } from "@/lib/server/data"
 import { parseTricountToken } from "@/lib/tricount/client"
 
-// Manage the household's single Tricount link.
-// GET    — current link (or null)
-// POST   — connect/replace a link from a share URL or bare code
-// DELETE — disconnect (mirrored expenses are left in place as normal rows)
+// Manage the household's Tricount links (a household may connect several).
+// GET    — list connected links
+// POST   — connect a new link from a share URL or bare code
+// PATCH  — update a link's manual member mapping
+// DELETE — disconnect a link (mirrored expenses are left in place as normal rows)
 
 const TRICOUNT_CATEGORY_NAME = "Tricount"
 
@@ -15,8 +16,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
 
   const supabase = await createServerSupabaseClient()
-  const { data } = await supabase.from("tricount_links").select("*").maybeSingle()
-  return NextResponse.json({ link: data ?? null })
+  const { data } = await supabase
+    .from("tricount_links")
+    .select("*")
+    .order("created_at", { ascending: true })
+  return NextResponse.json({ links: data ?? [] })
 }
 
 export async function POST(request: NextRequest) {
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createServerSupabaseClient()
 
-  // Ensure the dedicated "Tricount" category exists for this household.
+  // Ensure the shared "Tricount" category exists for this household.
   const { data: existingCat } = await supabase
     .from("categories")
     .select("id")
@@ -69,33 +73,69 @@ export async function POST(request: NextRequest) {
 
   const { data: link, error } = await supabase
     .from("tricount_links")
-    .upsert(
-      {
-        household_id: user.householdId,
-        public_identifier_token: token,
-        default_category_id: categoryId,
-      },
-      { onConflict: "household_id" }
-    )
+    .insert({
+      household_id: user.householdId,
+      public_identifier_token: token,
+      default_category_id: categoryId,
+    })
     .select("*")
     .single()
 
   if (error) {
+    // 23505 = unique_violation → this tricount is already connected.
+    if ((error as { code?: string }).code === "23505") {
+      return NextResponse.json({ error: "That tricount is already connected." }, { status: 409 })
+    }
     return NextResponse.json({ error: "Failed to save Tricount link" }, { status: 500 })
   }
 
   return NextResponse.json({ link })
 }
 
-export async function DELETE() {
+export async function PATCH(request: NextRequest) {
   const user = await getServerUser()
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
 
+  let body: { id?: string; member_map?: Record<string, unknown> }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
+  if (!body?.id || typeof body.member_map !== "object" || body.member_map === null) {
+    return NextResponse.json({ error: "id and member_map are required" }, { status: 400 })
+  }
+
+  // Normalize: membership id (string) → user id (string) or null (exclude).
+  const memberMap: Record<string, string | null> = {}
+  for (const [k, v] of Object.entries(body.member_map)) {
+    memberMap[k] = typeof v === "string" && v ? v : null
+  }
+
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase
+  const { data: link, error } = await supabase
     .from("tricount_links")
-    .delete()
-    .eq("household_id", user.householdId)
+    .update({ member_map: memberMap })
+    .eq("id", body.id)
+    .select("*")
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to update mapping" }, { status: 500 })
+  }
+  return NextResponse.json({ link })
+}
+
+export async function DELETE(request: NextRequest) {
+  const user = await getServerUser()
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+
+  const id = request.nextUrl.searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
+
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from("tricount_links").delete().eq("id", id)
 
   if (error) {
     return NextResponse.json({ error: "Failed to disconnect Tricount" }, { status: 500 })

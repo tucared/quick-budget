@@ -1,6 +1,6 @@
 // Pure mapping logic between Tricount registry entries and Quick Budget
-// expenses. No I/O — unit-tested in mapping.test.ts. The sync engine
-// (sync.ts) layers currency conversion and persistence on top.
+// expenses. No I/O — unit-tested in mapping.test.ts, and safe to import from
+// both the server sync engine (sync.ts) and the client mapping editor.
 
 import type { TricountRegistryEntry } from "./types"
 
@@ -17,26 +17,19 @@ export interface RegistryMember {
   name: string
 }
 
+// Manual membership→user overrides stored on tricount_links.member_map.
+// Keyed by Tricount membership id (string). Value = QB user id, or null to
+// force "exclude" (treat as outsider). A membership absent from the map is
+// auto-matched by name, so renames self-heal while explicit picks persist.
+export type MemberMap = Record<string, string | null>
+
 /** Lowercase, trim, collapse internal whitespace — for tolerant name matching. */
 export function normalizeName(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-/**
- * Match Tricount members to Quick Budget household users by display name,
- * falling back to the email local-part. Returns the member→user map (keyed by
- * Tricount membership id as a string, for JSON storage), the set of Tricount
- * membership ids that belong to the household, and the names of members with
- * no household match (outsiders — their shares are excluded from spend).
- */
-export function matchMembers(
-  members: RegistryMember[],
-  users: HouseholdUser[]
-): {
-  memberMap: Record<string, string>
-  householdMemberIds: number[]
-  unmatched: string[]
-} {
+/** Index household users by normalized full name and email local-part. */
+function userNameIndex(users: HouseholdUser[]): Map<string, string> {
   const byName = new Map<string, string>()
   for (const u of users) {
     if (u.full_name) byName.set(normalizeName(u.full_name), u.id)
@@ -45,22 +38,54 @@ export function matchMembers(
       byName.set(normalizeName(local), u.id)
     }
   }
+  return byName
+}
 
-  const memberMap: Record<string, string> = {}
+/** Auto-match a Tricount member name to a household user id, or null if none. */
+export function autoMatchUserId(name: string, users: HouseholdUser[]): string | null {
+  return userNameIndex(users).get(normalizeName(name)) ?? null
+}
+
+export interface ResolvedMember {
+  id: number
+  name: string
+  userId: string | null // resolved QB user id, or null = excluded (outsider)
+  source: "manual" | "auto"
+}
+
+/**
+ * Resolve every registry member to a household user (or excluded), applying
+ * manual overrides first and falling back to name auto-match. Returns the
+ * per-member resolution (for the editor) and the set of membership ids that
+ * count toward the household share (those mapped to a valid household user).
+ */
+export function resolveMembers(
+  members: RegistryMember[],
+  users: HouseholdUser[],
+  manual: MemberMap
+): { resolved: ResolvedMember[]; householdMemberIds: number[] } {
+  const userIds = new Set(users.map((u) => u.id))
+  const resolved: ResolvedMember[] = []
   const householdMemberIds: number[] = []
-  const unmatched: string[] = []
 
   for (const m of members) {
-    const userId = byName.get(normalizeName(m.name))
-    if (userId) {
-      memberMap[String(m.id)] = userId
-      householdMemberIds.push(m.id)
+    const key = String(m.id)
+    let userId: string | null
+    let source: "manual" | "auto"
+    if (Object.prototype.hasOwnProperty.call(manual, key)) {
+      userId = manual[key]
+      source = "manual"
     } else {
-      unmatched.push(m.name)
+      userId = autoMatchUserId(m.name, users)
+      source = "auto"
     }
+    // Guard against stale overrides pointing at a user no longer in the household.
+    if (userId && !userIds.has(userId)) userId = null
+    resolved.push({ id: m.id, name: m.name, userId, source })
+    if (userId) householdMemberIds.push(m.id)
   }
 
-  return { memberMap, householdMemberIds, unmatched }
+  return { resolved, householdMemberIds }
 }
 
 /**
@@ -109,9 +134,10 @@ export function isSyncableEntry(entry: Entry): boolean {
   return entry.status === "ACTIVE" && entry.type_transaction === "NORMAL"
 }
 
-// Deterministic FNV-1a hash (hex) of the Tricount-derived fields that, when
-// changed, should update the mirrored expense. Excludes the EUR exchange rate
-// so day-to-day rate caching never triggers spurious updates.
+// Deterministic FNV-1a hash (hex) of the fields that, when changed, should
+// update the mirrored expense. The caller passes the *final* (title-prefixed)
+// description so a tricount rename propagates; the EUR rate is intentionally
+// excluded so day-to-day rate caching never triggers spurious updates.
 export function contentHash(parts: {
   shareCents: number
   currency: string
@@ -123,7 +149,7 @@ export function contentHash(parts: {
     parts.currency,
     parts.expenseDate,
     parts.description ?? "",
-  ].join("")
+  ].join("")
   let h = 0x811c9dc5
   for (let i = 0; i < canonical.length; i++) {
     h ^= canonical.charCodeAt(i)
@@ -137,14 +163,13 @@ export interface MappedEntry {
   shareCents: number
   currency: string
   expenseDate: string
-  description: string | null
-  hash: string
+  description: string | null // raw Tricount description (title prefix added in sync)
 }
 
 /**
- * Map one registry entry to the household-share fields needed for an expense,
- * or null when the entry shouldn't be synced (non-syncable, no date, or zero
- * household share — e.g. fully allocated to outsiders).
+ * Map one registry entry to the household-share fields, or null when the entry
+ * shouldn't be synced (non-syncable, no date, or zero household share — e.g.
+ * fully allocated to outsiders).
  */
 export function mapEntry(
   entry: Entry,
@@ -155,14 +180,22 @@ export function mapEntry(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expenseDate)) return null
   const shareCents = householdShareCents(entry, householdMemberIds)
   if (shareCents === 0) return null
-  const currency = entry.amount?.currency ?? "EUR"
-  const description = entry.description ?? null
   return {
     tricountEntryId: entry.id,
     shareCents,
-    currency,
+    currency: entry.amount?.currency ?? "EUR",
     expenseDate,
-    description,
-    hash: contentHash({ shareCents, currency, expenseDate, description }),
+    description: entry.description ?? null,
   }
+}
+
+/**
+ * Compose the stored expense description: the tricount title prefixes the raw
+ * entry description so all tricounts can share one category yet stay readable.
+ */
+export function composeDescription(title: string | null, raw: string | null): string | null {
+  const t = (title ?? "").trim()
+  const r = (raw ?? "").trim()
+  if (!t) return r || null
+  return r ? `${t} · ${r}` : t
 }

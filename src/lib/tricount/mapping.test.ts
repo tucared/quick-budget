@@ -1,13 +1,15 @@
 import { describe, it, expect } from "vitest"
 import {
   normalizeName,
-  matchMembers,
+  autoMatchUserId,
+  resolveMembers,
   parseDecimalToCents,
   householdShareCents,
   entryDateOnly,
   isSyncableEntry,
   contentHash,
   mapEntry,
+  composeDescription,
   type HouseholdUser,
   type RegistryMember,
 } from "./mapping"
@@ -54,20 +56,36 @@ describe("normalizeName", () => {
   })
 })
 
-describe("matchMembers", () => {
-  it("maps household members by name and flags outsiders", () => {
-    const { memberMap, householdMemberIds, unmatched } = matchMembers(MEMBERS, USERS)
-    expect(memberMap).toEqual({ "1": "u1", "2": "u2" })
+describe("autoMatchUserId", () => {
+  it("matches by name and email local-part, null otherwise", () => {
+    expect(autoMatchUserId("User one", USERS)).toBe("u1")
+    expect(autoMatchUserId("user2", USERS)).toBe("u2")
+    expect(autoMatchUserId("Nobody", USERS)).toBeNull()
+  })
+})
+
+describe("resolveMembers", () => {
+  it("auto-matches household members and flags outsiders", () => {
+    const { resolved, householdMemberIds } = resolveMembers(MEMBERS, USERS, {})
     expect(householdMemberIds.sort()).toEqual([1, 2])
-    expect(unmatched).toEqual(["Other User"])
+    expect(resolved.find((r) => r.id === 3)).toMatchObject({ userId: null, source: "auto" })
+    expect(resolved.find((r) => r.id === 1)).toMatchObject({ userId: "u1", source: "auto" })
   })
 
-  it("falls back to the email local-part", () => {
-    const { memberMap } = matchMembers(
-      [{ id: 5, name: "user1" }],
-      USERS
-    )
-    expect(memberMap).toEqual({ "5": "u1" })
+  it("manual override assigns an unmatched member", () => {
+    const { householdMemberIds, resolved } = resolveMembers(MEMBERS, USERS, { "3": "u1" })
+    expect(householdMemberIds.sort()).toEqual([1, 2, 3])
+    expect(resolved.find((r) => r.id === 3)).toMatchObject({ userId: "u1", source: "manual" })
+  })
+
+  it("manual null override excludes an auto-matched member", () => {
+    const { householdMemberIds } = resolveMembers(MEMBERS, USERS, { "1": null })
+    expect(householdMemberIds.sort()).toEqual([2])
+  })
+
+  it("ignores overrides pointing at a non-household user", () => {
+    const { householdMemberIds } = resolveMembers(MEMBERS, USERS, { "3": "ghost" })
+    expect(householdMemberIds.sort()).toEqual([1, 2])
   })
 })
 
@@ -123,8 +141,22 @@ describe("contentHash", () => {
   })
 })
 
+describe("composeDescription", () => {
+  it("prefixes the raw description with the tricount title", () => {
+    expect(composeDescription("Test Claude", "Dinner")).toBe("Test Claude · Dinner")
+  })
+  it("uses the title alone when there is no description", () => {
+    expect(composeDescription("Test Claude", null)).toBe("Test Claude")
+    expect(composeDescription("Test Claude", "")).toBe("Test Claude")
+  })
+  it("falls back to the raw description when there is no title", () => {
+    expect(composeDescription(null, "Dinner")).toBe("Dinner")
+    expect(composeDescription("", "")).toBeNull()
+  })
+})
+
 describe("mapEntry", () => {
-  it("maps a syncable entry to the household share", () => {
+  it("maps a syncable entry to the household share (raw description)", () => {
     const m = mapEntry(entry(), new Set([1, 2]))
     expect(m).not.toBeNull()
     expect(m!.shareCents).toBe(14800)

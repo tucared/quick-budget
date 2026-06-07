@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation"
-import { getServerUser, getTricountLink } from "@/lib/server/data"
+import { getServerUser, getTricountLinks, getHouseholdUsers } from "@/lib/server/data"
 import { TricountSyncClient } from "@/components/tricount-sync-client"
 
 export default async function SyncPage() {
-  const [user, link] = await Promise.all([getServerUser(), getTricountLink()])
+  const [user, links, users] = await Promise.all([
+    getServerUser(),
+    getTricountLinks(),
+    getHouseholdUsers(),
+  ])
 
   if (!user) {
     redirect("/login")
@@ -11,7 +15,7 @@ export default async function SyncPage() {
 
   return (
     <main className="container mx-auto px-4 py-6 max-w-2xl">
-      <TricountSyncClient initialLink={link} />
+      <TricountSyncClient initialLinks={links} householdUsers={users} />
     </main>
   )
 }

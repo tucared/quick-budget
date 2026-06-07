@@ -337,30 +337,36 @@ REVOKE SELECT ON public.monthly_budget_targets FROM anon;
 -- ============================================================================
 -- TRICOUNT_LINKS
 -- ============================================================================
--- Connects a household to one Tricount shared ledger so its expenses can be
--- synced into Quick Budget (read-only, via Tricount's app backend). One link
--- per household — pasting a new share link replaces the previous one.
+-- Connects a household to a Tricount shared ledger so its expenses can be
+-- synced into Quick Budget (read-only, via Tricount's app backend). A household
+-- may connect several tricounts (UNIQUE on household + share token).
 --
 -- `public_identifier_token` is the share code from a Tricount link
--- (https://tricount.com/<token>). `member_map` caches the resolved mapping
--- from Tricount membership id (text) → Quick Budget user id (uuid), built by
--- matching member display names against household members; it is informational
--- (the sync recomputes it each run). `default_category_id` is the dedicated
--- "Tricount" category synced expenses are filed under. `last_synced_at`
--- records the most recent successful reconcile.
+-- (https://tricount.com/<token>). `members` caches the registry membership list
+-- [{id, name}] (refreshed each sync) so the mapping editor can render without a
+-- network call. `member_map` holds *manual* membership→user overrides only
+-- (Tricount membership id as text → Quick Budget user id, or null to force an
+-- exclude); members absent from it are auto-matched by name each run, so renames
+-- self-heal while explicit overrides persist. `default_category_id` is the
+-- shared "Tricount" category synced expenses are filed under (their description
+-- is prefixed with the tricount title). `last_synced_at` records the most recent
+-- successful reconcile.
 CREATE TABLE tricount_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   public_identifier_token TEXT NOT NULL,
   title TEXT,
   default_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  members JSONB NOT NULL DEFAULT '[]'::jsonb,
   member_map JSONB NOT NULL DEFAULT '{}'::jsonb,
   last_synced_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  -- One Tricount per household (MVP). Upsert on household_id to replace.
-  UNIQUE(household_id)
+  -- A household can link multiple tricounts, but not the same one twice.
+  UNIQUE(household_id, public_identifier_token)
 );
+
+CREATE INDEX idx_tricount_links_household ON tricount_links(household_id);
 
 CREATE TRIGGER update_tricount_links_updated_at BEFORE UPDATE ON tricount_links
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
