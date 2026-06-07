@@ -96,33 +96,49 @@ export async function PATCH(request: NextRequest) {
   const user = await getServerUser()
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
 
-  let body: { id?: string; member_map?: Record<string, unknown> }
+  let body: { id?: string; member_map?: Record<string, unknown>; is_active?: boolean }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
 
-  if (!body?.id || typeof body.member_map !== "object" || body.member_map === null) {
-    return NextResponse.json({ error: "id and member_map are required" }, { status: 400 })
+  if (!body?.id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 })
   }
 
-  // Normalize: membership id (string) → user id (string) or null (exclude).
-  const memberMap: Record<string, string | null> = {}
-  for (const [k, v] of Object.entries(body.member_map)) {
-    memberMap[k] = typeof v === "string" && v ? v : null
+  const update: { member_map?: Record<string, string | null>; is_active?: boolean } = {}
+
+  if (body.member_map !== undefined) {
+    if (typeof body.member_map !== "object" || body.member_map === null) {
+      return NextResponse.json({ error: "member_map must be an object" }, { status: 400 })
+    }
+    // Normalize: membership id (string) → user id (string) or null (exclude).
+    const memberMap: Record<string, string | null> = {}
+    for (const [k, v] of Object.entries(body.member_map)) {
+      memberMap[k] = typeof v === "string" && v ? v : null
+    }
+    update.member_map = memberMap
+  }
+
+  if (body.is_active !== undefined) {
+    update.is_active = Boolean(body.is_active)
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 })
   }
 
   const supabase = await createServerSupabaseClient()
   const { data: link, error } = await supabase
     .from("tricount_links")
-    .update({ member_map: memberMap })
+    .update(update)
     .eq("id", body.id)
     .select("*")
     .single()
 
   if (error) {
-    return NextResponse.json({ error: "Failed to update mapping" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to update link" }, { status: 500 })
   }
   return NextResponse.json({ link })
 }

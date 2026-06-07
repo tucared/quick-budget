@@ -249,7 +249,7 @@ export async function runSync(
   return { title: registry.title, created, updated, deleted, skipped, unmatchedMembers }
 }
 
-/** Reconcile every tricount linked to a household. */
+/** Reconcile every *active* tricount linked to a household (paused ones are skipped). */
 export async function runSyncAll(
   supabase: DB,
   opts: { userId: string; householdId: string }
@@ -258,6 +258,7 @@ export async function runSyncAll(
     .from("tricount_links")
     .select("*")
     .eq("household_id", opts.householdId)
+    .eq("is_active", true)
   if (error) throw new Error(`Failed to load tricount links: ${error.message}`)
 
   const out: { linkId: string; title: string; result?: SyncResult; error?: string }[] = []

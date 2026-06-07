@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check } from "lucide-react"
+import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check, Pause, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { TricountLink } from "@/lib/types"
@@ -123,6 +123,34 @@ export function TricountSyncClient({
     }
   }
 
+  async function setActive(linkId: string, active: boolean) {
+    setBusy(linkId)
+    setError(null)
+    try {
+      const res = await fetch("/api/tricount/link", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: linkId, is_active: active }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || "Could not update")
+        return
+      }
+      await refetchLinks()
+      // Resuming pulls anything that changed while paused.
+      if (active) {
+        await syncRequest(linkId)
+        await refetchLinks()
+        router.refresh()
+      }
+    } catch {
+      setError("Could not update — network error")
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function disconnect(linkId: string) {
     setBusy(linkId)
     setError(null)
@@ -203,6 +231,7 @@ export function TricountSyncClient({
               editing={editing === link.id}
               onToggleEdit={() => setEditing(editing === link.id ? null : link.id)}
               onSync={() => syncOne(link.id)}
+              onSetActive={(a) => setActive(link.id, a)}
               onDisconnect={() => disconnect(link.id)}
               onSaveMapping={(m) => saveMapping(link.id, m)}
             />
@@ -251,6 +280,7 @@ function LinkCard({
   editing,
   onToggleEdit,
   onSync,
+  onSetActive,
   onDisconnect,
   onSaveMapping,
 }: {
@@ -261,9 +291,11 @@ function LinkCard({
   editing: boolean
   onToggleEdit: () => void
   onSync: () => void
+  onSetActive: (active: boolean) => void
   onDisconnect: () => void
   onSaveMapping: (m: MemberMap) => void
 }) {
+  const paused = !link.is_active
   const members = (link.members ?? []) as unknown as RegistryMember[]
   const manual = (link.member_map ?? {}) as MemberMap
   const { resolved } = resolveMembers(members, householdUsers, manual)
@@ -272,10 +304,17 @@ function LinkCard({
   const needsMapping = resolved.filter((r) => r.status === "unset").length
 
   return (
-    <div className="rounded-md border bg-card p-3 space-y-3">
+    <div className={`rounded-md border bg-card p-3 space-y-3 ${paused ? "opacity-60" : ""}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{link.title || "Connected tricount"}</div>
+          <div className="text-sm font-medium truncate flex items-center gap-2">
+            <span className="truncate">{link.title || "Connected tricount"}</span>
+            {paused && (
+              <span className="shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                Paused
+              </span>
+            )}
+          </div>
           <div className="text-xs text-muted-foreground truncate">
             {link.last_synced_at
               ? `Last synced ${new Date(link.last_synced_at).toLocaleString()}`
@@ -283,13 +322,36 @@ function LinkCard({
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button onClick={onSync} disabled={busy !== null} size="sm" className="gap-2">
-            <RefreshCw className={`h-4 w-4 ${busy === link.id ? "animate-spin" : ""}`} />
-            Sync
-          </Button>
+          {paused ? (
+            <Button onClick={() => onSetActive(true)} disabled={busy !== null} size="sm" className="gap-2">
+              {busy === link.id ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              Resume
+            </Button>
+          ) : (
+            <>
+              <Button onClick={onSync} disabled={busy !== null} size="sm" className="gap-2">
+                <RefreshCw className={`h-4 w-4 ${busy === link.id ? "animate-spin" : ""}`} />
+                Sync
+              </Button>
+              <Button
+                onClick={() => onSetActive(false)}
+                disabled={busy !== null}
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                aria-label="Pause syncing"
+              >
+                <Pause className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button
             onClick={onToggleEdit}
-            disabled={busy !== null || members.length === 0}
+            disabled={busy !== null || members.length === 0 || paused}
             size="sm"
             variant="ghost"
             className="gap-1 text-muted-foreground"

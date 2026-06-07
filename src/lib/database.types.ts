@@ -326,6 +326,7 @@ export type Database = {
           default_category_id: string | null
           household_id: string
           id: string
+          is_active: boolean
           last_synced_at: string | null
           member_map: Json
           members: Json
@@ -338,6 +339,7 @@ export type Database = {
           default_category_id?: string | null
           household_id: string
           id?: string
+          is_active?: boolean
           last_synced_at?: string | null
           member_map?: Json
           members?: Json
@@ -350,6 +352,7 @@ export type Database = {
           default_category_id?: string | null
           household_id?: string
           id?: string
+          is_active?: boolean
           last_synced_at?: string | null
           member_map?: Json
           members?: Json
