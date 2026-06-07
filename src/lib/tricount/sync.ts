@@ -9,7 +9,6 @@ import {
   resolveMembers,
   mapEntry,
   contentHash,
-  composeDescription,
   type HouseholdUser,
   type MemberMap,
   type MappedEntry,
@@ -140,7 +139,9 @@ export async function runSync(
   for (const entry of registry.entries) {
     const m = mapEntry(entry, householdIdSet)
     if (!m) continue
-    const description = composeDescription(registry.title, m.description)
+    // The mirrored row's description is the raw entry description; the tricount
+    // name is surfaced as a tag in the UI (not prefixed here).
+    const description = m.description
     const hash = contentHash({
       shareCents: m.shareCents,
       currency: m.currency,

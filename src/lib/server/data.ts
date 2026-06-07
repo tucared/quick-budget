@@ -247,6 +247,35 @@ export async function getHouseholdUsers(): Promise<
 }
 
 /**
+ * Server-side map of synced expense id → the tricount title it was imported
+ * from, so the expense list can tag each mirrored row with its tricount name
+ * and render it read-only. Covers all of the household's links (one fetch).
+ * RLS filters by the caller's household — no explicit household_id needed.
+ */
+export async function getSyncedExpenseTitles(): Promise<Record<string, string>> {
+  const supabase = await getSupabase()
+
+  const [{ data: maps, error: mapErr }, { data: links, error: linkErr }] = await Promise.all([
+    supabase.from("tricount_entry_map").select("expense_id, link_id"),
+    supabase.from("tricount_links").select("id, title"),
+  ])
+
+  if (mapErr || linkErr) {
+    console.error("Failed to fetch synced expense titles:", mapErr ?? linkErr)
+    return {}
+  }
+
+  const titleByLink = new Map<string, string>()
+  for (const l of links ?? []) titleByLink.set(l.id, l.title || "Tricount")
+
+  const result: Record<string, string> = {}
+  for (const m of maps ?? []) {
+    result[m.expense_id] = titleByLink.get(m.link_id) ?? "Tricount"
+  }
+  return result
+}
+
+/**
  * Server-side function to fetch active categories.
  * RLS filters by the caller's household — no explicit household_id needed.
  */

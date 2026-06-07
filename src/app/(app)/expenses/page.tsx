@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import {
   getServerUser,
   getExpensesAndCategories,
+  getSyncedExpenseTitles,
   computeTopCategoryIds,
 } from "@/lib/server/data"
 import { ExpensesPageClient } from "@/components/expenses-page-client"
@@ -19,9 +20,10 @@ export default function ExpensesPage() {
 }
 
 async function ExpensesPageData() {
-  const [user, { expenses, categories }] = await Promise.all([
+  const [user, { expenses, categories }, syncedExpenseTitles] = await Promise.all([
     getServerUser(),
     getExpensesAndCategories({ mode: "recent", limit: 30 }),
+    getSyncedExpenseTitles(),
   ])
 
   if (!user) {
@@ -35,6 +37,7 @@ async function ExpensesPageData() {
       initialExpenses={expenses}
       initialCategories={categories}
       initialTopCategoryIds={topCategoryIds}
+      syncedExpenseTitles={syncedExpenseTitles}
     />
   )
 }

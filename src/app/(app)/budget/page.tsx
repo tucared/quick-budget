@@ -6,6 +6,7 @@ import {
   getBudgetAndAllowanceSummary,
   getMonthlyBudgetTarget,
   getExpensesAndCategories,
+  getSyncedExpenseTitles,
 } from "@/lib/server/data"
 import { BudgetPageContent } from "@/components/budget-page-content"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -34,11 +35,12 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
 }
 
 async function BudgetPageData({ budgetMonth }: { budgetMonth: string }) {
-  const [user, { budgets, allowances }, target, { expenses, categories }] = await Promise.all([
+  const [user, { budgets, allowances }, target, { expenses, categories }, syncedExpenseTitles] = await Promise.all([
     getServerUser(),
     getBudgetAndAllowanceSummary(budgetMonth),
     getMonthlyBudgetTarget(budgetMonth),
     getExpensesAndCategories({ mode: "monthly", month: budgetMonth }),
+    getSyncedExpenseTitles(),
   ])
 
   if (!user) {
@@ -54,6 +56,7 @@ async function BudgetPageData({ budgetMonth }: { budgetMonth: string }) {
       categories={categories}
       householdId={user.householdId}
       budgetMonth={budgetMonth}
+      syncedExpenseTitles={syncedExpenseTitles}
     />
   )
 }

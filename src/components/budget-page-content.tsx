@@ -35,6 +35,8 @@ interface BudgetPageContentProps {
   categories: Category[]
   householdId: string
   budgetMonth: string
+  /** expense id → tricount title for rows mirrored by sync (read-only in the drill-down). */
+  syncedExpenseTitles?: Record<string, string>
 }
 
 export function BudgetPageContent({
@@ -45,6 +47,7 @@ export function BudgetPageContent({
   categories,
   householdId,
   budgetMonth,
+  syncedExpenseTitles,
 }: BudgetPageContentProps) {
   const [budgets, setBudgets] = useState<BudgetSummary[]>(initialBudgets)
   const [allowances, setAllowances] = useState<BudgetSummary[]>(initialAllowances)
@@ -275,6 +278,7 @@ export function BudgetPageContent({
         budgetMonth={budgetMonth}
         allExpenses={expenses}
         categories={categories}
+        syncedExpenseTitles={syncedExpenseTitles}
       />
     </>
   )

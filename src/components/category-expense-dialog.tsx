@@ -23,6 +23,8 @@ interface CategoryExpenseDialogProps {
   budgetMonth: string
   allExpenses: Expense[]
   categories: Category[]
+  /** expense id → tricount title for rows mirrored by sync (read-only, tagged). */
+  syncedExpenseTitles?: Record<string, string>
 }
 
 export function CategoryExpenseDialog({
@@ -32,6 +34,7 @@ export function CategoryExpenseDialog({
   budgetMonth,
   allExpenses,
   categories,
+  syncedExpenseTitles,
 }: CategoryExpenseDialogProps) {
   const [editingExpenses, setEditingExpenses] = useState<Expense[] | null>(null)
 
@@ -88,6 +91,8 @@ export function CategoryExpenseDialog({
     categories.forEach((cat) => map.set(cat.id, cat))
     return map
   }, [categories])
+
+  const syncedTitles = syncedExpenseTitles ?? {}
 
   const expenses = useMemo(() => {
     if (!budget) return []
@@ -156,6 +161,7 @@ export function CategoryExpenseDialog({
                   isDeleting={deletingIds.has(expense.id)}
                   showDate
                   showSplitBadge
+                  importedFrom={syncedTitles[expense.id] ?? null}
                   onCardClick={handleCardClick}
                   onEdit={handleEdit}
                   onDelete={(_id, e) => handleDelete(expense, e)}

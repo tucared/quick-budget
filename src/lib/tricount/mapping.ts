@@ -173,14 +173,3 @@ export function mapEntry(
     description: entry.description ?? null,
   }
 }
-
-/**
- * Compose the stored expense description: the tricount title prefixes the raw
- * entry description so all tricounts can share one category yet stay readable.
- */
-export function composeDescription(title: string | null, raw: string | null): string | null {
-  const t = (title ?? "").trim()
-  const r = (raw ?? "").trim()
-  if (!t) return r || null
-  return r ? `${t} · ${r}` : t
-}

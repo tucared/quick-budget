@@ -151,21 +151,24 @@ export function TricountSyncClient({
     }
   }
 
-  async function disconnect(linkId: string) {
+  async function disconnect(linkId: string, deleteExpenses: boolean) {
     setBusy(linkId)
     setError(null)
     try {
-      const res = await fetch(`/api/tricount/link?id=${encodeURIComponent(linkId)}`, {
-        method: "DELETE",
-      })
+      const res = await fetch(
+        `/api/tricount/link?id=${encodeURIComponent(linkId)}${deleteExpenses ? "&deleteExpenses=true" : ""}`,
+        { method: "DELETE" }
+      )
       const data = await res.json()
       if (!res.ok || data.error) {
-        setError(data.error || "Could not disconnect")
+        setError(data.error || "Could not remove")
         return
       }
       await refetchLinks()
+      // Deleting mirrored expenses changes the rest of the app.
+      if (deleteExpenses) router.refresh()
     } catch {
-      setError("Could not disconnect — network error")
+      setError("Could not remove — network error")
     } finally {
       setBusy(null)
     }
@@ -232,7 +235,7 @@ export function TricountSyncClient({
               onToggleEdit={() => setEditing(editing === link.id ? null : link.id)}
               onSync={() => syncOne(link.id)}
               onSetActive={(a) => setActive(link.id, a)}
-              onDisconnect={() => disconnect(link.id)}
+              onDisconnect={(del) => disconnect(link.id, del)}
               onSaveMapping={(m) => saveMapping(link.id, m)}
             />
           ))}
@@ -292,10 +295,11 @@ function LinkCard({
   onToggleEdit: () => void
   onSync: () => void
   onSetActive: (active: boolean) => void
-  onDisconnect: () => void
+  onDisconnect: (deleteExpenses: boolean) => void
   onSaveMapping: (m: MemberMap) => void
 }) {
   const paused = !link.is_active
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const members = (link.members ?? []) as unknown as RegistryMember[]
   const manual = (link.member_map ?? {}) as MemberMap
   const { resolved } = resolveMembers(members, householdUsers, manual)
@@ -360,17 +364,48 @@ function LinkCard({
             <Users className="h-4 w-4" />
           </Button>
           <Button
-            onClick={onDisconnect}
+            onClick={() => setConfirmRemove((v) => !v)}
             disabled={busy !== null}
             size="sm"
             variant="ghost"
             className="text-muted-foreground"
-            aria-label="Disconnect tricount"
+            aria-label="Remove tricount"
           >
             <Unlink className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {confirmRemove && (
+        <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
+          <div className="font-medium">Remove this tricount?</div>
+          <p className="text-muted-foreground">
+            Disconnect keeps the {mapped > 0 ? "imported" : "synced"} expenses as plain rows.
+            Unlink &amp; delete also removes every expense this tricount created.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            <Button
+              onClick={() => { setConfirmRemove(false); onDisconnect(false) }}
+              disabled={busy !== null}
+              size="sm"
+              variant="outline"
+            >
+              Disconnect (keep)
+            </Button>
+            <Button
+              onClick={() => { setConfirmRemove(false); onDisconnect(true) }}
+              disabled={busy !== null}
+              size="sm"
+              variant="destructive"
+            >
+              Unlink &amp; delete
+            </Button>
+            <Button onClick={() => setConfirmRemove(false)} disabled={busy !== null} size="sm" variant="ghost">
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       {members.length > 0 && (
         <div className="text-xs text-muted-foreground">
