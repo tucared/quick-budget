@@ -13,12 +13,15 @@ interface ExpensesPageClientProps {
   initialExpenses: ExpenseWithDetails[]
   initialCategories: Category[]
   initialTopCategoryIds: string[]
+  /** expense id → tricount title for rows mirrored by sync (read-only, tagged). */
+  syncedExpenseTitles?: Record<string, string>
 }
 
 export function ExpensesPageClient({
   initialExpenses,
   initialCategories,
   initialTopCategoryIds,
+  syncedExpenseTitles,
 }: ExpensesPageClientProps) {
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>(initialExpenses)
   const [hasMore, setHasMore] = useState(initialExpenses.length === PAGE_SIZE)
@@ -127,6 +130,7 @@ export function ExpensesPageClient({
         expenses={expenses}
         categories={initialCategories}
         hasMore={hasMore}
+        syncedExpenseTitles={syncedExpenseTitles}
         onLoadMore={handleLoadMore}
         onExpenseUpdated={handleExpenseUpdated}
         onExpenseDeleted={handleExpenseDeleted}

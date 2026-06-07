@@ -17,6 +17,8 @@ interface ExpenseListClientProps {
   expenses: ExpenseWithDetails[]
   categories: Category[]
   hasMore: boolean
+  /** expense id → tricount title for rows mirrored by sync (read-only, tagged). */
+  syncedExpenseTitles?: Record<string, string>
   onLoadMore: () => Promise<void>
   onExpenseUpdated?: (updated: Expense | Expense[]) => void
   onExpenseDeleted?: (ids: string[]) => void
@@ -34,6 +36,7 @@ export function ExpenseListClient({
   expenses,
   categories: categoryList,
   hasMore,
+  syncedExpenseTitles,
   onLoadMore,
   onExpenseUpdated,
   onExpenseDeleted,
@@ -43,6 +46,8 @@ export function ExpenseListClient({
     categoryList.forEach((cat) => map.set(cat.id, cat))
     return map
   }, [categoryList])
+
+  const syncedTitles = syncedExpenseTitles ?? {}
 
   // Flag map keyed by category id, used to identify the allowance sibling.
   const categoryExcludeFlags = useMemo(() => {
@@ -320,6 +325,7 @@ export function ExpenseListClient({
                   category={item.category_id ? categories.get(item.category_id) : null}
                   isShowingDelete={showingDeleteId === item.id}
                   isDeleting={deletingIds.has(item.id)}
+                  importedFrom={syncedTitles[item.id] ?? null}
                   onCardClick={handleCardClick}
                   onEdit={handleEdit}
                   onDelete={(_id, e) => handleDelete(item, e)}

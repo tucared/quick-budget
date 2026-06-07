@@ -28,6 +28,9 @@ interface ExpenseCardProps {
   showDate?: boolean
   /** When inside a per-category drill-down, surface the split membership. */
   showSplitBadge?: boolean
+  /** When set, this row was mirrored from the named Tricount: tag it with that
+   *  name and suppress edit/delete (managed on the Sync tab). */
+  importedFrom?: string | null
   onCardClick: (id: string) => void
   onEdit?: (id: string, e: React.MouseEvent) => void
   onDelete: (id: string, e: React.MouseEvent) => void
@@ -40,10 +43,14 @@ function ExpenseCardImpl({
   isDeleting,
   showDate = false,
   showSplitBadge = false,
+  importedFrom = null,
   onCardClick,
   onEdit,
   onDelete,
 }: ExpenseCardProps) {
+  // Imported (Tricount) rows are read-only here — managed on the Sync tab.
+  const imported = !!importedFrom
+  const showActions = !imported
   return (
     <div
       className={`overflow-hidden transition-all duration-300 ${
@@ -57,8 +64,8 @@ function ExpenseCardImpl({
       >
         {/* onClick is the mobile tap-to-reveal for edit/delete buttons; on md+ the buttons appear on CSS hover instead */}
         <div
-          className="group cursor-pointer md:cursor-default py-3 px-1"
-          onClick={() => onCardClick(expense.id)}
+          className={`group py-3 px-1 ${imported ? "cursor-default" : "cursor-pointer md:cursor-default"}`}
+          onClick={imported ? undefined : () => onCardClick(expense.id)}
         >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
@@ -69,6 +76,14 @@ function ExpenseCardImpl({
                   <span className="font-medium">
                     {category?.name || "Uncategorized"}
                   </span>
+                  {imported && (
+                    <span
+                      className="shrink-0 max-w-[10rem] truncate text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5"
+                      title={`Imported from “${importedFrom}” — manage on the Sync tab`}
+                    >
+                      {importedFrom}
+                    </span>
+                  )}
                   {showSplitBadge && expense.split_group_id && (
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                       Part of a split
@@ -101,7 +116,11 @@ function ExpenseCardImpl({
               <div className="relative flex items-start">
                 <div
                   className={`text-right transition-all ${
-                    isShowingDelete ? "mr-[4.5rem]" : "md:group-hover:mr-[4.5rem]"
+                    !showActions
+                      ? ""
+                      : isShowingDelete
+                        ? "mr-[4.5rem]"
+                        : "md:group-hover:mr-[4.5rem]"
                   }`}
                 >
                   <div className="font-semibold text-lg">
@@ -113,30 +132,32 @@ function ExpenseCardImpl({
                     </div>
                   )}
                 </div>
-                <div
-                  className={`absolute right-0 top-0 flex items-center gap-0.5 transition-opacity ${
-                    isShowingDelete
-                      ? "opacity-100 pointer-events-auto"
-                      : "opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto"
-                  }`}
-                >
-                  {onEdit && (
-                    <button
-                      onClick={(e) => onEdit(expense.id, e)}
-                      className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground"
-                      aria-label="Edit expense"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => onDelete(expense.id, e)}
-                    className="p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive"
-                    aria-label="Delete expense"
+                {showActions && (
+                  <div
+                    className={`absolute right-0 top-0 flex items-center gap-0.5 transition-opacity ${
+                      isShowingDelete
+                        ? "opacity-100 pointer-events-auto"
+                        : "opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto"
+                    }`}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                    {onEdit && (
+                      <button
+                        onClick={(e) => onEdit(expense.id, e)}
+                        className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground"
+                        aria-label="Edit expense"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => onDelete(expense.id, e)}
+                      className="p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive"
+                      aria-label="Delete expense"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
         </div>

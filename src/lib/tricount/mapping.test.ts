@@ -7,7 +7,6 @@ import {
   isSyncableEntry,
   contentHash,
   mapEntry,
-  composeDescription,
   type HouseholdUser,
   type RegistryMember,
 } from "./mapping"
@@ -127,20 +126,6 @@ describe("contentHash", () => {
   it("changes when a field changes", () => {
     expect(contentHash(base)).not.toBe(contentHash({ ...base, description: "Changed" }))
     expect(contentHash(base)).not.toBe(contentHash({ ...base, shareCents: 14801 }))
-  })
-})
-
-describe("composeDescription", () => {
-  it("prefixes the raw description with the tricount title", () => {
-    expect(composeDescription("Test Claude", "Dinner")).toBe("Test Claude · Dinner")
-  })
-  it("uses the title alone when there is no description", () => {
-    expect(composeDescription("Test Claude", null)).toBe("Test Claude")
-    expect(composeDescription("Test Claude", "")).toBe("Test Claude")
-  })
-  it("falls back to the raw description when there is no title", () => {
-    expect(composeDescription(null, "Dinner")).toBe("Dinner")
-    expect(composeDescription("", "")).toBeNull()
   })
 })
 

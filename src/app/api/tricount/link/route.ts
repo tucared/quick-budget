@@ -150,9 +150,31 @@ export async function DELETE(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id")
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
-  const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from("tricount_links").delete().eq("id", id)
+  // Opt-in: also remove the mirrored expenses this link produced. Default
+  // ("Disconnect") keeps them as plain rows / history.
+  const deleteExpenses = request.nextUrl.searchParams.get("deleteExpenses") === "true"
 
+  const supabase = await createServerSupabaseClient()
+
+  if (deleteExpenses) {
+    const { data: maps, error: mapErr } = await supabase
+      .from("tricount_entry_map")
+      .select("expense_id")
+      .eq("link_id", id)
+    if (mapErr) {
+      return NextResponse.json({ error: "Failed to read sync map" }, { status: 500 })
+    }
+    const expenseIds = (maps ?? []).map((m) => m.expense_id)
+    if (expenseIds.length > 0) {
+      // Deleting the expenses cascades their tricount_entry_map rows away.
+      const { error: delErr } = await supabase.from("expenses").delete().in("id", expenseIds)
+      if (delErr) {
+        return NextResponse.json({ error: "Failed to delete mirrored expenses" }, { status: 500 })
+      }
+    }
+  }
+
+  const { error } = await supabase.from("tricount_links").delete().eq("id", id)
   if (error) {
     return NextResponse.json({ error: "Failed to disconnect Tricount" }, { status: 500 })
   }
