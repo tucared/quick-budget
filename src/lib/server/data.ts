@@ -206,24 +206,44 @@ export async function getExpensesAndCategories(
 }
 
 /**
- * Server-side function to fetch the household's linked tricount (if any).
- * Returns null when no Tricount has been connected.
+ * Server-side function to fetch the household's linked tricounts.
  * RLS filters by the caller's household — no explicit household_id needed.
  */
-export async function getTricountLink(): Promise<TricountLink | null> {
+export async function getTricountLinks(): Promise<TricountLink[]> {
   const supabase = await getSupabase()
 
   const { data, error } = await supabase
     .from("tricount_links")
     .select("*")
-    .maybeSingle()
+    .order("created_at", { ascending: true })
 
   if (error) {
-    console.error("Failed to fetch tricount link:", error)
-    return null
+    console.error("Failed to fetch tricount links:", error)
+    return []
   }
 
-  return data
+  return data ?? []
+}
+
+/**
+ * Server-side function to fetch the household's members (for member mapping).
+ * RLS filters by the caller's household — no explicit household_id needed.
+ */
+export async function getHouseholdUsers(): Promise<
+  { id: string; full_name: string | null; email: string }[]
+> {
+  const supabase = await getSupabase()
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, full_name, email")
+
+  if (error) {
+    console.error("Failed to fetch household users:", error)
+    return []
+  }
+
+  return data ?? []
 }
 
 /**

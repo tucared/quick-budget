@@ -328,6 +328,7 @@ export type Database = {
           id: string
           last_synced_at: string | null
           member_map: Json
+          members: Json
           public_identifier_token: string
           title: string | null
           updated_at: string
@@ -339,6 +340,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           member_map?: Json
+          members?: Json
           public_identifier_token: string
           title?: string | null
           updated_at?: string
@@ -350,6 +352,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           member_map?: Json
+          members?: Json
           public_identifier_token?: string
           title?: string | null
           updated_at?: string
