@@ -252,10 +252,25 @@ export async function runSync(
 }
 
 /** Reconcile every *active* tricount linked to a household (paused ones are skipped). */
+// Auto-sync (on app load) skips a link that was reconciled this recently, so a
+// session reload — or the other partner opening the app moments later — doesn't
+// re-hit Tricount's undocumented API. `last_synced_at` is server-side on the
+// link row, so the throttle dedupes across both partners and all tabs/devices.
+// Manual "Sync"/"Sync all" pass auto=false and always force a fresh pull.
+export const AUTO_SYNC_MIN_INTERVAL_MS = 10 * 60 * 1000
+
+export type LinkSyncOutcome = {
+  linkId: string
+  title: string
+  result?: SyncResult
+  error?: string
+  throttled?: boolean
+}
+
 export async function runSyncAll(
   supabase: DB,
-  opts: { userId: string; householdId: string }
-): Promise<{ linkId: string; title: string; result?: SyncResult; error?: string }[]> {
+  opts: { userId: string; householdId: string; auto?: boolean }
+): Promise<LinkSyncOutcome[]> {
   const { data: links, error } = await supabase
     .from("tricount_links")
     .select("*")
@@ -263,10 +278,17 @@ export async function runSyncAll(
     .eq("is_active", true)
   if (error) throw new Error(`Failed to load tricount links: ${error.message}`)
 
-  const out: { linkId: string; title: string; result?: SyncResult; error?: string }[] = []
+  const out: LinkSyncOutcome[] = []
   for (const link of links ?? []) {
+    if (opts.auto && link.last_synced_at) {
+      const age = Date.now() - new Date(link.last_synced_at).getTime()
+      if (age >= 0 && age < AUTO_SYNC_MIN_INTERVAL_MS) {
+        out.push({ linkId: link.id, title: link.title ?? "tricount", throttled: true })
+        continue
+      }
+    }
     try {
-      const result = await runSync(supabase, { ...opts, link })
+      const result = await runSync(supabase, { userId: opts.userId, householdId: opts.householdId, link })
       out.push({ linkId: link.id, title: result.title, result })
     } catch (e) {
       out.push({

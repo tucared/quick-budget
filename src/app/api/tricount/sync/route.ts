@@ -1,29 +1,31 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { getServerUser } from "@/lib/server/data"
-import { runSync, runSyncAll, type SyncResult } from "@/lib/tricount/sync"
-
-type LinkResult = { linkId: string; title: string; result?: SyncResult; error?: string }
+import { runSync, runSyncAll, type LinkSyncOutcome } from "@/lib/tricount/sync"
 
 // POST /api/tricount/sync — reconcile the household's tricounts.
-// Body { linkId } syncs one; no body syncs all. Runs in the caller's session
-// so RLS scopes every write to their household.
+// Body { linkId } syncs one; otherwise syncs all. { auto: true } marks the
+// on-load background sync, which throttles links synced in the last 10 min;
+// manual syncs omit it and always force a fresh pull. Runs in the caller's
+// session so RLS scopes every write to their household.
 export async function POST(request: NextRequest) {
   const user = await getServerUser()
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
 
   let linkId: string | undefined
+  let auto = false
   try {
     const body = await request.json()
     if (body && typeof body.linkId === "string") linkId = body.linkId
+    if (body && body.auto === true) auto = true
   } catch {
-    // No body — sync all.
+    // No body — manual sync all.
   }
 
   const supabase = await createServerSupabaseClient()
 
   try {
-    let results: LinkResult[]
+    let results: LinkSyncOutcome[]
     if (linkId) {
       const { data: link } = await supabase
         .from("tricount_links")
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
       })
       results = [{ linkId: link.id, title: result.title, result }]
     } else {
-      results = await runSyncAll(supabase, { userId: user.id, householdId: user.householdId })
+      results = await runSyncAll(supabase, { userId: user.id, householdId: user.householdId, auto })
     }
     return NextResponse.json({ configured: results.length > 0, results })
   } catch (error) {

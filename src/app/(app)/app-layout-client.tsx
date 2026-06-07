@@ -16,9 +16,12 @@ const tabs = [
   { href: "/sync", label: "Sync", icon: RefreshCw },
 ] as const
 
-// Auto-sync the linked tricount once per browser session. The endpoint no-ops
-// quickly when no tricount is connected. Refreshes the route tree only when the
-// reconcile actually changed something, so it's cheap on a steady state.
+// Auto-sync the linked tricount once per browser session (this sessionStorage
+// gate), backed by a server-side `auto: true` throttle that also skips links
+// reconciled in the last 10 min across both partners and all tabs/devices — so
+// the undocumented Tricount API isn't re-hit on every reload. The endpoint
+// no-ops quickly when no tricount is connected. Refreshes the route tree only
+// when the reconcile actually changed something, so it's cheap on a steady state.
 function useTricountAutoSync() {
   const router = useRouter()
   const ran = useRef(false)
@@ -33,7 +36,11 @@ function useTricountAutoSync() {
     }
     void (async () => {
       try {
-        const res = await fetch("/api/tricount/sync", { method: "POST" })
+        const res = await fetch("/api/tricount/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ auto: true }),
+        })
         if (!res.ok) return
         const data = await res.json()
         const changed = (data?.results ?? []).some(
