@@ -344,13 +344,15 @@ REVOKE SELECT ON public.monthly_budget_targets FROM anon;
 -- `public_identifier_token` is the share code from a Tricount link
 -- (https://tricount.com/<token>). `members` caches the registry membership list
 -- [{id, name}] (refreshed each sync) so the mapping editor can render without a
--- network call. `member_map` holds *manual* membership→user overrides only
--- (Tricount membership id as text → Quick Budget user id, or null to force an
--- exclude); members absent from it are auto-matched by name each run, so renames
--- self-heal while explicit overrides persist. `default_category_id` is the
--- shared "Tricount" category synced expenses are filed under (their description
--- is prefixed with the tricount title). `last_synced_at` records the most recent
--- successful reconcile.
+-- network call. `member_map` holds explicit membership→user decisions (Tricount
+-- membership id as text → Quick Budget user id, or null to exclude); a
+-- membership absent from it is "unset" and not counted (mapping is always
+-- explicit — no name auto-match). `default_category_id` is the shared "Tricount"
+-- category synced expenses are filed under (their description is prefixed with
+-- the tricount title). `is_active` lets a household pause a finished tricount:
+-- paused links are skipped by sync-all / auto-sync, freezing their mirrored
+-- expenses as a historical record (per-link manual sync still works on resume).
+-- `last_synced_at` records the most recent successful reconcile.
 CREATE TABLE tricount_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -359,6 +361,7 @@ CREATE TABLE tricount_links (
   default_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   members JSONB NOT NULL DEFAULT '[]'::jsonb,
   member_map JSONB NOT NULL DEFAULT '{}'::jsonb,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   last_synced_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
