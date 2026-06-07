@@ -151,14 +151,15 @@ export function TricountSyncClient({
     }
   }
 
-  async function disconnect(linkId: string, deleteExpenses: boolean) {
+  async function disconnect(linkId: string) {
     setBusy(linkId)
     setError(null)
     try {
-      const res = await fetch(
-        `/api/tricount/link?id=${encodeURIComponent(linkId)}${deleteExpenses ? "&deleteExpenses=true" : ""}`,
-        { method: "DELETE" }
-      )
+      // Unlink always removes the mirrored expenses too (no orphan-leaving
+      // "keep" variant). Pause is the way to freeze a finished tricount.
+      const res = await fetch(`/api/tricount/link?id=${encodeURIComponent(linkId)}`, {
+        method: "DELETE",
+      })
       const data = await res.json()
       if (!res.ok || data.error) {
         setError(data.error || "Could not remove")
@@ -166,7 +167,7 @@ export function TricountSyncClient({
       }
       await refetchLinks()
       // Deleting mirrored expenses changes the rest of the app.
-      if (deleteExpenses) router.refresh()
+      router.refresh()
     } catch {
       setError("Could not remove — network error")
     } finally {
@@ -235,7 +236,7 @@ export function TricountSyncClient({
               onToggleEdit={() => setEditing(editing === link.id ? null : link.id)}
               onSync={() => syncOne(link.id)}
               onSetActive={(a) => setActive(link.id, a)}
-              onDisconnect={(del) => disconnect(link.id, del)}
+              onDisconnect={() => disconnect(link.id)}
               onSaveMapping={(m) => saveMapping(link.id, m)}
             />
           ))}
@@ -295,7 +296,7 @@ function LinkCard({
   onToggleEdit: () => void
   onSync: () => void
   onSetActive: (active: boolean) => void
-  onDisconnect: (deleteExpenses: boolean) => void
+  onDisconnect: () => void
   onSaveMapping: (m: MemberMap) => void
 }) {
   const paused = !link.is_active
@@ -378,22 +379,14 @@ function LinkCard({
 
       {confirmRemove && (
         <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
-          <div className="font-medium">Remove this tricount?</div>
+          <div className="font-medium">Unlink this tricount?</div>
           <p className="text-muted-foreground">
-            Disconnect keeps the {mapped > 0 ? "imported" : "synced"} expenses as plain rows.
-            Unlink &amp; delete also removes every expense this tricount created.
+            This disconnects the tricount and deletes every expense it imported. To keep a
+            finished tricount&apos;s expenses as history, pause it instead.
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-0.5">
             <Button
-              onClick={() => { setConfirmRemove(false); onDisconnect(false) }}
-              disabled={busy !== null}
-              size="sm"
-              variant="outline"
-            >
-              Disconnect (keep)
-            </Button>
-            <Button
-              onClick={() => { setConfirmRemove(false); onDisconnect(true) }}
+              onClick={() => { setConfirmRemove(false); onDisconnect() }}
               disabled={busy !== null}
               size="sm"
               variant="destructive"

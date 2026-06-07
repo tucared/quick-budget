@@ -6,8 +6,9 @@ import { parseTricountToken } from "@/lib/tricount/client"
 // Manage the household's Tricount links (a household may connect several).
 // GET    — list connected links
 // POST   — connect a new link from a share URL or bare code
-// PATCH  — update a link's manual member mapping
-// DELETE — disconnect a link (mirrored expenses are left in place as normal rows)
+// PATCH  — update a link's manual member mapping / pause flag
+// DELETE — unlink: remove the link AND every expense it imported (no
+//          orphan-leaving "keep" variant; pause to freeze a finished tricount)
 
 const TRICOUNT_CATEGORY_NAME = "Tricount"
 
@@ -150,33 +151,28 @@ export async function DELETE(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id")
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
-  // Opt-in: also remove the mirrored expenses this link produced. Default
-  // ("Disconnect") keeps them as plain rows / history.
-  const deleteExpenses = request.nextUrl.searchParams.get("deleteExpenses") === "true"
-
   const supabase = await createServerSupabaseClient()
 
-  if (deleteExpenses) {
-    const { data: maps, error: mapErr } = await supabase
-      .from("tricount_entry_map")
-      .select("expense_id")
-      .eq("link_id", id)
-    if (mapErr) {
-      return NextResponse.json({ error: "Failed to read sync map" }, { status: 500 })
-    }
-    const expenseIds = (maps ?? []).map((m) => m.expense_id)
-    if (expenseIds.length > 0) {
-      // Deleting the expenses cascades their tricount_entry_map rows away.
-      const { error: delErr } = await supabase.from("expenses").delete().in("id", expenseIds)
-      if (delErr) {
-        return NextResponse.json({ error: "Failed to delete mirrored expenses" }, { status: 500 })
-      }
+  // Always remove the mirrored expenses this link produced (no "keep" variant
+  // — that left orphans). Deleting the expenses cascades their map rows away.
+  const { data: maps, error: mapErr } = await supabase
+    .from("tricount_entry_map")
+    .select("expense_id")
+    .eq("link_id", id)
+  if (mapErr) {
+    return NextResponse.json({ error: "Failed to read sync map" }, { status: 500 })
+  }
+  const expenseIds = (maps ?? []).map((m) => m.expense_id)
+  if (expenseIds.length > 0) {
+    const { error: delErr } = await supabase.from("expenses").delete().in("id", expenseIds)
+    if (delErr) {
+      return NextResponse.json({ error: "Failed to delete mirrored expenses" }, { status: 500 })
     }
   }
 
   const { error } = await supabase.from("tricount_links").delete().eq("id", id)
   if (error) {
-    return NextResponse.json({ error: "Failed to disconnect Tricount" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to unlink Tricount" }, { status: 500 })
   }
   return NextResponse.json({ ok: true })
 }
