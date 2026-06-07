@@ -120,9 +120,10 @@ export function isSyncableEntry(entry: Entry): boolean {
 }
 
 // Deterministic FNV-1a hash (hex) of the fields that, when changed, should
-// update the mirrored expense. The caller passes the *final* (title-prefixed)
-// description so a tricount rename propagates; the EUR rate is intentionally
-// excluded so day-to-day rate caching never triggers spurious updates.
+// update the mirrored expense. The caller passes the raw Tricount description
+// (the tricount title is surfaced as a UI tag, not stored on the row, so a
+// rename needs no expense update); the EUR rate is intentionally excluded so
+// day-to-day rate caching never triggers spurious updates.
 export function contentHash(parts: {
   shareCents: number
   currency: string

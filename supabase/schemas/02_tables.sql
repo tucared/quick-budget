@@ -348,8 +348,9 @@ REVOKE SELECT ON public.monthly_budget_targets FROM anon;
 -- membership id as text → Quick Budget user id, or null to exclude); a
 -- membership absent from it is "unset" and not counted (mapping is always
 -- explicit — no name auto-match). `default_category_id` is the shared "Tricount"
--- category synced expenses are filed under (their description is prefixed with
--- the tricount title). `is_active` lets a household pause a finished tricount:
+-- category synced expenses are filed under (the tricount title is surfaced as a
+-- read-only UI tag, not prefixed into the description). `is_active` lets a
+-- household pause a finished tricount:
 -- paused links are skipped by sync-all / auto-sync, freezing their mirrored
 -- expenses as a historical record (per-link manual sync still works on resume).
 -- `last_synced_at` records the most recent successful reconcile.
