@@ -127,3 +127,37 @@ CREATE POLICY "Household members can update monthly budget targets" ON monthly_b
 
 CREATE POLICY "Household members can delete monthly budget targets" ON monthly_budget_targets
   FOR DELETE USING (household_id = private.get_my_household_id());
+
+-- ============================================================================
+-- TRICOUNT_LINKS
+-- ============================================================================
+ALTER TABLE tricount_links ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Household members can view tricount links" ON tricount_links
+  FOR SELECT USING (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can insert tricount links" ON tricount_links
+  FOR INSERT WITH CHECK (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can update tricount links" ON tricount_links
+  FOR UPDATE USING (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can delete tricount links" ON tricount_links
+  FOR DELETE USING (household_id = private.get_my_household_id());
+
+-- ============================================================================
+-- TRICOUNT_ENTRY_MAP
+-- ============================================================================
+ALTER TABLE tricount_entry_map ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Household members can view tricount entry map" ON tricount_entry_map
+  FOR SELECT USING (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can insert tricount entry map" ON tricount_entry_map
+  FOR INSERT WITH CHECK (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can update tricount entry map" ON tricount_entry_map
+  FOR UPDATE USING (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can delete tricount entry map" ON tricount_entry_map
+  FOR DELETE USING (household_id = private.get_my_household_id());

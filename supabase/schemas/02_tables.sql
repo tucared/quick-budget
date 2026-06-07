@@ -333,3 +333,68 @@ CREATE TRIGGER update_monthly_budget_targets_updated_at BEFORE UPDATE ON monthly
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_budget_targets TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_budget_targets TO service_role;
 REVOKE SELECT ON public.monthly_budget_targets FROM anon;
+
+-- ============================================================================
+-- TRICOUNT_LINKS
+-- ============================================================================
+-- Connects a household to one Tricount shared ledger so its expenses can be
+-- synced into Quick Budget (read-only, via Tricount's app backend). One link
+-- per household — pasting a new share link replaces the previous one.
+--
+-- `public_identifier_token` is the share code from a Tricount link
+-- (https://tricount.com/<token>). `member_map` caches the resolved mapping
+-- from Tricount membership id (text) → Quick Budget user id (uuid), built by
+-- matching member display names against household members; it is informational
+-- (the sync recomputes it each run). `default_category_id` is the dedicated
+-- "Tricount" category synced expenses are filed under. `last_synced_at`
+-- records the most recent successful reconcile.
+CREATE TABLE tricount_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  public_identifier_token TEXT NOT NULL,
+  title TEXT,
+  default_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  member_map JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- One Tricount per household (MVP). Upsert on household_id to replace.
+  UNIQUE(household_id)
+);
+
+CREATE TRIGGER update_tricount_links_updated_at BEFORE UPDATE ON tricount_links
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tricount_links TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tricount_links TO service_role;
+REVOKE SELECT ON public.tricount_links FROM anon;
+
+-- ============================================================================
+-- TRICOUNT_ENTRY_MAP
+-- ============================================================================
+-- Idempotency ledger for the sync: maps a stable Tricount registry entry id
+-- to the Quick Budget expense row it produced. Lets re-syncs detect new,
+-- changed (via `content_hash`), and removed entries across all months instead
+-- of re-importing duplicates. `expense_id` cascades, so deleting a synced
+-- expense in Quick Budget drops its mapping and the next sync re-creates it.
+CREATE TABLE tricount_entry_map (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  link_id UUID NOT NULL REFERENCES tricount_links(id) ON DELETE CASCADE,
+  tricount_entry_id BIGINT NOT NULL,
+  expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  content_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(link_id, tricount_entry_id)
+);
+
+CREATE INDEX idx_tricount_entry_map_link ON tricount_entry_map(link_id);
+CREATE INDEX idx_tricount_entry_map_expense ON tricount_entry_map(expense_id);
+
+CREATE TRIGGER update_tricount_entry_map_updated_at BEFORE UPDATE ON tricount_entry_map
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tricount_entry_map TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tricount_entry_map TO service_role;
+REVOKE SELECT ON public.tricount_entry_map FROM anon;

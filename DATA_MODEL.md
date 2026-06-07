@@ -20,6 +20,11 @@ erDiagram
     households ||--o{ monthly_budget_targets : "targets"
 
     exchange_rates ||--o{ expenses : "converts (by currency + date)"
+
+    households ||--o| tricount_links : "links"
+    tricount_links ||--o{ tricount_entry_map : "tracks"
+    expenses ||--o| tricount_entry_map : "mirrored by"
+    categories ||--o{ tricount_links : "default for"
 ```
 
 ## Key Design Decisions
@@ -51,3 +56,15 @@ The helper reads `household_id` from the JWT custom claim `app_metadata.househol
 
 ### 8. Split Expenses via Sibling Rows
 A single user-facing "split expense" (JTBD #8: cap a shared category, overflow to allowance) is stored as **two sibling rows** in `expenses` sharing a nullable `split_group_id UUID`. The two rows share every metadata field (`household_id`, `logged_by_user_id`, `expense_date`, `description`, `currency`, `exchange_rate`, `is_cash`) and differ only in `category_id`, `amount`, and `converted_amount`. `split_group_id = NULL` means a normal single-row expense. The `id` is minted client-side via `crypto.randomUUID()`; no FK, no parent/child asymmetry. A partial index `idx_expenses_split_group` covers the rare lookups by group id. Because each sibling is a regular `expenses` row, the `budget_summary` view aggregates each portion against its own category naturally — no view, RLS, or realtime changes were needed. The app enforces the two-sibling invariant (the DB does not); an orphan singleton renders as a normal single-row expense, which is visually benign data debt. Reusable client helpers live in `src/lib/split-utils.ts` (`groupSplitSiblings` for list display, `partitionSplitSiblings` to identify primary vs overflow).
+
+### 9. Tricount Sync (read-only mirror)
+A household can link one Tricount shared ledger (JTBD #11) and mirror its expenses into Quick Budget. There is no official Tricount API; the sync uses Tricount's undocumented app backend (`api.tricount.bunq.com`) anonymously — generate an app-installation UUID + RSA keypair, `POST /v1/session-registry-installation` for a session token + synthetic user id, then `GET /v1/user/{id}/registry?public_identifier_token=<share-code>`. No signing, no secret. The client (`src/lib/tricount/client.ts`) is server-only; outbound fetch routes through the cloud proxy via `src/instrumentation.ts`.
+
+Two tables back the sync, both household-scoped under the standard `private.get_my_household_id()` RLS policies:
+
+- **`tricount_links`** — one row per household (`UNIQUE(household_id)`): the share token, cached `title`, the dedicated `default_category_id` ("Tricount" category synced rows land in, created on first connect), a `member_map` JSONB (Tricount membership id → QB user id, recomputed each run by matching member display names / email local-parts), and `last_synced_at`. `default_category_id` is `ON DELETE SET NULL`.
+- **`tricount_entry_map`** — the idempotency ledger, `UNIQUE(link_id, tricount_entry_id)`: maps a stable Tricount registry entry id to the `expenses.id` it produced, plus a `content_hash` of the Tricount-derived fields (share cents, currency, date, description — *not* the EUR rate, so rate caching never causes spurious updates). `expense_id` is `ON DELETE CASCADE`, so deleting a synced expense in-app drops its mapping and the next sync re-creates it.
+
+**Household-share semantics:** a tricount is a multi-party ledger, but a QB household is just its members. The amount mirrored for each entry is the household's share — the sum of `allocations` whose membership maps to a household member — not the full expense. Shares belonging to outsiders are excluded, and entries with a zero household share (fully allocated to outsiders) produce no expense. Each entry becomes one regular single-row `expenses` row (`amount` in the entry's currency, `converted_amount` in EUR via the existing `exchange_rates`/Frankfurter path), filed under the Tricount category and attributed (`logged_by_user_id`) to whoever ran the sync. Only `status = ACTIVE`, `type_transaction = NORMAL` entries sync; `BALANCE` settlements are skipped.
+
+**Reconcile loop** (`src/lib/tricount/sync.ts`, run by `POST /api/tricount/sync` in the caller's session so RLS applies): pull the whole registry (all months), diff the desired set against `tricount_entry_map`, then insert new entries, update changed ones (hash mismatch), and delete entries that vanished/settled/dropped to zero share. Concurrent syncs are guarded by the `UNIQUE` ledger constraint — a losing inserter rolls back its orphan expense. Pure mapping logic (member matching, share computation, hashing) lives in `src/lib/tricount/mapping.ts` and is unit-tested. Sync runs manually ("Sync now" on the `/sync` tab) and automatically once per browser session on app load (`useTricountAutoSync` in the app layout). Because synced rows are ordinary `expenses`, `budget_summary`, realtime, and the expense list need no special handling.

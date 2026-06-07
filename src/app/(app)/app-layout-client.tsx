@@ -1,10 +1,11 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 import { clearStorageKeys } from "@/lib/types"
-import { Receipt, Wallet, LogOut } from "lucide-react"
+import { Receipt, Wallet, RefreshCw, LogOut } from "lucide-react"
 import { UserProvider } from "@/lib/contexts/user-context"
 import type { UserData } from "@/lib/hooks/use-user"
 import { useKeyboardVisible } from "@/lib/hooks/use-keyboard-visible"
@@ -12,7 +13,39 @@ import { useKeyboardVisible } from "@/lib/hooks/use-keyboard-visible"
 const tabs = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/budget", label: "Budget", icon: Wallet },
+  { href: "/sync", label: "Sync", icon: RefreshCw },
 ] as const
+
+// Auto-sync the linked tricount once per browser session. The endpoint no-ops
+// quickly when no tricount is connected. Refreshes the route tree only when the
+// reconcile actually changed something, so it's cheap on a steady state.
+function useTricountAutoSync() {
+  const router = useRouter()
+  const ran = useRef(false)
+  useEffect(() => {
+    if (ran.current) return
+    ran.current = true
+    try {
+      if (sessionStorage.getItem("qb:tricount-autosynced")) return
+      sessionStorage.setItem("qb:tricount-autosynced", "1")
+    } catch {
+      // sessionStorage unavailable — fall through and sync this load.
+    }
+    void (async () => {
+      try {
+        const res = await fetch("/api/tricount/sync", { method: "POST" })
+        if (!res.ok) return
+        const data = await res.json()
+        const r = data?.result
+        if (r && (r.created > 0 || r.updated > 0 || r.deleted > 0)) {
+          router.refresh()
+        }
+      } catch {
+        // Best-effort background sync; ignore failures.
+      }
+    })()
+  }, [router])
+}
 
 export default function AppLayoutClient({
   children,
@@ -24,6 +57,7 @@ export default function AppLayoutClient({
   const router = useRouter()
   const pathname = usePathname()
   const isKeyboardVisible = useKeyboardVisible()
+  useTricountAutoSync()
 
   const handleLogout = async () => {
     clearStorageKeys()
