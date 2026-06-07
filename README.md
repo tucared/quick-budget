@@ -8,6 +8,7 @@ Scope: running discretionary spending only. Rent, subscriptions, and other fixed
 - Shared budget dashboard with real-time sync between partners
 - Mid-month rebalancing — move money between categories when priorities shift
 - Personal allowances tracked separately from shared spending
+- Connect a Tricount and sync your household's share of shared expenses (read-only)
 
 ## Background
 

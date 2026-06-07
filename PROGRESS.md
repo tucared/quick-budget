@@ -51,3 +51,10 @@ When logging an expense in BRL, I want to enter the amount I actually paid, so I
 ### [x] JTBD #10: Import historical data from current app
 When setting up the new system, I want to import my expense and budget data from CSV exports of my current app, so I have continuity of my financial history and can see trends without starting from zero
 
+---
+
+## External Sync
+
+### [x] JTBD #11: Sync shared expenses from Tricount
+When we already track some shared spending in a Tricount, I want to connect it once and have our household's share flow into Quick Budget automatically, so we see a complete picture without re-entering expenses by hand. Connect the tricount's share link on the **Sync** tab; each sync (manual "Sync now" or automatically once per session on app load) pulls the whole ledger and reconciles new, changed, and removed entries into the **Tricount** category. Only the share belonging to matched household members is counted — amounts shared with people outside the household are excluded. See DATA_MODEL.md (decision #9) for the data model; implementation lives in `src/lib/tricount/`.
+

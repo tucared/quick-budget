@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -285,6 +265,112 @@ export type Database = {
           },
         ]
       }
+      tricount_entry_map: {
+        Row: {
+          content_hash: string
+          created_at: string
+          expense_id: string
+          household_id: string
+          id: string
+          link_id: string
+          tricount_entry_id: number
+          updated_at: string
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          expense_id: string
+          household_id: string
+          id?: string
+          link_id: string
+          tricount_entry_id: number
+          updated_at?: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          expense_id?: string
+          household_id?: string
+          id?: string
+          link_id?: string
+          tricount_entry_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tricount_entry_map_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tricount_entry_map_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tricount_entry_map_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "tricount_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tricount_links: {
+        Row: {
+          created_at: string
+          default_category_id: string | null
+          household_id: string
+          id: string
+          last_synced_at: string | null
+          member_map: Json
+          public_identifier_token: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_category_id?: string | null
+          household_id: string
+          id?: string
+          last_synced_at?: string | null
+          member_map?: Json
+          public_identifier_token: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_category_id?: string | null
+          household_id?: string
+          id?: string
+          last_synced_at?: string | null
+          member_map?: Json
+          public_identifier_token?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tricount_links_default_category_id_fkey"
+            columns: ["default_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tricount_links_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: true
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -511,11 +597,7 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
 } as const
-

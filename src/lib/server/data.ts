@@ -9,6 +9,7 @@ import type {
   Expense,
   ExpenseWithDetails,
   MonthlyBudgetTarget,
+  TricountLink,
   UserData,
 } from "@/lib/types"
 
@@ -202,6 +203,27 @@ export async function getExpensesAndCategories(
     expenses: (payload.expenses ?? []) as ExpenseWithDetails[],
     categories: payload.categories ?? [],
   }
+}
+
+/**
+ * Server-side function to fetch the household's linked tricount (if any).
+ * Returns null when no Tricount has been connected.
+ * RLS filters by the caller's household — no explicit household_id needed.
+ */
+export async function getTricountLink(): Promise<TricountLink | null> {
+  const supabase = await getSupabase()
+
+  const { data, error } = await supabase
+    .from("tricount_links")
+    .select("*")
+    .maybeSingle()
+
+  if (error) {
+    console.error("Failed to fetch tricount link:", error)
+    return null
+  }
+
+  return data
 }
 
 /**

@@ -14,6 +14,7 @@ export type Expense = Tables['expenses']['Row']
 export type BudgetAllocation = Tables['budget_allocations']['Row']
 export type MonthlyBudgetTarget = Tables['monthly_budget_targets']['Row']
 export type BudgetSummary = Views['budget_summary']['Row']
+export type TricountLink = Tables['tricount_links']['Row']
 
 // Authenticated user data used across client and server
 export interface UserData {
