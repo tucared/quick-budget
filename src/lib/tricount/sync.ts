@@ -98,14 +98,15 @@ function expenseFields(
  * Reconcile one linked tricount into Quick Budget expenses.
  *
  * Pulls the full registry (all months), resolves each member to a household
- * user (manual overrides on `link.member_map`, else name auto-match), computes
- * each entry's household share, and upserts one expense per entry via the
- * tricount_entry_map idempotency ledger: new entries are inserted, changed ones
- * updated, and entries that disappeared (deleted, became settlements, dropped to
- * a zero household share, or whose member was un-mapped) have their mirrored
- * expense removed. Synced rows land in the shared Tricount category with their
- * description prefixed by the tricount title. Runs in the caller's session, so
- * RLS scopes every write to their household.
+ * user via the explicit `link.member_map` only (no name auto-match; members
+ * absent from the map are uncounted), computes each entry's household share, and
+ * upserts one expense per entry via the tricount_entry_map idempotency ledger:
+ * new entries are inserted, changed ones updated, and entries that disappeared
+ * (deleted, became settlements, dropped to a zero household share, or whose
+ * member was un-mapped) have their mirrored expense removed. Synced rows land in
+ * the shared Tricount category; the tricount title is surfaced as a read-only UI
+ * tag, not prefixed into the description. Runs in the caller's session, so RLS
+ * scopes every write to their household.
  */
 export async function runSync(
   supabase: DB,
