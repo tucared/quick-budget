@@ -1,4 +1,4 @@
-import { memo } from "react"
+import { memo, type ReactNode } from "react"
 import { Plus } from "lucide-react"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
@@ -20,6 +20,14 @@ interface CategoryBudgetCardProps {
   // and the projected "X left" figure, dropping the percentage / spent-allocated
   // rows so budget impact + Save stay reachable with the keyboard up.
   compact?: boolean
+  // Compact-only: when true, show the slice this expense puts into the category
+  // (additionalAmount) in parentheses after the name — so a split reads as
+  // "Dining Out (€10,00)" / "User One (€20,00)".
+  showFraction?: boolean
+  // Compact-only: inline control rendered in the top row before the "X left"
+  // figure (the cap checkbox on the category bar, the person buttons on the
+  // allowance bar).
+  trailing?: ReactNode
 }
 
 function CategoryBudgetCardImpl({
@@ -33,6 +41,8 @@ function CategoryBudgetCardImpl({
   additionalAmount = 0,
   loading = false,
   compact = false,
+  showFraction = false,
+  trailing,
 }: CategoryBudgetCardProps) {
   if (loading) {
     return (
@@ -76,10 +86,18 @@ function CategoryBudgetCardImpl({
           <span className="flex items-center gap-1 min-w-0 text-xs font-medium">
             {budget.category_icon && <span className="shrink-0 leading-none">{budget.category_icon}</span>}
             <span className="truncate">{budget.category_name}</span>
+            {showFraction && additionalAmount > 0 && (
+              <span className="shrink-0 font-normal text-muted-foreground">
+                ({formatCurrency(additionalAmount)})
+              </span>
+            )}
           </span>
-          <span className={`text-xs font-semibold shrink-0 ${willOverspend ? "text-destructive" : statusColor.text}`}>
-            {formatCurrency(additionalAmount > 0 ? newRemaining : remaining)} left{willOverspend && " ⚠️"}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {trailing}
+            <span className={`text-xs font-semibold ${willOverspend ? "text-destructive" : statusColor.text}`}>
+              {formatCurrency(additionalAmount > 0 ? newRemaining : remaining)} left{willOverspend && " ⚠️"}
+            </span>
+          </div>
         </div>
         <div className="h-1 bg-border rounded-full overflow-hidden flex">
           <div

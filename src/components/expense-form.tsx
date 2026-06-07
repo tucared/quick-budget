@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, ChevronDown } from "lucide-react"
+import { Check } from "lucide-react"
 import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
+import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
@@ -625,55 +625,65 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           <div className="overflow-hidden space-y-2 pt-0.5">
             {selectedCategory && (
               <>
+                {/* Category bar. When the amount exceeds the cap, an inline
+                    "Cap" checkbox (styled like the Cash checkbox) toggles the
+                    split (JTBD #8); the (€) fraction shows the capped slice. */}
                 <CategoryBudgetCard
                   budget={categoryBudget}
                   compact
+                  showFraction={isSplit}
+                  trailing={
+                    showCapControl ? (
+                      <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={applyCap}
+                          onChange={(e) => setApplyCap(e.target.checked)}
+                          className="h-4 w-4 rounded border-input accent-primary"
+                        />
+                        Cap
+                      </label>
+                    ) : undefined
+                  }
                   isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                   dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                   daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
                   additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
                 />
-                {/* Cap-with-overflow control (JTBD #8): one readable line — the
-                    amount over the cap, then an inline dropdown that collapses
-                    every choice (each allowance + "Don't cap") into the single
-                    current selection, expanded on demand via the native picker. */}
-                {showCapControl && (
-                  <div className="flex items-center gap-1.5 text-xs px-0.5">
-                    <span className="text-muted-foreground shrink-0">
-                      {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} over the{" "}
-                      {formatCurrency(capDerivation.capEUR, 2, "EUR")} cap
-                    </span>
-                    <span className="relative inline-flex items-center min-w-0">
-                      <select
-                        value={applyCap ? effectiveOverflowCategoryId ?? "" : "__nocap__"}
-                        onChange={(e) => {
-                          if (e.target.value === "__nocap__") {
-                            setApplyCap(false)
-                          } else {
-                            setApplyCap(true)
-                            setSelectedOverflowId(e.target.value)
-                          }
-                        }}
-                        aria-label="What to do with the amount over the cap"
-                        className="appearance-none bg-transparent font-medium text-foreground max-w-[10.5rem] truncate cursor-pointer rounded pr-4 focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {allowanceCategories.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            → {a.icon} {a.name}
-                          </option>
-                        ))}
-                        <option value="__nocap__">Don&apos;t cap</option>
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-0 h-3 w-3 text-muted-foreground" />
-                    </span>
-                  </div>
-                )}
+                {/* Overflow allowance bar. The person buttons on this line pick
+                    which allowance the overflow lands in (when >1 exists); the
+                    (€) fraction shows the overflow slice. */}
                 {isSplit && (
                   <CategoryBudgetCard
                     budget={overflowBudgetToShow}
                     compact
-                    showHeader
+                    showFraction
+                    trailing={
+                      allowanceCategories.length > 1 ? (
+                        <div className="flex gap-1">
+                          {allowanceCategories.map((a) => {
+                            const active = a.id === effectiveOverflowCategoryId
+                            return (
+                              <button
+                                type="button"
+                                key={a.id}
+                                onClick={() => setSelectedOverflowId(a.id)}
+                                className={`h-6 w-6 rounded text-sm border flex items-center justify-center transition-colors ${
+                                  active
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background border-border hover:border-foreground"
+                                }`}
+                                aria-label={`Send overflow to ${a.name}`}
+                                aria-pressed={active}
+                              >
+                                {a.icon}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : undefined
+                    }
                     isCurrentMonth={format(startOfMonth(new Date(expenseDate + 'T00:00:00')), 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')}
                     dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                     daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
