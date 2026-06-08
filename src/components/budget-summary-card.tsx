@@ -53,8 +53,11 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
         {/* Footer: spent line on the left, actual cash out on the right */}
         <div className="flex justify-between items-center text-xs gap-3">
           <span className="text-muted-foreground">
-            {formatCurrency(totalSpent)}
-            {!showCashflow && <> of {formatCurrency(paceBaseline)}</>} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
+            {showCashflow ? (
+              <>{formatCurrency(totalSpent)} / {formatCurrency(paceBaseline)} · {formatNumber(percentSpent, 0)}%</>
+            ) : (
+              <>{formatCurrency(totalSpent)} of {formatCurrency(paceBaseline)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}</>
+            )}
           </span>
           {showCashflow && (
             <span
