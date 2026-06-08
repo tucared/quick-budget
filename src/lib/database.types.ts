@@ -88,7 +88,7 @@ export type Database = {
           created_at: string
           exclude_from_budget_total: boolean
           household_id: string
-          icon: string | null
+          icon: string
           id: string
           is_active: boolean
           name: string
@@ -99,7 +99,7 @@ export type Database = {
           created_at?: string
           exclude_from_budget_total?: boolean
           household_id: string
-          icon?: string | null
+          icon: string
           id?: string
           is_active?: boolean
           name: string
@@ -110,7 +110,7 @@ export type Database = {
           created_at?: string
           exclude_from_budget_total?: boolean
           household_id?: string
-          icon?: string | null
+          icon?: string
           id?: string
           is_active?: boolean
           name?: string
