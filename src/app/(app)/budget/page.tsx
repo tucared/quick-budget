@@ -7,6 +7,7 @@ import {
   getMonthlyBudgetTarget,
   getExpensesAndCategories,
   getSyncedExpenseTitles,
+  getTricountMonthlyBalance,
 } from "@/lib/server/data"
 import { BudgetPageContent } from "@/components/budget-page-content"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -35,12 +36,13 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
 }
 
 async function BudgetPageData({ budgetMonth }: { budgetMonth: string }) {
-  const [user, { budgets, allowances }, target, { expenses, categories }, syncedExpenseTitles] = await Promise.all([
+  const [user, { budgets, allowances }, target, { expenses, categories }, syncedExpenseTitles, tricountBalance] = await Promise.all([
     getServerUser(),
     getBudgetAndAllowanceSummary(budgetMonth),
     getMonthlyBudgetTarget(budgetMonth),
     getExpensesAndCategories({ mode: "monthly", month: budgetMonth }),
     getSyncedExpenseTitles(),
+    getTricountMonthlyBalance(budgetMonth),
   ])
 
   if (!user) {
@@ -57,6 +59,7 @@ async function BudgetPageData({ budgetMonth }: { budgetMonth: string }) {
       householdId={user.householdId}
       budgetMonth={budgetMonth}
       syncedExpenseTitles={syncedExpenseTitles}
+      initialTricountBalance={tricountBalance}
     />
   )
 }

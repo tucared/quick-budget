@@ -387,13 +387,33 @@ REVOKE SELECT ON public.tricount_links FROM anon;
 -- changed (via `content_hash`), and removed entries across all months instead
 -- of re-importing duplicates. `expense_id` cascades, so deleting a synced
 -- expense in Quick Budget drops its mapping and the next sync re-creates it.
+--
+-- This table doubles as the owe/owed reconciliation ledger. A row exists for
+-- every *reconcilable* entry — ACTIVE NORMAL expenses AND ACTIVE INCOME — so the
+-- household's net Tricount balance (paid vs consumed) can be totalled per month
+-- and per link without re-fetching the registry. INCOME entries are NOT mirrored
+-- as budget expenses (the app does not track income as spend), so their rows
+-- carry `expense_id = NULL`; NORMAL expenses still point at their mirrored row.
+-- Both amounts are *signed* EUR: expense spend/cash-out is positive, income
+-- consumption/cash-in is negative.
+--   * `paid_converted_amount`  — household cash flow for the entry (the full
+--     entry amount when a household member paid; 0 when an outsider paid).
+--   * `share_converted_amount` — household consumption (sum of household members'
+--     allocations).
+-- Net owe/owed = SUM(paid_converted_amount − share_converted_amount): positive =
+-- the household is owed, negative = the household owes. `entry_date` is the
+-- entry's own date (mirrors the expense's date for NORMAL rows) so the monthly
+-- memo can aggregate without joining expenses.
 CREATE TABLE tricount_entry_map (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   link_id UUID NOT NULL REFERENCES tricount_links(id) ON DELETE CASCADE,
   tricount_entry_id BIGINT NOT NULL,
-  expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE,
   content_hash TEXT NOT NULL,
+  entry_date DATE NOT NULL DEFAULT '1970-01-01',
+  paid_converted_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  share_converted_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(link_id, tricount_entry_id)

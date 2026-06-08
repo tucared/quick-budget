@@ -8,10 +8,12 @@ import { fetchRegistry } from "./client"
 import {
   resolveMembers,
   mapEntry,
+  mapReconcileEntry,
   contentHash,
   type HouseholdUser,
   type MemberMap,
   type MappedEntry,
+  type ReconcileEntry,
 } from "./mapping"
 
 type DB = SupabaseClient<Database>
@@ -99,14 +101,17 @@ function expenseFields(
  *
  * Pulls the full registry (all months), resolves each member to a household
  * user via the explicit `link.member_map` only (no name auto-match; members
- * absent from the map are uncounted), computes each entry's household share, and
- * upserts one expense per entry via the tricount_entry_map idempotency ledger:
+ * absent from the map are uncounted), and upserts the tricount_entry_map ledger:
  * new entries are inserted, changed ones updated, and entries that disappeared
- * (deleted, became settlements, dropped to a zero household share, or whose
- * member was un-mapped) have their mirrored expense removed. Synced rows land in
- * the shared Tricount category; the tricount title is surfaced as a read-only UI
- * tag, not prefixed into the description. Runs in the caller's session, so RLS
- * scopes every write to their household.
+ * (deleted, became settlements, dropped to a zero household stake, or whose
+ * member was un-mapped) removed. Every reconcilable entry — NORMAL expenses AND
+ * INCOME — gets a ledger row carrying the signed owe/owed amounts (paid vs
+ * consumed). NORMAL expenses with a non-zero household share also mirror a budget
+ * expense in the shared Tricount category (the row's `expense_id`); INCOME is
+ * reconciled for owe/owed only, never mirrored as spend (`expense_id` null). The
+ * tricount title is surfaced as a read-only UI tag, not prefixed into the
+ * description. Runs in the caller's session, so RLS scopes every write to their
+ * household.
  */
 export async function runSync(
   supabase: DB,
@@ -132,34 +137,43 @@ export async function runSync(
   // Members still awaiting an explicit decision (not counted until mapped).
   const unmatchedMembers = resolved.filter((r) => r.status === "unset").map((r) => r.name)
 
-  // Desired state: tricountEntryId -> { mapped fields, final description, hash }.
+  // Desired state, keyed by tricount entry id. `rc` is the signed owe/owed
+  // reconciliation record (covers NORMAL + INCOME); `exp` is the mirrored budget
+  // expense, present only for NORMAL entries with a non-zero household share
+  // (INCOME is reconciled but never mirrored as spend).
   const desired = new Map<
     number,
-    { m: MappedEntry; description: string | null; hash: string }
+    { rc: ReconcileEntry; exp: MappedEntry | null; description: string | null; hash: string }
   >()
   for (const entry of registry.entries) {
-    const m = mapEntry(entry, householdIdSet)
-    if (!m) continue
+    const rc = mapReconcileEntry(entry, householdIdSet)
+    if (!rc) continue
+    const exp = mapEntry(entry, householdIdSet)
     // The mirrored row's description is the raw entry description; the tricount
     // name is surfaced as a tag in the UI (not prefixed here).
-    const description = m.description
+    const description = rc.description
     const hash = contentHash({
-      shareCents: m.shareCents,
-      currency: m.currency,
-      expenseDate: m.expenseDate,
+      shareCents: rc.shareCents,
+      paidCents: rc.paidCents,
+      currency: rc.currency,
+      expenseDate: rc.entryDate,
       description,
     })
-    desired.set(m.tricountEntryId, { m, description, hash })
+    desired.set(rc.tricountEntryId, { rc, exp, description, hash })
   }
 
-  // Current state from the idempotency ledger.
+  // Current state from the idempotency ledger. `expense_id` is null for income
+  // rows (reconciled, but not mirrored as an expense).
   const { data: existingRows, error: mapError } = await supabase
     .from("tricount_entry_map")
     .select("id, tricount_entry_id, expense_id, content_hash")
     .eq("link_id", link.id)
   if (mapError) throw new Error(`Failed to load sync map: ${mapError.message}`)
 
-  const existing = new Map<number, { id: string; expense_id: string; content_hash: string }>()
+  const existing = new Map<
+    number,
+    { id: string; expense_id: string | null; content_hash: string }
+  >()
   for (const r of existingRows ?? []) {
     existing.set(r.tricount_entry_id, {
       id: r.id,
@@ -174,7 +188,7 @@ export async function runSync(
   let deleted = 0
   let skipped = 0
 
-  for (const [entryId, { m, description, hash }] of desired) {
+  for (const [entryId, { rc, exp, description, hash }] of desired) {
     const prior = existing.get(entryId)
 
     if (prior && prior.content_hash === hash) {
@@ -182,45 +196,86 @@ export async function runSync(
       continue
     }
 
-    const rate = await getRateToEur(supabase, m.currency, m.expenseDate, rateCache)
-    const fields = expenseFields(m, description, rate, link.default_category_id)
+    const rate = await getRateToEur(supabase, rc.currency, rc.entryDate, rateCache)
+    // Signed EUR reconciliation amounts, stored on the ledger row.
+    const ledgerFields = {
+      entry_date: rc.entryDate,
+      paid_converted_amount: round2((rc.paidCents / 100) * rate),
+      share_converted_amount: round2((rc.shareCents / 100) * rate),
+      content_hash: hash,
+    }
 
     if (prior) {
-      // Changed entry — update the mirrored expense in place.
-      const { error: updErr } = await supabase
-        .from("expenses")
-        .update(fields)
-        .eq("id", prior.expense_id)
-      if (updErr) throw new Error(`Failed to update expense: ${updErr.message}`)
+      // Changed entry — reconcile the mirrored expense to the desired presence.
+      let expenseId = prior.expense_id
+      if (exp) {
+        const fields = expenseFields(exp, description, rate, link.default_category_id)
+        if (expenseId) {
+          const { error } = await supabase.from("expenses").update(fields).eq("id", expenseId)
+          if (error) throw new Error(`Failed to update expense: ${error.message}`)
+        } else {
+          // Entry gained a budget expense (e.g. INCOME → NORMAL).
+          expenseId = randomUUID()
+          const { error } = await supabase.from("expenses").insert({
+            id: expenseId,
+            household_id: householdId,
+            logged_by_user_id: userId,
+            ...fields,
+          })
+          if (error) throw new Error(`Failed to insert expense: ${error.message}`)
+        }
+      } else if (expenseId) {
+        // Entry lost its budget expense (e.g. NORMAL → INCOME). Deleting it
+        // cascades the ledger row away, so we re-insert a fresh income-only row.
+        const { error } = await supabase.from("expenses").delete().eq("id", expenseId)
+        if (error) throw new Error(`Failed to delete expense: ${error.message}`)
+        expenseId = null
+      }
 
-      const { error: mapUpdErr } = await supabase
-        .from("tricount_entry_map")
-        .update({ content_hash: hash })
-        .eq("id", prior.id)
-      if (mapUpdErr) throw new Error(`Failed to update sync map: ${mapUpdErr.message}`)
+      if (prior.expense_id && !expenseId) {
+        // The prior ledger row was cascaded away with its expense — re-create it.
+        const { error } = await supabase.from("tricount_entry_map").insert({
+          household_id: householdId,
+          link_id: link.id,
+          tricount_entry_id: entryId,
+          expense_id: null,
+          ...ledgerFields,
+        })
+        if (error) throw new Error(`Failed to insert sync map: ${error.message}`)
+      } else {
+        const { error } = await supabase
+          .from("tricount_entry_map")
+          .update({ expense_id: expenseId, ...ledgerFields })
+          .eq("id", prior.id)
+        if (error) throw new Error(`Failed to update sync map: ${error.message}`)
+      }
       updated++
     } else {
-      // New entry — insert expense, then claim it in the ledger.
-      const expenseId = randomUUID()
-      const { error: insErr } = await supabase.from("expenses").insert({
-        id: expenseId,
-        household_id: householdId,
-        logged_by_user_id: userId,
-        ...fields,
-      })
-      if (insErr) throw new Error(`Failed to insert expense: ${insErr.message}`)
+      // New entry — insert the expense (NORMAL only), then claim it in the ledger.
+      let expenseId: string | null = null
+      if (exp) {
+        expenseId = randomUUID()
+        const fields = expenseFields(exp, description, rate, link.default_category_id)
+        const { error: insErr } = await supabase.from("expenses").insert({
+          id: expenseId,
+          household_id: householdId,
+          logged_by_user_id: userId,
+          ...fields,
+        })
+        if (insErr) throw new Error(`Failed to insert expense: ${insErr.message}`)
+      }
 
       const { error: mapInsErr } = await supabase.from("tricount_entry_map").insert({
         household_id: householdId,
         link_id: link.id,
         tricount_entry_id: entryId,
         expense_id: expenseId,
-        content_hash: hash,
+        ...ledgerFields,
       })
       if (mapInsErr) {
-        // Likely a concurrent sync already claimed this entry — roll back the
+        // Likely a concurrent sync already claimed this entry — roll back any
         // orphan expense we just created so we don't leave a duplicate.
-        await supabase.from("expenses").delete().eq("id", expenseId)
+        if (expenseId) await supabase.from("expenses").delete().eq("id", expenseId)
         skipped++
         continue
       }
@@ -231,9 +286,18 @@ export async function runSync(
   // Reconcile removals: ledger entries no longer present in the desired set.
   for (const [entryId, prior] of existing) {
     if (desired.has(entryId)) continue
-    // Deleting the expense cascades the map row away (FK ON DELETE CASCADE).
-    const { error: delErr } = await supabase.from("expenses").delete().eq("id", prior.expense_id)
-    if (delErr) throw new Error(`Failed to delete expense: ${delErr.message}`)
+    if (prior.expense_id) {
+      // Deleting the expense cascades the map row away (FK ON DELETE CASCADE).
+      const { error: delErr } = await supabase.from("expenses").delete().eq("id", prior.expense_id)
+      if (delErr) throw new Error(`Failed to delete expense: ${delErr.message}`)
+    } else {
+      // Income row — no expense to cascade, drop the ledger row directly.
+      const { error: delErr } = await supabase
+        .from("tricount_entry_map")
+        .delete()
+        .eq("id", prior.id)
+      if (delErr) throw new Error(`Failed to delete sync map: ${delErr.message}`)
+    }
     deleted++
   }
 

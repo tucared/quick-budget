@@ -8,9 +8,11 @@ interface BudgetSummaryCardProps {
   target?: { amount: number; unallocated: number }
   dayOfMonth?: number
   daysInMonth?: number
+  /** Net Tricount owe/owed for the month (EUR; positive = owed to you, negative = you owe). */
+  tricountBalance?: number | null
 }
 
-export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: BudgetSummaryCardProps) {
+export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, tricountBalance }: BudgetSummaryCardProps) {
   const totalAllocated = budgets.reduce((sum, b) => sum + Number(b.allocated_amount), 0)
   const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spent_amount), 0)
   const paceBaseline = target ? target.amount : totalAllocated
@@ -46,6 +48,19 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth }: 
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}
           </span>
         </div>
+
+        {/* Tricount owe/owed reconciliation memo (cashflow adjustment for the month) */}
+        {tricountBalance != null && Math.abs(tricountBalance) >= 0.005 && (
+          <div className="mt-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
+            Tricount:{" "}
+            <span className="text-foreground font-medium">
+              {tricountBalance < 0
+                ? `you owe ${formatCurrency(Math.abs(tricountBalance))}`
+                : `you're owed ${formatCurrency(tricountBalance)}`}
+            </span>{" "}
+            this month
+          </div>
+        )}
 
       </CardContent>
     </Card>

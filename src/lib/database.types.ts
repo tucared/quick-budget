@@ -289,30 +289,39 @@ export type Database = {
         Row: {
           content_hash: string
           created_at: string
-          expense_id: string
+          entry_date: string
+          expense_id: string | null
           household_id: string
           id: string
           link_id: string
+          paid_converted_amount: number
+          share_converted_amount: number
           tricount_entry_id: number
           updated_at: string
         }
         Insert: {
           content_hash: string
           created_at?: string
-          expense_id: string
+          entry_date?: string
+          expense_id?: string | null
           household_id: string
           id?: string
           link_id: string
+          paid_converted_amount?: number
+          share_converted_amount?: number
           tricount_entry_id: number
           updated_at?: string
         }
         Update: {
           content_hash?: string
           created_at?: string
-          expense_id?: string
+          entry_date?: string
+          expense_id?: string | null
           household_id?: string
           id?: string
           link_id?: string
+          paid_converted_amount?: number
+          share_converted_amount?: number
           tricount_entry_id?: number
           updated_at?: string
         }
