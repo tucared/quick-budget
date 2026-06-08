@@ -1,5 +1,7 @@
 // Currency conversion utilities
 
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+
 // Currencies the user can pick when logging an expense. Order is preserved
 // for the EUR/BRL toggle. Add a new currency here AND in
 // FALLBACK_RATES_TO_EUR / CURRENCY_SYMBOLS below.
@@ -42,7 +44,7 @@ export async function fetchExchangeRateFromAPI(
   const url = `/api/exchange-rates?currency=${currency}&date=${dateParam}`
 
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    const response = await fetchWithTimeout(url)
     if (!response.ok) {
       throw new Error(`API responded with status ${response.status}`)
     }

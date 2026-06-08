@@ -9,6 +9,8 @@
  * multi-region / multi-instance setups, swap for a Redis-backed store.
  */
 
+import { NextResponse } from "next/server"
+
 interface RateLimitEntry {
   timestamps: number[]
 }
@@ -25,6 +27,9 @@ interface RateLimitResult {
   remaining: number
   retryAfterMs: number | null
 }
+
+/** The per-key check returned by {@link createRateLimiter}. */
+export type RateLimiter = (key: string) => RateLimitResult
 
 export function createRateLimiter({ maxRequests, windowMs }: RateLimitConfig) {
   const store = new Map<string, RateLimitEntry>()
@@ -77,4 +82,21 @@ export function createRateLimiter({ maxRequests, windowMs }: RateLimitConfig) {
       retryAfterMs: null,
     }
   }
+}
+
+/**
+ * Apply a limiter to `key` and, if the request is over the limit, return a ready
+ * `429` response with a `Retry-After` header. Returns `null` when allowed, so
+ * routes can write `const limited = rateLimitResponse(limiter, key); if (limited) return limited`.
+ */
+export function rateLimitResponse(limiter: RateLimiter, key: string): NextResponse | null {
+  const { allowed, retryAfterMs } = limiter(key)
+  if (allowed) return null
+  return NextResponse.json(
+    { error: "Too many requests. Please try again shortly." },
+    {
+      status: 429,
+      headers: { "Retry-After": String(Math.ceil((retryAfterMs ?? 1000) / 1000)) },
+    }
+  )
 }

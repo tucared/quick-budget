@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { getServerUser } from '@/lib/server/data'
+import { verifyAccessToken } from '@/lib/server/jwt-verify'
 import { fetchExchangeRate, adjustToWorkingDay } from '@/lib/exchange-rate-api'
-import { createRateLimiter } from '@/lib/rate-limit'
+import { createRateLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { isValidIsoDate } from '@/lib/date-utils'
 import { FALLBACK_RATES_TO_EUR } from '@/lib/currency'
 
 // 20 requests per user per minute — generous for normal use,
 // but prevents runaway loops from hammering Frankfurter.
 const rateLimiter = createRateLimiter({ maxRequests: 20, windowMs: 60_000 })
-
-// A real calendar date in YYYY-MM-DD form. The regex alone accepts impossible
-// dates (e.g. 2024-02-30) that `adjustToWorkingDay` would silently roll over,
-// so round-trip through Date to reject them up front.
-function isValidIsoDate(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
-  const d = new Date(s + 'T00:00:00Z')
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
-}
 
 /**
  * GET /api/exchange-rates?currency=BRL&date=2024-01-15
@@ -68,31 +60,27 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Verify the user is authenticated. Local JWKS verification (no network
-    // round-trip), consistent with the rest of the server data layer.
-    const user = await getServerUser()
-    if (!user) {
+    const supabase = await createServerSupabaseClient()
+
+    // Authenticate via local JWKS verification (no network round-trip). This
+    // route only needs a valid authenticated user, not a household, so verify
+    // the access token directly rather than via getServerUser (which also
+    // requires the household_id claim and would 401 — then silently fall back
+    // to a hardcoded rate — for a valid session that lacks it).
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const verdict = await verifyAccessToken(session?.access_token)
+    if (!verdict.ok) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       )
     }
 
-    const supabase = await createServerSupabaseClient()
-
     // Rate-limit by authenticated user ID
-    const { allowed, retryAfterMs } = rateLimiter(user.id)
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again shortly.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(Math.ceil((retryAfterMs ?? 1000) / 1000)),
-          },
-        }
-      )
-    }
+    const limited = rateLimitResponse(rateLimiter, verdict.claims.sub)
+    if (limited) return limited
 
     // Check if rate exists in database
     const { data: cachedRate, error: selectError } = await supabase

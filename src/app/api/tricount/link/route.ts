@@ -155,18 +155,18 @@ export async function DELETE(request: NextRequest) {
 
   // Always remove the mirrored expenses this link produced (no "keep" variant
   // — that left orphans). Deleting the expenses cascades their map rows away.
+  // Income rows carry a null expense_id (reconciled, never mirrored as spend);
+  // exclude them at the query so only real expense ids come back.
   const { data: maps, error: mapErr } = await supabase
     .from("tricount_entry_map")
     .select("expense_id")
     .eq("link_id", id)
+    .not("expense_id", "is", null)
   if (mapErr) {
     return NextResponse.json({ error: "Failed to read sync map" }, { status: 500 })
   }
-  // Income rows carry a null expense_id (reconciled, never mirrored as spend);
-  // drop them so only real expense ids reach the .in() delete.
-  const expenseIds = (maps ?? [])
-    .map((m) => m.expense_id)
-    .filter((id): id is string => id !== null)
+  // Non-null by the query filter above.
+  const expenseIds = (maps ?? []).map((m) => m.expense_id as string)
   if (expenseIds.length > 0) {
     const { error: delErr } = await supabase.from("expenses").delete().in("id", expenseIds)
     if (delErr) {

@@ -184,15 +184,23 @@ export async function runSync(
 
   const rateCache = new Map<string, number>()
 
+  // A reconcilable entry is unchanged (skippable) when its prior ledger row's
+  // hash matches. Shared by the prefetch and write loops below so the two
+  // passes over `desired` can't drift on what counts as "needs writing".
+  const isUnchanged = (entryId: number, hash: string): boolean => {
+    const prior = existing.get(entryId)
+    return !!prior && prior.content_hash === hash
+  }
+
   // Warm the rate cache before the write loop: resolve the distinct
   // (currency, date) pairs of entries that will actually be written (skipping
-  // hash-unchanged and EUR ones) concurrently, so the sequential loop below
-  // reads them from cache instead of awaiting a lookup per entry. Writes stay
-  // sequential — the unique-ledger rollback guard depends on that ordering.
+  // unchanged and EUR ones, which need no lookup) concurrently, so the
+  // sequential loop below reads them from cache instead of awaiting a lookup
+  // per entry. Writes stay sequential — the unique-ledger rollback guard
+  // depends on that ordering.
   const rateKeys = new Map<string, { currency: string; date: string }>()
   for (const [entryId, { rc, hash }] of desired) {
-    const prior = existing.get(entryId)
-    if (prior && prior.content_hash === hash) continue
+    if (isUnchanged(entryId, hash)) continue
     if (rc.currency === "EUR") continue
     rateKeys.set(`${rc.currency}:${rc.entryDate}`, { currency: rc.currency, date: rc.entryDate })
   }
@@ -210,7 +218,7 @@ export async function runSync(
   for (const [entryId, { rc, exp, description, hash }] of desired) {
     const prior = existing.get(entryId)
 
-    if (prior && prior.content_hash === hash) {
+    if (isUnchanged(entryId, hash)) {
       skipped++
       continue
     }

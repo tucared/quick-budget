@@ -1,5 +1,6 @@
 import "server-only"
 import { generateKeyPairSync, randomUUID } from "node:crypto"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import type { FetchedRegistry, TricountMembership } from "./types"
 
 // Read-only client for Tricount's undocumented app backend (bunq infra).
@@ -16,10 +17,6 @@ import type { FetchedRegistry, TricountMembership } from "./types"
 // and in production alike.
 
 const BASE_URL = "https://api.tricount.bunq.com"
-// Tricount's backend is undocumented and carries no SLA. Cap each call so a
-// hung upstream can't keep a serverless invocation (or a manual "Sync") open
-// until the platform timeout — the abort surfaces as the normal fetch error.
-const FETCH_TIMEOUT_MS = 10_000
 // Pins the app build the API expects in the User-Agent. Bump if the endpoint
 // starts rejecting the handshake after a Tricount app update.
 const USER_AGENT = "com.bunq.tricount.android:RELEASE:7.0.7:3174:ANDROID:13:C"
@@ -66,7 +63,7 @@ async function authenticate(): Promise<{ token: string; userId: number; headers:
     "Content-Type": "application/json",
   }
 
-  const res = await fetch(`${BASE_URL}/v1/session-registry-installation`, {
+  const res = await fetchWithTimeout(`${BASE_URL}/v1/session-registry-installation`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -74,7 +71,6 @@ async function authenticate(): Promise<{ token: string; userId: number; headers:
       client_public_key: pem,
       device_description: "Android",
     }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -106,12 +102,9 @@ async function authenticate(): Promise<{ token: string; userId: number; headers:
 export async function fetchRegistry(token: string): Promise<FetchedRegistry> {
   const { token: authToken, userId, headers } = await authenticate()
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${BASE_URL}/v1/user/${userId}/registry?public_identifier_token=${encodeURIComponent(token)}`,
-    {
-      headers: { ...headers, "X-Bunq-Client-Authentication": authToken },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    }
+    { headers: { ...headers, "X-Bunq-Client-Authentication": authToken } }
   )
 
   if (!res.ok) {
