@@ -601,7 +601,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       </div>
 
       {/* Category - tile grid for quick selection */}
-      <div className="space-y-1.5" aria-label="Category">
+      <div aria-label="Category">
         <CategoryTileSelector
           categories={categories}
           topCategoryIds={topCategoryIds}
@@ -610,19 +610,22 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           allOptions={getCategoryOptions()}
         />
         {formErrors.category_id && (
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-destructive mt-1.5">
             {formErrors.category_id}
           </p>
         )}
         {/* Budget status preview - compact, labelled bar(s) sit directly under
             the category tiles for immediate feedback. When the amount exceeds a
             category's cap, an explicit labelled control between the bars lets
-            the user pick where the overflow goes (or skip the cap). */}
+            the user pick where the overflow goes (or skip the cap). The top gap
+            lives inside the collapsing region (pt-2) so it animates away and the
+            collapsed block adds no height — keeping the form's gaps uniform. */}
         <div
           className="grid transition-[grid-template-rows] duration-200 ease-out"
           style={{ gridTemplateRows: selectedCategory ? '1fr' : '0fr' }}
         >
-          <div className="overflow-hidden space-y-2 pt-0.5">
+          <div className="overflow-hidden">
+            <div className="space-y-2 pt-2">
             {selectedCategory && (
               <>
                 {/* Category bar. When the amount exceeds the cap, an inline
@@ -692,6 +695,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                 )}
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
@@ -701,7 +705,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         <Textarea
           ref={descriptionRef}
           id="description"
-          placeholder="Optional notes about this expense"
+          placeholder="Expense description"
           rows={1}
           className="min-h-0 resize-none overflow-hidden"
           value={description}

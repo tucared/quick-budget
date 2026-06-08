@@ -70,7 +70,6 @@ export default function LoginForm() {
                 id="email"
                 name="email"
                 type="email"
-                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

@@ -501,7 +501,7 @@ function EditExpenseForm({
         {/* Description */}
         <div>
           <Textarea
-            placeholder="Optional notes about this expense"
+            placeholder="Expense description"
             rows={1}
             className="min-h-0 resize-none overflow-hidden"
             value={description}
