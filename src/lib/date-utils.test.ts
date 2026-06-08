@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { monthPrefix, nextMonthString, parseLocalDate } from "@/lib/date-utils"
+import { isValidIsoDate, monthPrefix, nextMonthString, parseLocalDate } from "@/lib/date-utils"
 
 describe("parseLocalDate", () => {
   it("returns a Date with the requested local Y/M/D", () => {
@@ -65,5 +65,33 @@ describe("monthPrefix", () => {
 
   it("works for December", () => {
     expect(monthPrefix("2026-12-31")).toBe("2026-12")
+  })
+})
+
+describe("isValidIsoDate", () => {
+  it("accepts a real calendar date", () => {
+    expect(isValidIsoDate("2024-01-15")).toBe(true)
+  })
+
+  it("accepts a leap day in a leap year", () => {
+    expect(isValidIsoDate("2024-02-29")).toBe(true)
+  })
+
+  it("rejects an impossible day that Date would roll over (2024-02-30)", () => {
+    expect(isValidIsoDate("2024-02-30")).toBe(false)
+  })
+
+  it("rejects Feb 29 in a non-leap year", () => {
+    expect(isValidIsoDate("2023-02-29")).toBe(false)
+  })
+
+  it("rejects an out-of-range month", () => {
+    expect(isValidIsoDate("2024-13-01")).toBe(false)
+  })
+
+  it("rejects wrong shapes (missing zero-padding, slashes, empty)", () => {
+    expect(isValidIsoDate("2024-1-1")).toBe(false)
+    expect(isValidIsoDate("2024/01/01")).toBe(false)
+    expect(isValidIsoDate("")).toBe(false)
   })
 })

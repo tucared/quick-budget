@@ -1,6 +1,8 @@
 // Exchange rate API utilities
 // Uses Frankfurter (https://www.frankfurter.dev) — free, no API key, ECB data
 
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+
 interface FrankfurterResponse {
   base: string
   date: string
@@ -57,7 +59,7 @@ export async function fetchExchangeRate(
 
   // Cap the upstream call so a hung Frankfurter request can't stall the route
   // (and the Tricount sync, which resolves rates through this path).
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+  const response = await fetchWithTimeout(url)
 
   if (!response.ok) {
     throw new Error(`Frankfurter API responded with status ${response.status}`)
