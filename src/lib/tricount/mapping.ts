@@ -105,6 +105,50 @@ export function householdShareCents(
   return Math.abs(cents)
 }
 
+/**
+ * The household's *signed* share of an entry, in cents — like
+ * `householdShareCents` but preserving Tricount's sign so income and expenses
+ * unify. Expense allocations are negative (consumption), income allocations are
+ * positive (money received), so we negate: a NORMAL expense yields a positive
+ * share (cash consumed), an INCOME entry a negative share (cash received). Used
+ * only for owe/owed reconciliation — the mirrored budget expense keeps using the
+ * absolute `householdShareCents`.
+ */
+export function signedHouseholdShareCents(
+  entry: Entry,
+  householdMemberIds: Set<number>
+): number {
+  let cents = 0
+  for (const alloc of entry.allocations ?? []) {
+    const mid = alloc.membership?.RegistryMembershipNonUser?.id
+    if (mid != null && householdMemberIds.has(mid)) {
+      cents += parseDecimalToCents(alloc.amount.value)
+    }
+  }
+  // Normalize −0 → 0 so the signed value compares and stores cleanly.
+  return cents === 0 ? 0 : -cents
+}
+
+/**
+ * The *signed* cash flowing through the household for an entry, in cents: the
+ * full entry amount when a household member is the payer (`membership_owned`),
+ * else 0. Negated so it matches the share sign convention — a NORMAL expense
+ * paid by the household is positive (cash out), an INCOME received by the
+ * household is negative (cash in). The household's net balance on the entry is
+ * `paid − share`: positive = owed to the household, negative = the household
+ * owes.
+ */
+export function paidByHouseholdCents(
+  entry: Entry,
+  householdMemberIds: Set<number>
+): number {
+  const payerId = entry.membership_owned?.RegistryMembershipNonUser?.id
+  if (payerId != null && householdMemberIds.has(payerId)) {
+    return -parseDecimalToCents(entry.amount?.value ?? "0")
+  }
+  return 0
+}
+
 /** Date-only (YYYY-MM-DD) from a Tricount timestamp like "2026-06-07 13:33:31.295". */
 export function entryDateOnly(dateStr: string): string {
   return (dateStr ?? "").slice(0, 10)
@@ -113,29 +157,47 @@ export function entryDateOnly(dateStr: string): string {
 /**
  * Whether an entry should produce a Quick Budget expense at all: only ACTIVE,
  * NORMAL entries. BALANCE rows are member-to-member settlements (not spend),
- * and non-active rows are deletions to reconcile away.
+ * and non-active rows are deletions to reconcile away. INCOME entries are
+ * reconciled for owe/owed (see `isReconcilableEntry`) but never mirrored as
+ * budget expenses — the app does not track income as spend.
  */
 export function isSyncableEntry(entry: Entry): boolean {
   return entry.status === "ACTIVE" && entry.type_transaction === "NORMAL"
 }
 
-// Deterministic FNV-1a hash (hex) of the fields that, when changed, should
-// update the mirrored expense. The caller passes the raw Tricount description
-// (the tricount title is surfaced as a UI tag, not stored on the row, so a
-// rename needs no expense update); the EUR rate is intentionally excluded so
-// day-to-day rate caching never triggers spurious updates.
+/**
+ * Whether an entry counts toward the household's owe/owed reconciliation: ACTIVE
+ * NORMAL expenses AND ACTIVE INCOME. BALANCE settlements stay excluded (settling
+ * is out of scope). Superset of `isSyncableEntry`.
+ */
+export function isReconcilableEntry(entry: Entry): boolean {
+  return (
+    entry.status === "ACTIVE" &&
+    (entry.type_transaction === "NORMAL" || entry.type_transaction === "INCOME")
+  )
+}
+
+// Deterministic FNV-1a hash (hex) of the Tricount-derived fields that, when
+// changed, should re-reconcile the entry. `shareCents` and `paidCents` are the
+// *signed* reconciliation amounts, so a change to either the household's share
+// or who paid is detected. The caller passes the raw Tricount description (the
+// tricount title is surfaced as a UI tag, not stored on the row, so a rename
+// needs no update); the EUR rate is intentionally excluded so day-to-day rate
+// caching never triggers spurious updates.
 export function contentHash(parts: {
   shareCents: number
+  paidCents: number
   currency: string
   expenseDate: string
   description: string | null
 }): string {
   const canonical = [
     parts.shareCents,
+    parts.paidCents,
     parts.currency,
     parts.expenseDate,
     parts.description ?? "",
-  ].join("")
+  ].join("|")
   let h = 0x811c9dc5
   for (let i = 0; i < canonical.length; i++) {
     h ^= canonical.charCodeAt(i)
@@ -172,5 +234,42 @@ export function mapEntry(
     currency: entry.amount?.currency ?? "EUR",
     expenseDate,
     description: entry.description ?? null,
+  }
+}
+
+export interface ReconcileEntry {
+  tricountEntryId: number
+  entryDate: string
+  currency: string
+  description: string | null
+  shareCents: number // signed household consumption (expense +, income −)
+  paidCents: number // signed household cash flow (paid out +, received −)
+}
+
+/**
+ * Map one registry entry to its owe/owed reconciliation record (signed share +
+ * paid), covering NORMAL expenses and INCOME alike. Returns null when the entry
+ * isn't reconcilable, has no valid date, or leaves the household with no stake
+ * (neither consumed nor paid anything). Unlike `mapEntry`, this never filters on
+ * a zero share — a household member paying an entry fully allocated to outsiders
+ * still produces a balance.
+ */
+export function mapReconcileEntry(
+  entry: Entry,
+  householdMemberIds: Set<number>
+): ReconcileEntry | null {
+  if (!isReconcilableEntry(entry)) return null
+  const entryDate = entryDateOnly(entry.date)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) return null
+  const shareCents = signedHouseholdShareCents(entry, householdMemberIds)
+  const paidCents = paidByHouseholdCents(entry, householdMemberIds)
+  if (shareCents === 0 && paidCents === 0) return null
+  return {
+    tricountEntryId: entry.id,
+    entryDate,
+    currency: entry.amount?.currency ?? "EUR",
+    description: entry.description ?? null,
+    shareCents,
+    paidCents,
   }
 }

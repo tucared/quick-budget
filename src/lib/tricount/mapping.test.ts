@@ -3,14 +3,18 @@ import {
   resolveMembers,
   parseDecimalToCents,
   householdShareCents,
+  signedHouseholdShareCents,
+  paidByHouseholdCents,
   entryDateOnly,
   isSyncableEntry,
+  isReconcilableEntry,
   contentHash,
   mapEntry,
+  mapReconcileEntry,
   type HouseholdUser,
   type RegistryMember,
 } from "./mapping"
-import type { TricountRegistryEntry } from "./types"
+import type { TricountMembership, TricountRegistryEntry } from "./types"
 
 type Entry = TricountRegistryEntry["RegistryEntry"]
 
@@ -25,11 +29,18 @@ const MEMBERS: RegistryMember[] = [
   { id: 3, name: "Other User" }, // outsider
 ]
 
-function alloc(memberId: number, value: string) {
+function membership(memberId: number): TricountMembership {
   return {
-    amount: { currency: "EUR", value },
-    membership: { RegistryMembershipNonUser: { id: memberId, uuid: "x", alias: { pointer: { type: "UUID", value: "x", name: "n" } } } },
+    RegistryMembershipNonUser: {
+      id: memberId,
+      uuid: "x",
+      alias: { pointer: { type: "UUID", value: "x", name: "n" } },
+    },
   }
+}
+
+function alloc(memberId: number, value: string) {
+  return { amount: { currency: "EUR", value }, membership: membership(memberId) }
 }
 
 function entry(overrides: Partial<Entry> = {}): Entry {
@@ -41,10 +52,25 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     description: "Test Expense",
     type: "MANUAL",
     type_transaction: "NORMAL",
+    membership_owned: membership(1), // paid by household member 1
     allocations: [alloc(3, "-74.00"), alloc(1, "-74.00"), alloc(2, "-74.00")],
     date: "2026-06-07 13:33:31.295000",
     ...overrides,
   } as Entry
+}
+
+// Income matches the real "Test Income" fixture: positive amount + positive
+// allocations, paid by household member 1.
+function incomeEntry(overrides: Partial<Entry> = {}): Entry {
+  return entry({
+    id: 500,
+    description: "Test Income",
+    type_transaction: "INCOME",
+    amount: { currency: "EUR", value: "500.00" },
+    membership_owned: membership(1),
+    allocations: [alloc(3, "166.67"), alloc(1, "166.67"), alloc(2, "166.66")],
+    ...overrides,
+  })
 }
 
 describe("resolveMembers (explicit only — no auto-match)", () => {
@@ -106,26 +132,56 @@ describe("entryDateOnly", () => {
   })
 })
 
-describe("isSyncableEntry", () => {
-  it("accepts ACTIVE NORMAL", () => {
+describe("signedHouseholdShareCents", () => {
+  it("is positive (consumption) for a NORMAL expense", () => {
+    expect(signedHouseholdShareCents(entry(), new Set([1, 2]))).toBe(14800)
+  })
+  it("is negative (money received) for INCOME", () => {
+    // 166.67 + 166.66 = 333.33 received → −33333
+    expect(signedHouseholdShareCents(incomeEntry(), new Set([1, 2]))).toBe(-33333)
+  })
+})
+
+describe("paidByHouseholdCents", () => {
+  it("is the full positive amount when a household member paid an expense", () => {
+    expect(paidByHouseholdCents(entry(), new Set([1, 2]))).toBe(22200)
+  })
+  it("is zero when an outsider paid", () => {
+    expect(paidByHouseholdCents(entry({ membership_owned: membership(3) }), new Set([1, 2]))).toBe(0)
+  })
+  it("is zero when no payer is set", () => {
+    expect(paidByHouseholdCents(entry({ membership_owned: undefined }), new Set([1, 2]))).toBe(0)
+  })
+  it("is negative (cash in) when a household member received INCOME", () => {
+    expect(paidByHouseholdCents(incomeEntry(), new Set([1, 2]))).toBe(-50000)
+  })
+})
+
+describe("isSyncableEntry / isReconcilableEntry", () => {
+  it("syncable accepts ACTIVE NORMAL only", () => {
     expect(isSyncableEntry(entry())).toBe(true)
+    expect(isSyncableEntry(incomeEntry())).toBe(false)
   })
-  it("rejects BALANCE settlements", () => {
+  it("reconcilable accepts ACTIVE NORMAL and INCOME", () => {
+    expect(isReconcilableEntry(entry())).toBe(true)
+    expect(isReconcilableEntry(incomeEntry())).toBe(true)
+  })
+  it("both reject BALANCE settlements and non-active rows", () => {
     expect(isSyncableEntry(entry({ type_transaction: "BALANCE" }))).toBe(false)
-  })
-  it("rejects non-active rows", () => {
-    expect(isSyncableEntry(entry({ status: "DELETED" }))).toBe(false)
+    expect(isReconcilableEntry(entry({ type_transaction: "BALANCE" }))).toBe(false)
+    expect(isReconcilableEntry(entry({ status: "DELETED" }))).toBe(false)
   })
 })
 
 describe("contentHash", () => {
-  const base = { shareCents: 14800, currency: "EUR", expenseDate: "2026-06-07", description: "Test" }
+  const base = { shareCents: 14800, paidCents: 22200, currency: "EUR", expenseDate: "2026-06-07", description: "Test" }
   it("is deterministic", () => {
     expect(contentHash(base)).toBe(contentHash({ ...base }))
   })
-  it("changes when a field changes", () => {
+  it("changes when share, payer, or description changes", () => {
     expect(contentHash(base)).not.toBe(contentHash({ ...base, description: "Changed" }))
     expect(contentHash(base)).not.toBe(contentHash({ ...base, shareCents: 14801 }))
+    expect(contentHash(base)).not.toBe(contentHash({ ...base, paidCents: 0 }))
   })
 })
 
@@ -144,5 +200,58 @@ describe("mapEntry", () => {
   })
   it("returns null for BALANCE settlements", () => {
     expect(mapEntry(entry({ type_transaction: "BALANCE" }), new Set([1, 2]))).toBeNull()
+  })
+})
+
+describe("mapReconcileEntry (owe/owed, signed)", () => {
+  const HH = new Set([1, 2])
+  const net = (e: Entry) => {
+    const rc = mapReconcileEntry(e, HH)
+    return rc && (rc.paidCents - rc.shareCents) / 100
+  }
+
+  it("expense paid by household: +74 owed (paid 222 − share 148)", () => {
+    expect(net(entry())).toBe(74)
+  })
+  it("expense paid by an outsider: −60 owe (paid 0 − share 60)", () => {
+    // member 1 not allocated; member 2 owes 60; outsider 3 paid the 120.
+    const e = entry({
+      amount: { currency: "EUR", value: "-120.00" },
+      membership_owned: membership(3),
+      allocations: [alloc(3, "-60.00"), alloc(2, "-60.00")],
+    })
+    expect(net(e)).toBe(-60)
+  })
+  it("income received by household: −166.67 owe (paid −500 − share −333.33)", () => {
+    expect(net(incomeEntry())).toBeCloseTo(-166.67, 2)
+  })
+  it("produces a record for INCOME (so it reconciles without a budget expense)", () => {
+    const rc = mapReconcileEntry(incomeEntry(), HH)
+    expect(rc).not.toBeNull()
+    expect(rc!.shareCents).toBe(-33333)
+    expect(rc!.paidCents).toBe(-50000)
+    // INCOME never mirrors a budget expense.
+    expect(mapEntry(incomeEntry(), HH)).toBeNull()
+  })
+  it("returns null when the household neither paid nor consumed", () => {
+    const e = entry({
+      membership_owned: membership(3),
+      allocations: [alloc(3, "-74.00")],
+    })
+    expect(mapReconcileEntry(e, HH)).toBeNull()
+  })
+  it("reconciles a household-paid, outsider-only entry (paid, zero share)", () => {
+    // Household member 1 paid 100, fully allocated to outsider 3.
+    const e = entry({
+      amount: { currency: "EUR", value: "-100.00" },
+      membership_owned: membership(1),
+      allocations: [alloc(3, "-100.00")],
+    })
+    const rc = mapReconcileEntry(e, HH)
+    expect(rc).not.toBeNull()
+    expect(rc!.shareCents).toBe(0)
+    expect(rc!.paidCents).toBe(10000)
+    // No budget expense (zero household share), but it still owes a balance.
+    expect(mapEntry(e, HH)).toBeNull()
   })
 })

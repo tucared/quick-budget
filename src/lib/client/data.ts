@@ -71,3 +71,34 @@ export async function fetchMonthlyExpenses(
 
   return { data, error }
 }
+
+/**
+ * Net Tricount owe/owed balance for a month (EUR): sum of `paid − consumed` over
+ * the household's reconciled entries that month. Mirrors
+ * `getTricountMonthlyBalance` in server/data.ts; kept live after the on-load
+ * auto-sync. Returns null (no entries) so the budget memo can be hidden.
+ */
+export async function fetchTricountMonthlyBalance(
+  supabase: SupabaseClient,
+  householdId: string,
+  budgetMonth: string
+): Promise<{ data: number | null; error: unknown }> {
+  const { data, error } = await supabase
+    .from("tricount_entry_map")
+    .select("paid_converted_amount, share_converted_amount")
+    .eq("household_id", householdId)
+    .gte("entry_date", budgetMonth)
+    .lt("entry_date", nextMonthString(budgetMonth))
+
+  if (error || !data || data.length === 0) {
+    return { data: null, error }
+  }
+
+  const cents = data.reduce(
+    (sum, r) =>
+      sum +
+      Math.round((Number(r.paid_converted_amount) - Number(r.share_converted_amount)) * 100),
+    0
+  )
+  return { data: cents / 100, error: null }
+}

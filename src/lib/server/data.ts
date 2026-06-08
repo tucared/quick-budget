@@ -270,7 +270,84 @@ export async function getSyncedExpenseTitles(): Promise<Record<string, string>> 
 
   const result: Record<string, string> = {}
   for (const m of maps ?? []) {
+    // Income rows carry no expense_id (reconciled, not mirrored as spend).
+    if (!m.expense_id) continue
     result[m.expense_id] = titleByLink.get(m.link_id) ?? "Tricount"
+  }
+  return result
+}
+
+/**
+ * Net Tricount owe/owed balance for a month, in EUR: the sum over every
+ * reconciled entry (NORMAL expenses + INCOME) of `paid − consumed`. Positive =
+ * the household is owed (it fronted others' share); negative = the household
+ * owes (someone fronted its share). Surfaced as the month-end cashflow memo on
+ * the budget page. Returns null when the household has no reconciled entries
+ * that month (so the memo can be hidden). RLS scopes to the caller's household.
+ */
+export async function getTricountMonthlyBalance(
+  budgetMonth?: string
+): Promise<number | null> {
+  const supabase = await getSupabase()
+  const month = budgetMonth || format(startOfMonth(new Date()), "yyyy-MM-dd")
+
+  const { data, error } = await supabase
+    .from("tricount_entry_map")
+    .select("paid_converted_amount, share_converted_amount")
+    .gte("entry_date", month)
+    .lt("entry_date", nextMonthString(month))
+
+  if (error) {
+    console.error("Failed to fetch tricount monthly balance:", error)
+    return null
+  }
+  if (!data || data.length === 0) return null
+
+  const cents = data.reduce(
+    (sum, r) =>
+      sum +
+      Math.round((Number(r.paid_converted_amount) - Number(r.share_converted_amount)) * 100),
+    0
+  )
+  return cents / 100
+}
+
+/** Per-link signed owe/owed totals (paid & consumed, EUR) for the Sync tab. */
+export interface TricountLinkBalance {
+  paid: number
+  share: number
+}
+
+/**
+ * Per-link owe/owed totals across all months, in EUR: for each link, the signed
+ * sums of `paid_converted_amount` and `share_converted_amount` over its
+ * reconciled entries (NORMAL + INCOME). The Sync tab renders the full breakdown
+ * (you paid / your share / net). RLS scopes to the caller's household.
+ */
+export async function getTricountLinkBalances(): Promise<Record<string, TricountLinkBalance>> {
+  const supabase = await getSupabase()
+
+  const { data, error } = await supabase
+    .from("tricount_entry_map")
+    .select("link_id, paid_converted_amount, share_converted_amount")
+
+  if (error) {
+    console.error("Failed to fetch tricount link balances:", error)
+    return {}
+  }
+
+  // Accumulate in integer cents to avoid float drift, then convert back.
+  const cents = new Map<string, { paid: number; share: number }>()
+  for (const r of data ?? []) {
+    const acc = cents.get(r.link_id) ?? { paid: 0, share: 0 }
+    acc.paid += Math.round(Number(r.paid_converted_amount) * 100)
+    acc.share += Math.round(Number(r.share_converted_amount) * 100)
+    cents.set(r.link_id, acc)
+  }
+
+  const result: Record<string, TricountLinkBalance> = {}
+  for (const [linkId, acc] of cents) {
+    result[linkId] = { paid: acc.paid / 100, share: acc.share / 100 }
   }
   return result
 }

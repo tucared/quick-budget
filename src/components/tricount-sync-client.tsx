@@ -6,12 +6,16 @@ import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check, Pause, Play } fr
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { TricountLink } from "@/lib/types"
+import { formatCurrency } from "@/lib/currency"
 import {
   resolveMembers,
   type HouseholdUser,
   type RegistryMember,
   type MemberMap,
 } from "@/lib/tricount/mapping"
+
+/** Per-link signed owe/owed totals (EUR). Mirrors getTricountLinkBalances. */
+type LinkBalance = { paid: number; share: number }
 
 interface SyncResult {
   title: string
@@ -28,9 +32,11 @@ const EXCLUDE = "__exclude__"
 export function TricountSyncClient({
   initialLinks,
   householdUsers,
+  linkBalances,
 }: {
   initialLinks: TricountLink[]
   householdUsers: HouseholdUser[]
+  linkBalances: Record<string, LinkBalance>
 }) {
   const router = useRouter()
   const [links, setLinks] = useState<TricountLink[]>(initialLinks)
@@ -230,6 +236,7 @@ export function TricountSyncClient({
               key={link.id}
               link={link}
               householdUsers={householdUsers}
+              balance={linkBalances[link.id]}
               result={results[link.id]}
               busy={busy}
               editing={editing === link.id}
@@ -279,6 +286,7 @@ export function TricountSyncClient({
 function LinkCard({
   link,
   householdUsers,
+  balance,
   result,
   busy,
   editing,
@@ -290,6 +298,7 @@ function LinkCard({
 }: {
   link: TricountLink
   householdUsers: HouseholdUser[]
+  balance?: LinkBalance
   result?: LinkResult
   busy: string | null
   editing: boolean
@@ -307,6 +316,9 @@ function LinkCard({
   const mapped = resolved.filter((r) => r.status === "mapped").length
   const excluded = resolved.filter((r) => r.status === "excluded").length
   const needsMapping = resolved.filter((r) => r.status === "unset").length
+  // Net owe/owed = household cash paid − household share consumed (signed EUR,
+  // income included). Positive = you're owed, negative = you owe.
+  const net = balance ? Math.round((balance.paid - balance.share) * 100) / 100 : null
 
   return (
     <div className={`rounded-md border bg-card p-3 space-y-3 ${paused ? "opacity-60" : ""}`}>
@@ -411,6 +423,21 @@ function LinkCard({
               · {needsMapping} need mapping
             </button>
           )}
+        </div>
+      )}
+
+      {net != null && (
+        <div className="rounded-md bg-muted/40 px-2.5 py-2 text-xs space-y-0.5">
+          <div className="text-muted-foreground">
+            You paid {formatCurrency(balance!.paid)} · your share {formatCurrency(balance!.share)}
+          </div>
+          <div className="font-medium text-foreground">
+            {Math.abs(net) < 0.005
+              ? "Settled up"
+              : net < 0
+                ? `You owe ${formatCurrency(Math.abs(net))}`
+                : `You're owed ${formatCurrency(net)}`}
+          </div>
         </div>
       )}
 

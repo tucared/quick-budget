@@ -9,6 +9,7 @@ import {
   fetchBudgetAndAllowanceSummary,
   fetchMonthlyBudgetTarget,
   fetchMonthlyExpenses,
+  fetchTricountMonthlyBalance,
 } from "@/lib/client/data"
 import { BudgetSummaryCard } from "@/components/budget-summary-card"
 import dynamic from "next/dynamic"
@@ -37,6 +38,8 @@ interface BudgetPageContentProps {
   budgetMonth: string
   /** expense id → tricount title for rows mirrored by sync (read-only in the drill-down). */
   syncedExpenseTitles?: Record<string, string>
+  /** Net Tricount owe/owed for the month (EUR; +owed/−owe), or null when none. */
+  initialTricountBalance?: number | null
 }
 
 export function BudgetPageContent({
@@ -48,11 +51,15 @@ export function BudgetPageContent({
   householdId,
   budgetMonth,
   syncedExpenseTitles,
+  initialTricountBalance,
 }: BudgetPageContentProps) {
   const [budgets, setBudgets] = useState<BudgetSummary[]>(initialBudgets)
   const [allowances, setAllowances] = useState<BudgetSummary[]>(initialAllowances)
   const [target, setTarget] = useState<MonthlyBudgetTarget | null>(initialTarget)
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
+  const [tricountBalance, setTricountBalance] = useState<number | null>(
+    initialTricountBalance ?? null
+  )
   const [error, setError] = useState("")
   const [editOpen, setEditOpen] = useState(false)
   const [rebalanceOpen, setRebalanceOpen] = useState(false)
@@ -77,6 +84,8 @@ export function BudgetPageContent({
   useEffect(() => { setTarget(initialTarget) }, [initialTarget])
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setExpenses(initialExpenses) }, [initialExpenses])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setTricountBalance(initialTricountBalance ?? null) }, [initialTricountBalance])
 
   function reloadData() {
     const supabase = createClient()
@@ -102,7 +111,8 @@ export function BudgetPageContent({
     Promise.all([
       fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
       fetchMonthlyExpenses(supabase, householdId, budgetMonth),
-    ]).then(([summaryResult, expensesResult]) => {
+      fetchTricountMonthlyBalance(supabase, householdId, budgetMonth),
+    ]).then(([summaryResult, expensesResult, tricountResult]) => {
       if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
       else if (summaryResult.data) {
         setBudgets(summaryResult.data.budgets)
@@ -110,6 +120,8 @@ export function BudgetPageContent({
       }
       if (expensesResult.error) setError(getErrorMessage(expensesResult.error))
       else if (expensesResult.data) setExpenses(expensesResult.data)
+      // Synced expense changes (incl. on-load auto-sync) shift the owe/owed memo.
+      if (!tricountResult.error) setTricountBalance(tricountResult.data)
     })
   }
 
@@ -193,6 +205,7 @@ export function BudgetPageContent({
             target={hasTarget ? { amount: targetAmount, unallocated } : undefined}
             dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
             daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
+            tricountBalance={tricountBalance}
           />
 
           {/* Burndown Chart */}
