@@ -176,7 +176,10 @@ CREATE TABLE categories (
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   exclude_from_budget_total BOOLEAN NOT NULL DEFAULT FALSE,
-  icon TEXT,
+  -- Every category carries a non-empty emoji. The expense list shows the icon
+  -- as the sole category cue when a description replaces the category name as a
+  -- row's title, so the icon must always be present.
+  icon TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   -- Optional cap configuration (JTBD #8). When set, expenses logged against
   -- this category in amounts exceeding `cap_amount` (EUR-equivalent) surface
@@ -189,7 +192,8 @@ CREATE TABLE categories (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT categories_cap_positive CHECK (
     cap_amount IS NULL OR cap_amount > 0
-  )
+  ),
+  CONSTRAINT categories_icon_not_empty CHECK (btrim(icon) <> '')
 );
 
 CREATE INDEX idx_categories_household ON categories(household_id);
