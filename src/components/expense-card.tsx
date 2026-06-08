@@ -211,38 +211,17 @@ function SplitExpenseCardImpl({
           className="group cursor-pointer md:cursor-default py-3 px-1"
           onClick={() => onCardClick(primary.id)}
         >
+          {/* Header: Split badge + description on the left, total + actions on
+              the right. The per-category breakdown sits below as full-width
+              rows so its amounts align flush-right with the total — one clean
+              right-hand number column. */}
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
-                  Split
-                </span>
-                {primary.description && (
-                  <span className="text-sm font-medium truncate">{primary.description}</span>
-                )}
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {primaryCategory?.icon && <span className="text-base">{primaryCategory.icon}</span>}
-                    <span className="truncate">{primaryCategory?.name || "Uncategorized"}</span>
-                  </div>
-                  <span className="font-medium tabular-nums shrink-0">
-                    {formatCurrency(primary.converted_amount)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {overflowCategory?.icon && <span className="text-base">{overflowCategory.icon}</span>}
-                    <span className="truncate">{overflowCategory?.name || "Uncategorized"}</span>
-                  </div>
-                  <span className="font-medium tabular-nums shrink-0">
-                    {formatCurrency(overflow.converted_amount)}
-                  </span>
-                </div>
-              </div>
-              {primary.is_cash && (
-                <p className="text-xs text-muted-foreground mt-1">Cash</p>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                Split
+              </span>
+              {primary.description && (
+                <span className="text-sm font-medium truncate">{primary.description}</span>
               )}
             </div>
             <div className="relative flex items-start">
@@ -284,6 +263,30 @@ function SplitExpenseCardImpl({
               </div>
             </div>
           </div>
+          {/* Per-category breakdown: full-width rows, amounts flush-right. */}
+          <div className="space-y-0.5 mt-1">
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                {primaryCategory?.icon && <span className="text-base">{primaryCategory.icon}</span>}
+                <span className="truncate">{primaryCategory?.name || "Uncategorized"}</span>
+              </div>
+              <span className="font-medium tabular-nums shrink-0 text-muted-foreground">
+                {formatCurrency(primary.converted_amount)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                {overflowCategory?.icon && <span className="text-base">{overflowCategory.icon}</span>}
+                <span className="truncate">{overflowCategory?.name || "Uncategorized"}</span>
+              </div>
+              <span className="font-medium tabular-nums shrink-0 text-muted-foreground">
+                {formatCurrency(overflow.converted_amount)}
+              </span>
+            </div>
+          </div>
+          {primary.is_cash && (
+            <p className="text-xs text-muted-foreground mt-1">Cash</p>
+          )}
         </div>
       </div>
     </div>
