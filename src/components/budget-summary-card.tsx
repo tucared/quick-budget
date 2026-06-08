@@ -28,22 +28,12 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
   return (
     <Card className={`border-l-4 ${theme.border} ${theme.bg}`}>
       <CardContent className="pt-4 pb-4">
-        {/* Hero: remaining amount, with actual cash flow to the right when relevant */}
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
-            <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
-              {formatCurrency(totalRemaining)}
-            </div>
+        {/* Hero: remaining amount */}
+        <div className="mb-3">
+          <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
+          <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
+            {formatCurrency(totalRemaining)}
           </div>
-          {showCashflow && (
-            <div className="text-right shrink-0">
-              <div className="text-xs text-muted-foreground mb-0.5 font-medium">Cash out</div>
-              <div className="text-xl font-semibold tabular-nums" title="Actual cash that left the wallet this month (Tricount share replaced by what you paid, income netted in)">
-                {formatCurrency(cashOut)}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Progress bar */}
@@ -58,6 +48,17 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
         <div className="flex justify-between items-center text-xs">
           <span className="text-muted-foreground">
             {formatCurrency(totalSpent)} of {formatCurrency(paceBaseline)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
+            {showCashflow && (
+              <>
+                {" · "}
+                <span
+                  className="text-foreground"
+                  title="Actual cash that left the wallet this month (Tricount share replaced by what you paid, income netted in)"
+                >
+                  {formatCurrency(cashOut)} cash out
+                </span>
+              </>
+            )}
           </span>
           <span className={`${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)} font-medium`}>
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}
