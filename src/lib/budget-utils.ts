@@ -1,6 +1,49 @@
 import { getDaysInMonth } from "date-fns"
-import type { Expense } from "@/lib/types"
+import type { BudgetSummary, Expense } from "@/lib/types"
 import { parseLocalDate } from "@/lib/date-utils"
+
+/**
+ * Partition budget_summary rows into budgets vs allowances by the
+ * `exclude_from_budget_total` flag (allowances are excluded from the
+ * household budget total). Shared by the server and client data fetchers so the
+ * single budget_summary query can be split the same way in both places.
+ */
+export function partitionBudgetSummary(rows: BudgetSummary[]): {
+  budgets: BudgetSummary[]
+  allowances: BudgetSummary[]
+} {
+  const budgets: BudgetSummary[] = []
+  const allowances: BudgetSummary[] = []
+  for (const row of rows) {
+    if (row.exclude_from_budget_total) allowances.push(row)
+    else budgets.push(row)
+  }
+  return { budgets, allowances }
+}
+
+/** Minimal tricount_entry_map shape needed for the cashflow adjustment. */
+type CashflowRow = {
+  paid_converted_amount: number | string
+  share_converted_amount: number | string
+  expense_id: string | null
+}
+
+/**
+ * EUR adjustment that turns the budget's share-based "spent" into the month's
+ * actual cash flow: per reconciled entry, `paid − share` for mirrored expenses
+ * (expense_id set, in the budget total at their share) and `paid` for income
+ * (expense_id null, not in the total, so only its cash counts). Summed in
+ * integer cents to avoid float drift, then converted back to euros. Returns
+ * null for an empty input (no reconciled entries) so the figure can be hidden.
+ */
+export function tricountCashflowAdjustmentEuros(rows: CashflowRow[]): number | null {
+  if (rows.length === 0) return null
+  const cents = rows.reduce((sum, r) => {
+    const consumed = r.expense_id ? Number(r.share_converted_amount) : 0
+    return sum + Math.round((Number(r.paid_converted_amount) - consumed) * 100)
+  }, 0)
+  return cents / 100
+}
 
 type BudgetStatus = "over" | "fully_used" | "critical" | "ahead" | "warning" | "on_track"
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getServerUser } from '@/lib/server/data'
 import { fetchExchangeRate, adjustToWorkingDay } from '@/lib/exchange-rate-api'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { FALLBACK_RATES_TO_EUR } from '@/lib/currency'
@@ -7,6 +8,15 @@ import { FALLBACK_RATES_TO_EUR } from '@/lib/currency'
 // 20 requests per user per minute — generous for normal use,
 // but prevents runaway loops from hammering Frankfurter.
 const rateLimiter = createRateLimiter({ maxRequests: 20, windowMs: 60_000 })
+
+// A real calendar date in YYYY-MM-DD form. The regex alone accepts impossible
+// dates (e.g. 2024-02-30) that `adjustToWorkingDay` would silently roll over,
+// so round-trip through Date to reject them up front.
+function isValidIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const d = new Date(s + 'T00:00:00Z')
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
+}
 
 /**
  * GET /api/exchange-rates?currency=BRL&date=2024-01-15
@@ -20,9 +30,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const currency = searchParams.get('currency')
     const requestedDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
-
-    // Adjust weekend dates to previous working day
-    const date = adjustToWorkingDay(requestedDate)
 
     if (!currency) {
       return NextResponse.json(
@@ -39,13 +46,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Validate date format (YYYY-MM-DD)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // Validate the requested date is a real calendar date before adjusting it.
+    if (!isValidIsoDate(requestedDate)) {
       return NextResponse.json(
-        { error: 'Date must be in YYYY-MM-DD format' },
+        { error: 'Date must be a valid date in YYYY-MM-DD format' },
         { status: 400 }
       )
     }
+
+    // Adjust weekend dates to previous working day
+    const date = adjustToWorkingDay(requestedDate)
 
     // EUR to EUR is always 1.0
     if (currency === 'EUR') {
@@ -58,16 +68,17 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const supabase = await createServerSupabaseClient()
-
-    // Verify the user is authenticated
-    const { data: { user } } = await supabase.auth.getUser()
+    // Verify the user is authenticated. Local JWKS verification (no network
+    // round-trip), consistent with the rest of the server data layer.
+    const user = await getServerUser()
     if (!user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       )
     }
+
+    const supabase = await createServerSupabaseClient()
 
     // Rate-limit by authenticated user ID
     const { allowed, retryAfterMs } = rateLimiter(user.id)

@@ -7,6 +7,35 @@ architecture is clean and well-documented, and there are **no production depende
 vulnerabilities**. Findings below are robustness/maintainability improvements, not fires —
 none block shipping.
 
+## Resolution (this branch)
+
+All actionable findings were implemented on this branch and verified (lint, typecheck,
+143 tests, and a production build all pass):
+
+- **M1** ✅ Added `AbortSignal.timeout(10s)` to every outbound fetch (Tricount client ×2,
+  Frankfurter server + client paths).
+- **M2** ✅ Applied the existing `createRateLimiter` to `/api/tricount/sync` (10 req/user/min, 429 + `Retry-After`).
+- **M3** ✅ Extracted `partitionBudgetSummary` and `tricountCashflowAdjustmentEuros` into the
+  unit-tested `src/lib/budget-utils.ts`; both server and client data layers now call them (no more copy-paste). Added 9 tests.
+- **M4** ✅ `runSync` now pre-resolves distinct exchange-rate keys concurrently before the write
+  loop; writes stay sequential so the unique-ledger rollback guard is unchanged.
+- **L2** ✅ `/api/exchange-rates` now authenticates via local-verify `getServerUser()` (no network round-trip).
+- **L3** ✅ The link-delete route filters null `expense_id`s out of the `.in()` delete.
+- **L4** ✅ `/api/exchange-rates` rejects impossible dates (e.g. `2024-02-30`) before adjusting.
+- **DB indexes** ✅ Added covering indexes for the two unindexed FKs in the declarative schema
+  (`supabase/schemas/02_tables.sql`). The migration is CI-generated on PR; it reaches Prod only
+  through the normal merge / `apply-to-dev` flow.
+- **Dependencies** ✅ Bumped all packages to the latest within their semver ranges (`npm update`);
+  `npm audit` remains clean. The `eslint` 9→10 **major** is intentionally left pinned (defer until
+  flat-config plugins support it).
+
+**Deferred (judgment calls, not done automatically):**
+
+- **L1** (decompose the 780-line `expense-form.tsx`) — a large refactor with real regression risk
+  and no component-level test coverage; best done deliberately when that code is next touched.
+- **Leaked-password protection** (DB security WARN) — a Supabase **dashboard** toggle
+  (Authentication → Providers), not a code change. Enable it on Dev + Prod manually.
+
 ## Baseline (all green)
 
 | Check | Result |
