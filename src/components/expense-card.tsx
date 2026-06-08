@@ -73,9 +73,16 @@ function ExpenseCardImpl({
                   {category?.icon && (
                     <span className="text-xl">{category.icon}</span>
                   )}
-                  <span className="font-medium">
-                    {category?.name || "Uncategorized"}
+                  {/* When a description is set it replaces the category name as
+                      the title; otherwise the category name stands in. */}
+                  <span className="font-medium truncate min-w-0">
+                    {expense.description || category?.name || "Uncategorized"}
                   </span>
+                  {expense.is_cash && (
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                      Cash
+                    </span>
+                  )}
                   {imported && (
                     <span
                       className="shrink-0 max-w-[10rem] truncate text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5"
@@ -85,32 +92,15 @@ function ExpenseCardImpl({
                     </span>
                   )}
                   {showSplitBadge && expense.split_group_id && (
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                       Part of a split
                     </span>
                   )}
                 </div>
-                {expense.description && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {expense.description}
-                  </p>
-                )}
-                {showDate ? (
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <span>
-                      {format(parseLocalDate(expense.expense_date), "MMM d, yyyy")}
-                    </span>
-                    {expense.is_cash && (
-                      <>
-                        <span>•</span>
-                        <span>Cash</span>
-                      </>
-                    )}
+                {showDate && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {format(parseLocalDate(expense.expense_date), "MMM d, yyyy")}
                   </div>
-                ) : (
-                  expense.is_cash && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Cash</p>
-                  )
                 )}
               </div>
               <div className="relative flex items-start">
@@ -220,6 +210,11 @@ function SplitExpenseCardImpl({
               <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                 Split
               </span>
+              {primary.is_cash && (
+                <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                  Cash
+                </span>
+              )}
               {primary.description && (
                 <span className="text-sm font-medium truncate">{primary.description}</span>
               )}
@@ -284,9 +279,6 @@ function SplitExpenseCardImpl({
               </span>
             </div>
           </div>
-          {primary.is_cash && (
-            <p className="text-xs text-muted-foreground mt-1">Cash</p>
-          )}
         </div>
       </div>
     </div>
