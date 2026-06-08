@@ -278,14 +278,17 @@ export async function getSyncedExpenseTitles(): Promise<Record<string, string>> 
 }
 
 /**
- * Net Tricount owe/owed balance for a month, in EUR: the sum over every
- * reconciled entry (NORMAL expenses + INCOME) of `paid − consumed`. Positive =
- * the household is owed (it fronted others' share); negative = the household
- * owes (someone fronted its share). Surfaced as the month-end cashflow memo on
- * the budget page. Returns null when the household has no reconciled entries
- * that month (so the memo can be hidden). RLS scopes to the caller's household.
+ * EUR adjustment that turns the budget's share-based "spent" into the month's
+ * actual cash flow (what really left the household wallet). The budget total
+ * counts each mirrored Tricount entry at the household's *share* (consumption);
+ * actual cash is what the household *paid*. So per reconciled entry we add
+ * `paid − share` for mirrored expenses (swap consumption for cash) and `paid`
+ * for INCOME (cash received, never in the budget total). Adding this to the
+ * displayed `totalSpent` yields the real cash out. Returns null when the
+ * household has no reconciled entries that month (so the figure can be hidden).
+ * RLS scopes to the caller's household.
  */
-export async function getTricountMonthlyBalance(
+export async function getTricountCashflowAdjustment(
   budgetMonth?: string
 ): Promise<number | null> {
   const supabase = await getSupabase()
@@ -293,22 +296,22 @@ export async function getTricountMonthlyBalance(
 
   const { data, error } = await supabase
     .from("tricount_entry_map")
-    .select("paid_converted_amount, share_converted_amount")
+    .select("paid_converted_amount, share_converted_amount, expense_id")
     .gte("entry_date", month)
     .lt("entry_date", nextMonthString(month))
 
   if (error) {
-    console.error("Failed to fetch tricount monthly balance:", error)
+    console.error("Failed to fetch tricount cashflow adjustment:", error)
     return null
   }
   if (!data || data.length === 0) return null
 
-  const cents = data.reduce(
-    (sum, r) =>
-      sum +
-      Math.round((Number(r.paid_converted_amount) - Number(r.share_converted_amount)) * 100),
-    0
-  )
+  const cents = data.reduce((sum, r) => {
+    // Mirrored expenses (expense_id set) are in the budget total at their share;
+    // income (expense_id null) is not in the total, so only its cash counts.
+    const consumed = r.expense_id ? Number(r.share_converted_amount) : 0
+    return sum + Math.round((Number(r.paid_converted_amount) - consumed) * 100)
+  }, 0)
   return cents / 100
 }
 

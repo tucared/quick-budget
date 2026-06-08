@@ -8,27 +8,42 @@ interface BudgetSummaryCardProps {
   target?: { amount: number; unallocated: number }
   dayOfMonth?: number
   daysInMonth?: number
-  /** Net Tricount owe/owed for the month (EUR; positive = owed to you, negative = you owe). */
-  tricountBalance?: number | null
+  /** EUR delta from budget "spent" to actual cash flow (Tricount), or null when none. */
+  cashflowAdjustment?: number | null
 }
 
-export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, tricountBalance }: BudgetSummaryCardProps) {
+export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, cashflowAdjustment }: BudgetSummaryCardProps) {
   const totalAllocated = budgets.reduce((sum, b) => sum + Number(b.allocated_amount), 0)
   const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spent_amount), 0)
   const paceBaseline = target ? target.amount : totalAllocated
   const totalRemaining = paceBaseline - totalSpent
   const percentSpent = paceBaseline > 0 ? (totalSpent / paceBaseline) * 100 : 0
   const theme = getBudgetStatusTheme(percentSpent, dayOfMonth, daysInMonth, totalRemaining)
+  // Actual cash that left the wallet: budget "spent" (share-based) plus the
+  // Tricount cash-flow adjustment (what was actually paid, income netted in).
+  // Shown only when Tricount activity makes it differ from "spent".
+  const showCashflow = cashflowAdjustment != null && Math.abs(cashflowAdjustment) >= 0.005
+  const cashOut = totalSpent + (cashflowAdjustment ?? 0)
 
   return (
     <Card className={`border-l-4 ${theme.border} ${theme.bg}`}>
       <CardContent className="pt-4 pb-4">
-        {/* Hero: remaining amount */}
-        <div className="mb-3">
-          <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
-          <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
-            {formatCurrency(totalRemaining)}
+        {/* Hero: remaining amount, with actual cash flow to the right when relevant */}
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
+            <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
+              {formatCurrency(totalRemaining)}
+            </div>
           </div>
+          {showCashflow && (
+            <div className="text-right shrink-0">
+              <div className="text-xs text-muted-foreground mb-0.5 font-medium">Cash out</div>
+              <div className="text-xl font-semibold tabular-nums" title="Actual cash that left the wallet this month (Tricount share replaced by what you paid, income netted in)">
+                {formatCurrency(cashOut)}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -48,19 +63,6 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, tr
             {getBudgetStatusLabel(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}
           </span>
         </div>
-
-        {/* Tricount owe/owed reconciliation memo (cashflow adjustment for the month) */}
-        {tricountBalance != null && Math.abs(tricountBalance) >= 0.005 && (
-          <div className="mt-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
-            Tricount:{" "}
-            <span className="text-foreground font-medium">
-              {tricountBalance < 0
-                ? `you owe ${formatCurrency(Math.abs(tricountBalance))}`
-                : `you're owed ${formatCurrency(tricountBalance)}`}
-            </span>{" "}
-            this month
-          </div>
-        )}
 
       </CardContent>
     </Card>
