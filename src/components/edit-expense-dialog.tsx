@@ -1,18 +1,20 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { format } from "date-fns"
+import { useEffect, useMemo, useState } from "react"
+import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
-import { getStorageKeys, type Category, type Expense } from "@/lib/types"
-import { fetchExchangeRateFromAPI, formatCurrency } from "@/lib/currency"
+import { getStorageKeys, type BudgetSummary, type Category, type Expense } from "@/lib/types"
+import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState, partitionSplitSiblings } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { CategoryBudgetCard } from "@/components/category-budget-card"
 import { CategoryTileSelector, buildCategoryOptions } from "@/components/category-tile-selector"
 import { AmountInputWithCurrency } from "@/components/amount-input-with-currency"
 import { DatePicker } from "@/components/ui/date-picker"
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 import {
   Dialog,
   DialogContent,
@@ -167,10 +169,114 @@ function EditExpenseForm({
       : undefined
     return stored ?? allowanceCategories[0]?.id ?? null
   }, [selectedOverflowId, allowanceCategories])
-  const overflowCategoryName = useMemo(
-    () => categories.find((c) => c.id === effectiveOverflowCategoryId)?.name,
-    [categories, effectiveOverflowCategoryId],
+
+  // Mirror the expense form's split derivation. `isSplit` drives the inline
+  // budget-bar treatment; `showCapControl` decides whether the "Cap" checkbox
+  // surfaces on the category bar.
+  const isSplit = capDerivation.exceedsCap && applyCap && allowanceCategories.length > 0
+  const showCapControl =
+    capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0
+
+  // Slice (in the entered currency) each bar represents. Debounced so the bar
+  // animation doesn't jitter while typing — matches the expense form.
+  const primaryPortion = isSplit ? capDerivation.primaryOriginal : amount
+  const overflowPortion = isSplit ? capDerivation.overflowOriginal : 0
+  const debouncedPrimaryPortion = useDebouncedValue(primaryPortion, 300)
+  const debouncedOverflowPortion = useDebouncedValue(overflowPortion, 300)
+
+  // Live budget previews for the capped category and the overflow allowance.
+  const [primaryBudget, setPrimaryBudget] = useState<BudgetSummary | null>(null)
+  const [overflowBudget, setOverflowBudget] = useState<BudgetSummary | null>(null)
+  const [loadingBudget, setLoadingBudget] = useState(false)
+
+  const budgetMonth = useMemo(
+    () => format(startOfMonth(new Date(expenseDate + "T00:00:00")), "yyyy-MM-dd"),
+    [expenseDate],
   )
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!categoryId) {
+        setPrimaryBudget(null)
+        return
+      }
+      setLoadingBudget(true)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("budget_summary")
+        .select("*")
+        .eq("household_id", primaryRow.household_id)
+        .eq("category_id", categoryId)
+        .eq("budget_month", budgetMonth)
+        .maybeSingle()
+      if (!cancelled) {
+        setPrimaryBudget(data || null)
+        setLoadingBudget(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [categoryId, budgetMonth, primaryRow.household_id])
+
+  useEffect(() => {
+    if (!isSplit || !effectiveOverflowCategoryId) return
+    let cancelled = false
+    ;(async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("budget_summary")
+        .select("*")
+        .eq("household_id", primaryRow.household_id)
+        .eq("category_id", effectiveOverflowCategoryId)
+        .eq("budget_month", budgetMonth)
+        .maybeSingle()
+      if (!cancelled) setOverflowBudget(data || null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isSplit, effectiveOverflowCategoryId, budgetMonth, primaryRow.household_id])
+
+  // The expense being edited is already counted in budget_summary. Rebase a
+  // fetched bar by removing this expense's own existing EUR contribution to the
+  // category so the preview reflects the edited amount instead of double-
+  // counting it. A category the original rows never touched (e.g. the user
+  // moved this expense here) is returned unchanged.
+  const originalEurInCategory = (catId: string | null): number => {
+    if (!catId) return 0
+    let sum = 0
+    if (primaryRow.category_id === catId) sum += Math.abs(Number(primaryRow.converted_amount))
+    if (initialOverflowRow?.category_id === catId)
+      sum += Math.abs(Number(initialOverflowRow.converted_amount))
+    return sum
+  }
+  const rebaseBudget = (
+    budget: BudgetSummary | null,
+    catId: string | null,
+  ): BudgetSummary | null => {
+    if (!budget) return null
+    const own = originalEurInCategory(catId)
+    if (own === 0) return budget
+    return {
+      ...budget,
+      spent_amount: Number(budget.spent_amount) - own,
+      remaining_amount: Number(budget.remaining_amount) + own,
+    }
+  }
+
+  const rebasedPrimaryBudget = rebaseBudget(primaryBudget, categoryId)
+  // Drop the stale overflow snapshot the moment the split is turned off so the
+  // bar doesn't flash a "no budget set" placeholder on re-expand.
+  const rebasedOverflowBudget = isSplit
+    ? rebaseBudget(overflowBudget, effectiveOverflowCategoryId)
+    : null
+
+  const isCurrentMonth =
+    budgetMonth === format(startOfMonth(new Date()), "yyyy-MM-dd")
+  const dayOfMonth = new Date(expenseDate + "T00:00:00").getDate()
+  const daysInMonth = getDaysInMonth(new Date(expenseDate + "T00:00:00"))
 
   // Render-time reset of the cap toggle when the category changes. The
   // overflow allowance pick is sticky — it's a user preference, not a per-
@@ -418,53 +524,73 @@ function EditExpenseForm({
           )}
         </div>
 
-        {/* Cap-with-overflow toggle. Same model as the expense form: surfaces
-            only when the selected category has a cap configured AND the
-            entered amount exceeds it (EUR-converted) AND there's at least
-            one allowance to overflow into. The allowance is picked at log
-            time. */}
-        {capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0 && (
-          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-            <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">
-                  Cap at {formatCurrency(capDerivation.capEUR, 2, "EUR")}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Send {formatCurrency(capDerivation.overflowEUR, 2, "EUR")} to{" "}
-                  {overflowCategoryName ?? "allowance"}
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={applyCap}
-                onChange={(e) => setApplyCap(e.target.checked)}
-                className="h-4 w-4 rounded border-input accent-primary"
-                aria-label="Apply cap"
+        {/* Budget status preview — same inline treatment as the expense form.
+            The capped category bar carries the inline "Cap" checkbox (surfaces
+            when the amount exceeds the category's cap and there's an allowance
+            to overflow into); the overflow allowance bar carries the per-
+            allowance icon buttons and the (€) fraction shows each slice. Bars
+            are rebased to drop this expense's own existing contribution so the
+            preview reflects the edit, not a double-count. */}
+        {categoryId && (
+          <div className="space-y-2">
+            <CategoryBudgetCard
+              budget={rebasedPrimaryBudget}
+              compact
+              showFraction={isSplit}
+              trailing={
+                showCapControl ? (
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={applyCap}
+                      onChange={(e) => setApplyCap(e.target.checked)}
+                      className="h-4 w-4 rounded border-input accent-primary"
+                    />
+                    Cap
+                  </label>
+                ) : undefined
+              }
+              isCurrentMonth={isCurrentMonth}
+              dayOfMonth={dayOfMonth}
+              daysInMonth={daysInMonth}
+              additionalAmount={debouncedPrimaryPortion > 0 ? debouncedPrimaryPortion * previewExchangeRate : 0}
+              loading={loadingBudget}
+            />
+            {isSplit && (
+              <CategoryBudgetCard
+                budget={rebasedOverflowBudget}
+                compact
+                showFraction
+                trailing={
+                  allowanceCategories.length > 1 ? (
+                    <div className="flex gap-1">
+                      {allowanceCategories.map((a) => {
+                        const active = a.id === effectiveOverflowCategoryId
+                        return (
+                          <button
+                            type="button"
+                            key={a.id}
+                            onClick={() => setSelectedOverflowId(a.id)}
+                            className={`h-6 w-6 rounded text-sm border flex items-center justify-center transition-colors ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background border-border hover:border-foreground"
+                            }`}
+                            aria-label={`Send overflow to ${a.name}`}
+                            aria-pressed={active}
+                          >
+                            {a.icon}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : undefined
+                }
+                isCurrentMonth={isCurrentMonth}
+                dayOfMonth={dayOfMonth}
+                daysInMonth={daysInMonth}
+                additionalAmount={debouncedOverflowPortion > 0 ? debouncedOverflowPortion * previewExchangeRate : 0}
               />
-            </label>
-            {applyCap && allowanceCategories.length > 1 && (
-              <div className="flex gap-1.5">
-                {allowanceCategories.map((a) => {
-                  const active = a.id === effectiveOverflowCategoryId
-                  return (
-                    <button
-                      type="button"
-                      key={a.id}
-                      onClick={() => setSelectedOverflowId(a.id)}
-                      className={`flex-1 h-8 rounded-md text-xs font-medium border transition-colors ${
-                        active
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background border-border text-muted-foreground hover:text-foreground"
-                      }`}
-                      aria-pressed={active}
-                    >
-                      {a.name}
-                    </button>
-                  )
-                })}
-              </div>
             )}
           </div>
         )}
