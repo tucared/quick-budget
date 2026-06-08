@@ -79,7 +79,7 @@ function ExpenseCardImpl({
                     {expense.description || category?.name || "Uncategorized"}
                   </span>
                   {expense.is_cash && (
-                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                    <span className="shrink-0 text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                       Cash
                     </span>
                   )}
@@ -92,7 +92,7 @@ function ExpenseCardImpl({
                     </span>
                   )}
                   {showSplitBadge && expense.split_group_id && (
-                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                    <span className="shrink-0 text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                       Part of a split
                     </span>
                   )}
@@ -207,11 +207,11 @@ function SplitExpenseCardImpl({
               right-hand number column. */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+              <span className="shrink-0 text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                 Split
               </span>
               {primary.is_cash && (
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                <span className="shrink-0 text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                   Cash
                 </span>
               )}
