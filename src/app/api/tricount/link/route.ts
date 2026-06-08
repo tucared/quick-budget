@@ -162,7 +162,11 @@ export async function DELETE(request: NextRequest) {
   if (mapErr) {
     return NextResponse.json({ error: "Failed to read sync map" }, { status: 500 })
   }
-  const expenseIds = (maps ?? []).map((m) => m.expense_id)
+  // Income rows carry a null expense_id (reconciled, never mirrored as spend);
+  // drop them so only real expense ids reach the .in() delete.
+  const expenseIds = (maps ?? [])
+    .map((m) => m.expense_id)
+    .filter((id): id is string => id !== null)
   if (expenseIds.length > 0) {
     const { error: delErr } = await supabase.from("expenses").delete().in("id", expenseIds)
     if (delErr) {

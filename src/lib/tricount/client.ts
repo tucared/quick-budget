@@ -16,6 +16,10 @@ import type { FetchedRegistry, TricountMembership } from "./types"
 // and in production alike.
 
 const BASE_URL = "https://api.tricount.bunq.com"
+// Tricount's backend is undocumented and carries no SLA. Cap each call so a
+// hung upstream can't keep a serverless invocation (or a manual "Sync") open
+// until the platform timeout — the abort surfaces as the normal fetch error.
+const FETCH_TIMEOUT_MS = 10_000
 // Pins the app build the API expects in the User-Agent. Bump if the endpoint
 // starts rejecting the handshake after a Tricount app update.
 const USER_AGENT = "com.bunq.tricount.android:RELEASE:7.0.7:3174:ANDROID:13:C"
@@ -70,6 +74,7 @@ async function authenticate(): Promise<{ token: string; userId: number; headers:
       client_public_key: pem,
       device_description: "Android",
     }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -103,7 +108,10 @@ export async function fetchRegistry(token: string): Promise<FetchedRegistry> {
 
   const res = await fetch(
     `${BASE_URL}/v1/user/${userId}/registry?public_identifier_token=${encodeURIComponent(token)}`,
-    { headers: { ...headers, "X-Bunq-Client-Authentication": authToken } }
+    {
+      headers: { ...headers, "X-Bunq-Client-Authentication": authToken },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }
   )
 
   if (!res.ok) {

@@ -55,7 +55,9 @@ export async function fetchExchangeRate(
 
   const url = `https://api.frankfurter.dev/v1/${workingDayDate}?base=EUR&symbols=${currency}`
 
-  const response = await fetch(url)
+  // Cap the upstream call so a hung Frankfurter request can't stall the route
+  // (and the Tricount sync, which resolves rates through this path).
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
 
   if (!response.ok) {
     throw new Error(`Frankfurter API responded with status ${response.status}`)

@@ -183,6 +183,25 @@ export async function runSync(
   }
 
   const rateCache = new Map<string, number>()
+
+  // Warm the rate cache before the write loop: resolve the distinct
+  // (currency, date) pairs of entries that will actually be written (skipping
+  // hash-unchanged and EUR ones) concurrently, so the sequential loop below
+  // reads them from cache instead of awaiting a lookup per entry. Writes stay
+  // sequential — the unique-ledger rollback guard depends on that ordering.
+  const rateKeys = new Map<string, { currency: string; date: string }>()
+  for (const [entryId, { rc, hash }] of desired) {
+    const prior = existing.get(entryId)
+    if (prior && prior.content_hash === hash) continue
+    if (rc.currency === "EUR") continue
+    rateKeys.set(`${rc.currency}:${rc.entryDate}`, { currency: rc.currency, date: rc.entryDate })
+  }
+  await Promise.all(
+    Array.from(rateKeys.values()).map((k) =>
+      getRateToEur(supabase, k.currency, k.date, rateCache)
+    )
+  )
+
   let created = 0
   let updated = 0
   let deleted = 0

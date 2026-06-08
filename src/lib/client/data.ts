@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { nextMonthString } from "@/lib/date-utils"
+import { partitionBudgetSummary, tricountCashflowAdjustmentEuros } from "@/lib/budget-utils"
 import type {
   BudgetSummary,
   Expense,
@@ -32,13 +33,7 @@ export async function fetchBudgetAndAllowanceSummary(
     return { data: null, error }
   }
 
-  const budgets: BudgetSummary[] = []
-  const allowances: BudgetSummary[] = []
-  for (const row of data) {
-    if (row.exclude_from_budget_total) allowances.push(row)
-    else budgets.push(row)
-  }
-  return { data: { budgets, allowances }, error: null }
+  return { data: partitionBudgetSummary(data), error: null }
 }
 
 export async function fetchMonthlyBudgetTarget(
@@ -94,9 +89,5 @@ export async function fetchTricountCashflowAdjustment(
     return { data: null, error }
   }
 
-  const cents = data.reduce((sum, r) => {
-    const consumed = r.expense_id ? Number(r.share_converted_amount) : 0
-    return sum + Math.round((Number(r.paid_converted_amount) - consumed) * 100)
-  }, 0)
-  return { data: cents / 100, error: null }
+  return { data: tricountCashflowAdjustmentEuros(data), error: null }
 }

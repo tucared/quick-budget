@@ -2,6 +2,7 @@ import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, startOfMonth, subDays } from "date-fns"
 import { nextMonthString } from "@/lib/date-utils"
+import { partitionBudgetSummary, tricountCashflowAdjustmentEuros } from "@/lib/budget-utils"
 import { verifyAccessToken } from "@/lib/server/jwt-verify"
 import type {
   BudgetSummary,
@@ -79,13 +80,7 @@ export async function getBudgetAndAllowanceSummary(
     return { budgets: [], allowances: [] }
   }
 
-  const budgets: BudgetSummary[] = []
-  const allowances: BudgetSummary[] = []
-  for (const row of data ?? []) {
-    if (row.exclude_from_budget_total) allowances.push(row)
-    else budgets.push(row)
-  }
-  return { budgets, allowances }
+  return partitionBudgetSummary(data ?? [])
 }
 
 /**
@@ -304,15 +299,7 @@ export async function getTricountCashflowAdjustment(
     console.error("Failed to fetch tricount cashflow adjustment:", error)
     return null
   }
-  if (!data || data.length === 0) return null
-
-  const cents = data.reduce((sum, r) => {
-    // Mirrored expenses (expense_id set) are in the budget total at their share;
-    // income (expense_id null) is not in the total, so only its cash counts.
-    const consumed = r.expense_id ? Number(r.share_converted_amount) : 0
-    return sum + Math.round((Number(r.paid_converted_amount) - consumed) * 100)
-  }, 0)
-  return cents / 100
+  return tricountCashflowAdjustmentEuros(data ?? [])
 }
 
 /** Per-link signed owe/owed totals (paid & consumed, EUR) for the Sync tab. */

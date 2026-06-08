@@ -5,8 +5,10 @@ import {
   getBudgetStatusColor,
   getBudgetStatusLabel,
   getBudgetStatusTheme,
+  partitionBudgetSummary,
+  tricountCashflowAdjustmentEuros,
 } from "@/lib/budget-utils"
-import type { Expense } from "@/lib/types"
+import type { BudgetSummary, Expense } from "@/lib/types"
 
 function mkExpense(date: string, amount: number, overrides: Partial<Expense> = {}): Expense {
   return {
@@ -28,6 +30,103 @@ function mkExpense(date: string, amount: number, overrides: Partial<Expense> = {
     ...overrides,
   }
 }
+
+function mkBudgetRow(
+  id: string,
+  excludeFromBudgetTotal: boolean,
+  overrides: Partial<BudgetSummary> = {}
+): BudgetSummary {
+  return {
+    id,
+    category_id: `cat-${id}`,
+    category_name: `Category ${id}`,
+    category_icon: null,
+    budget_month: "2026-05-01",
+    household_id: "hh-1",
+    currency: "EUR",
+    allocated_amount: 100,
+    spent_amount: 0,
+    remaining_amount: 100,
+    percent_spent: 0,
+    exclude_from_budget_total: excludeFromBudgetTotal,
+    ...overrides,
+  }
+}
+
+describe("partitionBudgetSummary", () => {
+  it("splits rows by exclude_from_budget_total", () => {
+    const rows = [
+      mkBudgetRow("a", false),
+      mkBudgetRow("b", true),
+      mkBudgetRow("c", false),
+      mkBudgetRow("d", true),
+    ]
+    const { budgets, allowances } = partitionBudgetSummary(rows)
+    expect(budgets.map((r) => r.id)).toEqual(["a", "c"])
+    expect(allowances.map((r) => r.id)).toEqual(["b", "d"])
+  })
+
+  it("returns empty arrays for empty input", () => {
+    expect(partitionBudgetSummary([])).toEqual({ budgets: [], allowances: [] })
+  })
+
+  it("treats a null flag as a budget (not an allowance)", () => {
+    const { budgets, allowances } = partitionBudgetSummary([
+      mkBudgetRow("x", false, { exclude_from_budget_total: null }),
+    ])
+    expect(budgets.map((r) => r.id)).toEqual(["x"])
+    expect(allowances).toEqual([])
+  })
+})
+
+describe("tricountCashflowAdjustmentEuros", () => {
+  it("returns null for empty input", () => {
+    expect(tricountCashflowAdjustmentEuros([])).toBeNull()
+  })
+
+  it("sums paid − share for mirrored rows (expense_id set)", () => {
+    const result = tricountCashflowAdjustmentEuros([
+      { paid_converted_amount: 30, share_converted_amount: 10, expense_id: "exp-1" },
+      { paid_converted_amount: 0, share_converted_amount: 5, expense_id: "exp-2" },
+    ])
+    // (30 - 10) + (0 - 5) = 15
+    expect(result).toBe(15)
+  })
+
+  it("counts full paid for income rows (expense_id null), ignoring share", () => {
+    const result = tricountCashflowAdjustmentEuros([
+      { paid_converted_amount: -20, share_converted_amount: -8, expense_id: null },
+    ])
+    // income: paid only (share ignored) → -20
+    expect(result).toBe(-20)
+  })
+
+  it("mixes mirrored expenses and income", () => {
+    const result = tricountCashflowAdjustmentEuros([
+      { paid_converted_amount: 30, share_converted_amount: 10, expense_id: "exp-1" },
+      { paid_converted_amount: -20, share_converted_amount: -8, expense_id: null },
+    ])
+    // (30 - 10) + (-20) = 0
+    expect(result).toBe(0)
+  })
+
+  it("rounds in integer cents (no float drift)", () => {
+    // 0.1 + 0.2 = 0.30000000000000004 under naive float sum; the integer-cents
+    // reduce must yield exactly 0.3.
+    const result = tricountCashflowAdjustmentEuros([
+      { paid_converted_amount: 0.1, share_converted_amount: 0, expense_id: "exp-1" },
+      { paid_converted_amount: 0.2, share_converted_amount: 0, expense_id: "exp-2" },
+    ])
+    expect(result).toBe(0.3)
+  })
+
+  it("coerces string amounts (DB numeric arrives as string)", () => {
+    const result = tricountCashflowAdjustmentEuros([
+      { paid_converted_amount: "30.00", share_converted_amount: "10.00", expense_id: "exp-1" },
+    ])
+    expect(result).toBe(20)
+  })
+})
 
 describe("getBudgetStatusLabel — threshold boundaries", () => {
   describe("on_track", () => {

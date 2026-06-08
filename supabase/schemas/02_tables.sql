@@ -371,6 +371,9 @@ CREATE TABLE tricount_links (
 );
 
 CREATE INDEX idx_tricount_links_household ON tricount_links(household_id);
+-- Covering index for the default_category_id FK (ON DELETE SET NULL) so a
+-- category delete doesn't sequential-scan this table.
+CREATE INDEX idx_tricount_links_default_category ON tricount_links(default_category_id);
 
 CREATE TRIGGER update_tricount_links_updated_at BEFORE UPDATE ON tricount_links
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -421,6 +424,9 @@ CREATE TABLE tricount_entry_map (
 
 CREATE INDEX idx_tricount_entry_map_link ON tricount_entry_map(link_id);
 CREATE INDEX idx_tricount_entry_map_expense ON tricount_entry_map(expense_id);
+-- Covering index for the household_id FK (ON DELETE CASCADE) so a household
+-- delete doesn't sequential-scan this table.
+CREATE INDEX idx_tricount_entry_map_household ON tricount_entry_map(household_id);
 
 CREATE TRIGGER update_tricount_entry_map_updated_at BEFORE UPDATE ON tricount_entry_map
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

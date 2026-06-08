@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { getServerUser } from "@/lib/server/data"
 import { runSync, runSyncAll, type LinkSyncOutcome } from "@/lib/tricount/sync"
+import { createRateLimiter } from "@/lib/rate-limit"
+
+// Each sync fans out to Tricount's undocumented backend. 10 requests per user
+// per minute is generous for normal use (the on-load auto-sync is separately
+// throttled to once per 10 min per link) but stops a stuck client or rapid
+// re-clicking from hammering the upstream and risking an IP block.
+const rateLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 })
 
 // POST /api/tricount/sync — reconcile the household's tricounts.
 // Body { linkId } syncs one; otherwise syncs all. { auto: true } marks the
@@ -11,6 +18,17 @@ import { runSync, runSyncAll, type LinkSyncOutcome } from "@/lib/tricount/sync"
 export async function POST(request: NextRequest) {
   const user = await getServerUser()
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+
+  const { allowed, retryAfterMs } = rateLimiter(user.id)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((retryAfterMs ?? 1000) / 1000)) },
+      }
+    )
+  }
 
   let linkId: string | undefined
   let auto = false

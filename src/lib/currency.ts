@@ -42,7 +42,7 @@ export async function fetchExchangeRateFromAPI(
   const url = `/api/exchange-rates?currency=${currency}&date=${dateParam}`
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     if (!response.ok) {
       throw new Error(`API responded with status ${response.status}`)
     }
