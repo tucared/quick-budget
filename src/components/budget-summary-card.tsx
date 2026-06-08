@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import type { BudgetSummary } from "@/lib/types"
 import { formatCurrency, formatNumber } from "@/lib/currency"
@@ -21,19 +24,53 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
   const theme = getBudgetStatusTheme(percentSpent, dayOfMonth, daysInMonth, totalRemaining)
   // Actual cash that left the wallet: budget "spent" (share-based) plus the
   // Tricount cash-flow adjustment (what was actually paid, income netted in).
-  // Shown only when Tricount activity makes it differ from "spent".
+  // Only meaningful when Tricount activity makes it differ from "spent".
   const showCashflow = cashflowAdjustment != null && Math.abs(cashflowAdjustment) >= 0.005
   const cashOut = totalSpent + (cashflowAdjustment ?? 0)
+  const percentCash = paceBaseline > 0 ? (cashOut / paceBaseline) * 100 : 0
+
+  // The summary line can show budget "spent" (share-based) or actual "cash out".
+  // The hero remaining, bar, and status stay share-based — budget tracking is
+  // deliberately about consumption, not wallet movement.
+  const [view, setView] = useState<"spent" | "cash">("spent")
+  const showCash = view === "cash" && showCashflow
 
   return (
     <Card className={`border-l-4 ${theme.border} ${theme.bg}`}>
       <CardContent className="pt-4 pb-4">
-        {/* Hero: remaining amount */}
-        <div className="mb-3">
-          <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
-          <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
-            {formatCurrency(totalRemaining)}
+        {/* Hero: remaining amount, with the Spent/Cash basis toggle top-right */}
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
+            <div className={`text-3xl font-bold ${getBudgetStatusColor(percentSpent, dayOfMonth, daysInMonth, totalRemaining)}`}>
+              {formatCurrency(totalRemaining)}
+            </div>
           </div>
+          {showCashflow && (
+            <div
+              className="flex shrink-0 rounded-md border border-border overflow-hidden text-[11px] leading-none"
+              role="group"
+              aria-label="Summary basis"
+            >
+              <button
+                type="button"
+                onClick={() => setView("spent")}
+                aria-pressed={view === "spent"}
+                className={`px-2 py-1 transition-colors ${view === "spent" ? "bg-foreground/10 text-foreground font-medium" : "text-muted-foreground"}`}
+              >
+                Spent
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("cash")}
+                aria-pressed={view === "cash"}
+                className={`px-2 py-1 transition-colors ${view === "cash" ? "bg-foreground/10 text-foreground font-medium" : "text-muted-foreground"}`}
+                title="Actual cash that left the wallet this month (Tricount share replaced by what you paid, income netted in)"
+              >
+                Cash
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -47,16 +84,13 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
         {/* Footer row */}
         <div className="flex justify-between items-center text-xs">
           <span className="text-muted-foreground">
-            {formatCurrency(totalSpent)} of {formatCurrency(paceBaseline)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
-            {showCashflow && (
+            {showCash ? (
               <>
-                {" · "}
-                <span
-                  className="text-foreground"
-                  title="Actual cash that left the wallet this month (Tricount share replaced by what you paid, income netted in)"
-                >
-                  {formatCurrency(cashOut)} cash out
-                </span>
+                <span className="text-foreground font-medium">{formatCurrency(cashOut)}</span> cash out · {formatNumber(percentCash, 0)}%{target ? " of target" : ""}
+              </>
+            ) : (
+              <>
+                {formatCurrency(totalSpent)} of {formatCurrency(paceBaseline)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}
               </>
             )}
           </span>
