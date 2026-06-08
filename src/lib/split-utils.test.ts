@@ -9,7 +9,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     household_id: "hh-1",
     name: "Dining Out",
     exclude_from_budget_total: false,
-    icon: null,
+    icon: "🍽️",
     is_active: true,
     cap_amount: null,
     created_at: "2026-05-15T00:00:00Z",
