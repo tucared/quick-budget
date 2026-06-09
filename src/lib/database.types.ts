@@ -153,7 +153,7 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
-          category_id: string | null
+          category_id: string
           converted_amount: number
           converted_currency: string
           created_at: string
@@ -164,13 +164,13 @@ export type Database = {
           household_id: string
           id: string
           is_cash: boolean
-          logged_by_user_id: string
+          logged_by_user_id: string | null
           split_group_id: string | null
           updated_at: string
         }
         Insert: {
           amount: number
-          category_id?: string | null
+          category_id: string
           converted_amount: number
           converted_currency?: string
           created_at?: string
@@ -181,13 +181,13 @@ export type Database = {
           household_id: string
           id?: string
           is_cash?: boolean
-          logged_by_user_id: string
+          logged_by_user_id?: string | null
           split_group_id?: string | null
           updated_at?: string
         }
         Update: {
           amount?: number
-          category_id?: string | null
+          category_id?: string
           converted_amount?: number
           converted_currency?: string
           created_at?: string
@@ -198,7 +198,7 @@ export type Database = {
           household_id?: string
           id?: string
           is_cash?: boolean
-          logged_by_user_id?: string
+          logged_by_user_id?: string | null
           split_group_id?: string | null
           updated_at?: string
         }

@@ -32,23 +32,28 @@ export interface SyncResult {
 }
 
 /**
+ * A sync failure whose message is written for the user and surfaced verbatim
+ * (unlike other sync errors, which are laundered) because the situation needs
+ * a human decision.
+ */
+export class UserFacingSyncError extends Error {}
+
+/**
  * Raised by the shape-drift guard in {@link runSync}: the fetched registry
  * parsed to zero reconcilable entries while the ledger still has rows, which
- * would otherwise mass-delete every mirrored expense. Its message is surfaced
- * verbatim to the user (unlike other sync errors, which are laundered) because
- * the situation needs a human decision.
+ * would otherwise mass-delete every mirrored expense.
  */
-export class EmptyRegistryError extends Error {}
+export class EmptyRegistryError extends UserFacingSyncError {}
 
 /**
  * User-facing message for a failed sync. Raw error detail (Postgres text,
  * upstream HTTP bodies) must never reach the client — callers log it
  * server-side via console.error; everything else is laundered through the
- * shared getErrorMessage() patterns. The shape-drift abort keeps its own
+ * shared getErrorMessage() patterns. UserFacingSyncError keeps its own
  * distinct, self-explanatory message.
  */
 export function publicSyncErrorMessage(error: unknown): string {
-  if (error instanceof EmptyRegistryError) return error.message
+  if (error instanceof UserFacingSyncError) return error.message
   return getErrorMessage(error)
 }
 
@@ -114,7 +119,7 @@ export function expenseFields(
   m: MappedEntry,
   description: string | null,
   rate: number,
-  categoryId: string | null
+  categoryId: string
 ) {
   const amount = round2(m.shareCents / 100)
   const convertedAmount = round2(amount * rate)
@@ -156,6 +161,18 @@ export async function runSync(
   opts: { userId: string; householdId: string; link: TricountLink }
 ): Promise<SyncResult> {
   const { userId, householdId, link } = opts
+
+  // expenses.category_id is NOT NULL, but default_category_id is ON DELETE
+  // SET NULL — a link whose Tricount category was deleted can't mirror
+  // anything. Fail fast with an actionable message instead of letting every
+  // expense insert hit the constraint.
+  const defaultCategoryId = link.default_category_id
+  if (!defaultCategoryId) {
+    throw new UserFacingSyncError(
+      `"${link.title ?? link.public_identifier_token}" has no Tricount category ` +
+        `(it was deleted) — unlink and reconnect the tricount to recreate it.`
+    )
+  }
 
   const registry = await fetchRegistry(link.public_identifier_token)
 
@@ -288,7 +305,7 @@ export async function runSync(
     // The mirrored budget expense for this entry, or null when there shouldn't
     // be one: INCOME (`exp` null) or a sub-cent share whose EUR amount rounds
     // to 0 (expenseFields null).
-    const fields = exp ? expenseFields(exp, description, rate, link.default_category_id) : null
+    const fields = exp ? expenseFields(exp, description, rate, defaultCategoryId) : null
     // Signed EUR reconciliation amounts, stored on the ledger row.
     const ledgerFields = {
       entry_date: rc.entryDate,
