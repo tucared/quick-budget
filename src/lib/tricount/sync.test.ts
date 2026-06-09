@@ -29,32 +29,32 @@ describe("expenseFields", () => {
   })
 
   it("converts a foreign-currency share at the resolved rate", () => {
-    const fields = expenseFields(mapped({ shareCents: 1000, currency: "BRL" }), null, 0.164, null)
+    const fields = expenseFields(mapped({ shareCents: 1000, currency: "BRL" }), null, 0.164, "cat-1")
     expect(fields).toMatchObject({
       amount: 10,
       currency: "BRL",
       converted_amount: 1.64,
       exchange_rate: 0.164,
       description: null,
-      category_id: null,
+      category_id: "cat-1",
     })
   })
 
   it("returns null when the converted EUR amount rounds to 0 (sub-cent share)", () => {
     // 0.02 BRL × 0.164 = 0.00328 → rounds to €0.00, which the DB CHECK
     // converted_amount <> 0 would reject.
-    expect(expenseFields(mapped({ shareCents: 2, currency: "BRL" }), null, 0.164, null)).toBeNull()
+    expect(expenseFields(mapped({ shareCents: 2, currency: "BRL" }), null, 0.164, "cat-1")).toBeNull()
     // 0.03 BRL × 0.164 = 0.00492 → still €0.00.
-    expect(expenseFields(mapped({ shareCents: 3, currency: "BRL" }), null, 0.164, null)).toBeNull()
+    expect(expenseFields(mapped({ shareCents: 3, currency: "BRL" }), null, 0.164, "cat-1")).toBeNull()
   })
 
   it("keeps the smallest share that rounds to a whole cent", () => {
     // 0.04 BRL × 0.164 = 0.00656 → rounds to €0.01.
     expect(
-      expenseFields(mapped({ shareCents: 4, currency: "BRL" }), null, 0.164, null)
+      expenseFields(mapped({ shareCents: 4, currency: "BRL" }), null, 0.164, "cat-1")
     ).toMatchObject({ amount: 0.04, converted_amount: 0.01 })
     // A 1-cent EUR share at rate 1 stays a valid expense.
-    expect(expenseFields(mapped({ shareCents: 1 }), null, 1, null)).toMatchObject({
+    expect(expenseFields(mapped({ shareCents: 1 }), null, 1, "cat-1")).toMatchObject({
       amount: 0.01,
       converted_amount: 0.01,
     })
