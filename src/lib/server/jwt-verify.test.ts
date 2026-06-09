@@ -39,7 +39,10 @@ function baseClaims() {
     email: "test@example.com",
     aud: "authenticated",
     role: "authenticated" as const,
-    iss: "http://localhost:54321/auth/v1",
+    // Must match the issuer the verifier pins, which derives from the same
+    // env var (defaulted in vitest.setup.ts, but may be a real URL in envs
+    // that export it).
+    iss: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1`,
     session_id: "sess-abc",
     iat: Math.floor(Date.now() / 1000),
     app_metadata: { household_id: "house-abc" },
@@ -72,6 +75,19 @@ describe("verifyAccessToken", () => {
 
   it("returns reason=invalid for a token signed with an unknown key", async () => {
     const token = await mintToken(baseClaims(), wrongSigningKey)
+    expect(await verifyAccessToken(token)).toEqual({ ok: false, reason: "invalid" })
+  })
+
+  it("returns reason=invalid for a token from a different issuer", async () => {
+    const token = await mintToken(
+      { ...baseClaims(), iss: "https://some-other-project.supabase.co/auth/v1" },
+      signingKey
+    )
+    expect(await verifyAccessToken(token)).toEqual({ ok: false, reason: "invalid" })
+  })
+
+  it("returns reason=invalid for a token with the wrong audience", async () => {
+    const token = await mintToken({ ...baseClaims(), aud: "anon" }, signingKey)
     expect(await verifyAccessToken(token)).toEqual({ ok: false, reason: "invalid" })
   })
 

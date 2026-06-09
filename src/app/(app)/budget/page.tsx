@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { format, startOfMonth } from "date-fns"
+import { isValidIsoDate } from "@/lib/date-utils"
 import {
   getServerUser,
   getBudgetAndAllowanceSummary,
@@ -19,8 +20,10 @@ interface BudgetPageProps {
 export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   const { month } = await searchParams
 
+  // Shape alone isn't enough (?month=2026-99 passes the regex but is not a
+  // month) — require the resulting first-of-month to be a real calendar date.
   let budgetMonth: string
-  if (month && /^\d{4}-\d{2}$/.test(month)) {
+  if (month && /^\d{4}-\d{2}$/.test(month) && isValidIsoDate(`${month}-01`)) {
     budgetMonth = `${month}-01`
   } else {
     budgetMonth = format(startOfMonth(new Date()), "yyyy-MM-dd")

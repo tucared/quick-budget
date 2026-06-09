@@ -3,6 +3,13 @@ import { isSplitGroup } from "./types"
 
 export const isSplitGroupItem = isSplitGroup
 
+// Round to 2 decimals (cents). Amounts written to the DECIMAL amount /
+// converted_amount columns must go through this so the client convention
+// matches the server-side sync path (src/lib/tricount/sync.ts).
+export function round2(value: number): number {
+  return +value.toFixed(2)
+}
+
 // Cap-with-overflow derivation (JTBD #8). Given the selected category's cap
 // configuration and the entered amount + exchange rate, returns whether the
 // expense exceeds the configured cap and — if so — the exact original- and
@@ -55,10 +62,18 @@ export function deriveCapState(
     return { ...EMPTY_DERIVATION, capEUR }
   }
 
-  const overflowEUR = +(totalEUR - capEUR).toFixed(2)
+  const overflowEUR = round2(totalEUR - capEUR)
   const primaryOriginal =
-    exchangeRate === 1 ? capEUR : +(capEUR / exchangeRate).toFixed(2)
-  const overflowOriginal = +(amountOriginal - primaryOriginal).toFixed(2)
+    exchangeRate === 1 ? capEUR : round2(capEUR / exchangeRate)
+  const overflowOriginal = round2(amountOriginal - primaryOriginal)
+
+  // A total that exceeds the cap by less than half a cent — in EUR or, for
+  // foreign-currency inputs, in the original currency — rounds one overflow
+  // side to 0.00, which the DB CHECK (amount <> 0) would reject with a
+  // cryptic error. Treat it as not exceeding the cap instead: no split.
+  if (overflowEUR < 0.01 || overflowOriginal < 0.01) {
+    return { ...EMPTY_DERIVATION, capEUR }
+  }
 
   return {
     exceedsCap: true,
@@ -74,7 +89,10 @@ export function deriveCapState(
 // SplitGroup item, preserving the original order. Rows without a
 // split_group_id pass through unchanged. An orphan sibling (only one row in
 // the page for a given group) also passes through as a plain expense — the
-// missing other half lives on a different page or is data debt.
+// missing other half lives on a different page or is data debt. An
+// over-populated group (3+ rows — data debt the app's two-sibling invariant
+// doesn't expect) emits the first two as the SplitGroup and passes the extras
+// through as plain expenses, so no row that counts in totals is hidden.
 export function groupSplitSiblings(expenses: ExpenseWithDetails[]): ExpenseListItem[] {
   const buckets = new Map<string, ExpenseWithDetails[]>()
   for (const exp of expenses) {
@@ -89,9 +107,15 @@ export function groupSplitSiblings(expenses: ExpenseWithDetails[]): ExpenseListI
   const out: ExpenseListItem[] = []
   for (const exp of expenses) {
     if (exp.split_group_id) {
-      if (emitted.has(exp.split_group_id)) continue
       const siblings = buckets.get(exp.split_group_id)!
       if (siblings.length >= 2) {
+        // 3rd+ row of an over-populated group: pass through at its original
+        // position instead of silently dropping it.
+        if (siblings.indexOf(exp) >= 2) {
+          out.push(exp)
+          continue
+        }
+        if (emitted.has(exp.split_group_id)) continue
         const group: SplitGroup = {
           splitGroupId: exp.split_group_id,
           siblings: [siblings[0], siblings[1]],

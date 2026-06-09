@@ -49,17 +49,6 @@ export async function GET(request: NextRequest) {
     // Adjust weekend dates to previous working day
     const date = adjustToWorkingDay(requestedDate)
 
-    // EUR to EUR is always 1.0
-    if (currency === 'EUR') {
-      return NextResponse.json({
-        currency,
-        date,
-        rate: 1.0,
-        source: 'fixed',
-        ...(date !== requestedDate && { adjustedFrom: requestedDate })
-      })
-    }
-
     const supabase = await createServerSupabaseClient()
 
     // Authenticate via local JWKS verification (no network round-trip). This
@@ -81,6 +70,18 @@ export async function GET(request: NextRequest) {
     // Rate-limit by authenticated user ID
     const limited = rateLimitResponse(rateLimiter, verdict.claims.sub)
     if (limited) return limited
+
+    // EUR to EUR is always 1.0 (after auth so the route exposes nothing,
+    // not even a constant, to unauthenticated callers)
+    if (currency === 'EUR') {
+      return NextResponse.json({
+        currency,
+        date,
+        rate: 1.0,
+        source: 'fixed',
+        ...(date !== requestedDate && { adjustedFrom: requestedDate })
+      })
+    }
 
     // Check if rate exists in database
     const { data: cachedRate, error: selectError } = await supabase

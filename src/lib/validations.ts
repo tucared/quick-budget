@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { isValidIsoDate } from "@/lib/date-utils"
 
 // Expense form validation schema
 export const expenseSchema = z.object({
@@ -15,7 +16,7 @@ export const expenseSchema = z.object({
 
   expense_date: z
     .string({ message: "Date is required" })
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+    .refine(isValidIsoDate, "Invalid date"),
 
   description: z
     .string()

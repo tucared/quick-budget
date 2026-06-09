@@ -27,6 +27,18 @@ BEGIN
     RAISE EXCEPTION 'Source and destination must be different';
   END IF;
 
+  -- Both categories must belong to the household. The FK alone would accept
+  -- another household's category id (SECURITY INVOKER + RLS on categories
+  -- makes foreign rows invisible, so this also rejects forged household ids).
+  IF EXISTS (
+    SELECT 1 FROM unnest(ARRAY[p_source_category_id, p_dest_category_id]) AS cid
+    WHERE NOT EXISTS (
+      SELECT 1 FROM categories c WHERE c.id = cid AND c.household_id = p_household_id
+    )
+  ) THEN
+    RAISE EXCEPTION 'Category does not belong to household';
+  END IF;
+
   -- Get current source allocation and lock the row
   SELECT allocated_amount INTO v_source_allocated
   FROM budget_allocations
@@ -113,6 +125,21 @@ BEGIN
     RAISE EXCEPTION 'Allocation amounts must not be negative';
   END IF;
 
+  -- Every category being allocated to must belong to the household (the FK
+  -- alone would accept another household's category id). Zeroed-out entries
+  -- are exempt — they only drive the household-scoped DELETE below.
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_allocations) AS elem
+    WHERE (elem->>'amount')::DECIMAL > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM categories c
+        WHERE c.id = (elem->>'category_id')::UUID
+          AND c.household_id = p_household_id
+      )
+  ) THEN
+    RAISE EXCEPTION 'Category does not belong to household';
+  END IF;
+
   -- Process each allocation
   FOR v_alloc IN SELECT * FROM jsonb_array_elements(p_allocations)
   LOOP
@@ -185,6 +212,15 @@ BEGIN
     RAISE EXCEPTION 'Amount must be positive';
   END IF;
 
+  -- The destination category must belong to the household (the FK alone
+  -- would accept another household's category id).
+  IF NOT EXISTS (
+    SELECT 1 FROM categories c
+    WHERE c.id = p_category_id AND c.household_id = p_household_id
+  ) THEN
+    RAISE EXCEPTION 'Category does not belong to household';
+  END IF;
+
   -- Lock the target row to serialise concurrent allocations.
   SELECT target_amount INTO v_target
   FROM monthly_budget_targets
@@ -238,6 +274,15 @@ BEGIN
   -- Validate amount
   IF p_amount <= 0 THEN
     RAISE EXCEPTION 'Top-up amount must be positive';
+  END IF;
+
+  -- The category must belong to the household (the FK alone would accept
+  -- another household's category id).
+  IF NOT EXISTS (
+    SELECT 1 FROM categories c
+    WHERE c.id = p_category_id AND c.household_id = p_household_id
+  ) THEN
+    RAISE EXCEPTION 'Category does not belong to household';
   END IF;
 
   -- Upsert: create or increase allocation

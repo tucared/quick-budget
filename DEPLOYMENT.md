@@ -65,7 +65,7 @@ Save.
 
 **What the hook does**: injects `household_id` into the JWT's `app_metadata`, so server- and client-side code read it from the token instead of hitting `public.users`, and the `private.get_my_household_id()` RLS helper skips its DB lookup on every household-scoped query.
 
-**Safe to ship without it**: `private.get_my_household_id()` and `getServerUser()` both fall back to a `public.users` SELECT when the claim is absent. You just don't get the per-request perf win until the hook is enabled.
+**NOT safe to ship without it**: there is no fallback. `private.get_my_household_id()` returns `NULL` for a token without the claim (the original `public.users` fallback was removed in `20260514163400_drop_users_fallback_from_get_my_household_id.sql`), so every household-scoped RLS policy matches zero rows, and `getServerUser()` treats a claim-less token as unauthenticated — users get an empty app and a bounce to `/login`. Enable the hook (and have users re-login so their tokens carry the claim) before pointing the app at a project.
 
 The hook setting is project-level, not schema-level, so the daily Dev reset doesn't clear it — no need to re-toggle after a reset.
 
@@ -131,7 +131,7 @@ supabase db reset  # Verify locally
 
 ## Deploying Schema Changes
 
-Schemas are **declarative**. You never hand-write SQL in `supabase/migrations/` — `.claude/settings.json` blocks it, and CI generates the migration for you.
+Schemas are **declarative**. By default you don't hand-write SQL in `supabase/migrations/` — `.claude/settings.json` prompts on it, and CI generates the migration for you. A narrow set of cases (cross-schema objects, function grants, views, data migrations) does warrant a hand-authored migration; see [`.agents/skills/supabase-schema-flow/SKILL.md`](./.agents/skills/supabase-schema-flow/SKILL.md).
 
 1. Edit `supabase/schemas/**`
 2. Open a PR

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase"
 import { startOfMonth, getDaysInMonth, format } from "date-fns"
 import { Pencil } from "lucide-react"
@@ -87,13 +87,21 @@ export function BudgetPageContent({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setCashflowAdjustment(initialCashflowAdjustment ?? null) }, [initialCashflowAdjustment])
 
+  // Stale-reload guard: an in-flight reload started before month navigation
+  // must not overwrite the new month's data when it resolves late.
+  const currentMonthRef = useRef(budgetMonth)
+  useEffect(() => { currentMonthRef.current = budgetMonth }, [budgetMonth])
+
   function reloadData() {
+    const month = budgetMonth
+    setError("")
     const supabase = createClient()
     Promise.all([
-      fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
-      fetchMonthlyBudgetTarget(supabase, householdId, budgetMonth),
-      fetchMonthlyExpenses(supabase, householdId, budgetMonth),
+      fetchBudgetAndAllowanceSummary(supabase, householdId, month),
+      fetchMonthlyBudgetTarget(supabase, householdId, month),
+      fetchMonthlyExpenses(supabase, householdId, month),
     ]).then(([summaryResult, targetResult, expensesResult]) => {
+      if (currentMonthRef.current !== month) return
       if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
       else if (summaryResult.data) {
         setBudgets(summaryResult.data.budgets)
@@ -107,12 +115,15 @@ export function BudgetPageContent({
   }
 
   function reloadExpenses() {
+    const month = budgetMonth
+    setError("")
     const supabase = createClient()
     Promise.all([
-      fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
-      fetchMonthlyExpenses(supabase, householdId, budgetMonth),
-      fetchTricountCashflowAdjustment(supabase, householdId, budgetMonth),
+      fetchBudgetAndAllowanceSummary(supabase, householdId, month),
+      fetchMonthlyExpenses(supabase, householdId, month),
+      fetchTricountCashflowAdjustment(supabase, householdId, month),
     ]).then(([summaryResult, expensesResult, tricountResult]) => {
+      if (currentMonthRef.current !== month) return
       if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
       else if (summaryResult.data) {
         setBudgets(summaryResult.data.budgets)
@@ -126,11 +137,14 @@ export function BudgetPageContent({
   }
 
   function reloadAllocations() {
+    const month = budgetMonth
+    setError("")
     const supabase = createClient()
     Promise.all([
-      fetchBudgetAndAllowanceSummary(supabase, householdId, budgetMonth),
-      fetchMonthlyBudgetTarget(supabase, householdId, budgetMonth),
+      fetchBudgetAndAllowanceSummary(supabase, householdId, month),
+      fetchMonthlyBudgetTarget(supabase, householdId, month),
     ]).then(([summaryResult, targetResult]) => {
+      if (currentMonthRef.current !== month) return
       if (summaryResult.error) setError(getErrorMessage(summaryResult.error))
       else if (summaryResult.data) {
         setBudgets(summaryResult.data.budgets)

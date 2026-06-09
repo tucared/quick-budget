@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { getServerUser } from "@/lib/server/data"
-import { runSync, runSyncAll, type LinkSyncOutcome } from "@/lib/tricount/sync"
+import { runSync, runSyncAll, publicSyncErrorMessage, type LinkSyncOutcome } from "@/lib/tricount/sync"
 import { createRateLimiter, rateLimitResponse } from "@/lib/rate-limit"
 
 // Each sync fans out to Tricount's undocumented backend. 10 requests per user
@@ -54,8 +54,10 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ configured: results.length > 0, results })
   } catch (error) {
+    // Raw detail (Postgres text, upstream HTTP bodies) stays server-side; the
+    // client gets a laundered message (the shape-drift "registry empty" abort
+    // keeps its distinct text).
     console.error("Tricount sync failed:", error)
-    const message = error instanceof Error ? error.message : "Sync failed"
-    return NextResponse.json({ error: message }, { status: 502 })
+    return NextResponse.json({ error: publicSyncErrorMessage(error) }, { status: 502 })
   }
 }

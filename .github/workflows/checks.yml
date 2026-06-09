@@ -11,12 +11,18 @@ on:
       - "package.json"
       - "package-lock.json"
       - "vitest.config.ts"
+      - "vitest.setup.ts"
       - "tsconfig.json"
       - "eslint.config.js"
+      - "next.config.js"
+      - "postcss.config.cjs"
       - ".github/workflows/checks.yml"
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -8,7 +8,7 @@ import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
 import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
-import { deriveCapState } from "@/lib/split-utils"
+import { deriveCapState, round2 } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -44,6 +44,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     { status: 'idle' } | { status: 'loading' } | { status: 'error'; error: string }
   >(initialCategories === undefined ? { status: 'loading' } : { status: 'idle' })
   const [error, setError] = useState("")
+  // Non-blocking notice shown after a save that had to use a static fallback
+  // exchange rate (rate API down). The expense is still logged; the stored
+  // rate is approximate, so the user shouldn't find out by accident later.
+  const [rateWarning, setRateWarning] = useState("")
   const [showSuccess, setShowSuccess] = useState(false)
   const [topCategoryIds, setTopCategoryIds] = useState<string[]>(initialTopCategoryIds ?? [])
   const [categoryBudget, setCategoryBudget] = useState<BudgetSummary | null>(null)
@@ -350,7 +354,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviewExchangeRate(null)
-    fetchExchangeRateFromAPI(selectedCurrency, expenseDate).then((rate) => {
+    fetchExchangeRateFromAPI(selectedCurrency, expenseDate).then(({ rate }) => {
       if (!cancelled) setPreviewExchangeRate(rate)
     })
     return () => { cancelled = true }
@@ -376,6 +380,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   const onSubmit = async () => {
     setError("")
+    setRateWarning("")
     setFormErrors({})
 
     // Validate with Zod
@@ -413,8 +418,11 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       // Convert to EUR for consistent tracking
       const cur = data.currency || "EUR"
 
-      // Fetch exchange rate from API (with database caching)
-      const exchangeRate = await fetchExchangeRateFromAPI(cur, data.expense_date)
+      // Fetch exchange rate from API (with database caching). `isFallback`
+      // means a static hardcoded rate was used — still log the expense, but
+      // surface a notice afterwards instead of staying silent about it.
+      const { rate: exchangeRate, isFallback: usedFallbackRate } =
+        await fetchExchangeRateFromAPI(cur, data.expense_date)
       const sharedFields = {
         logged_by_user_id: user.id,
         household_id: user.householdId,
@@ -471,7 +479,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             ...sharedFields,
             category_id: data.category_id,
             amount: data.amount,
-            converted_amount: data.amount * exchangeRate,
+            converted_amount: round2(data.amount * exchangeRate),
           })
           .select()
           .single()
@@ -508,6 +516,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
       // Refresh budget status for the same category
       setBudgetRefreshTick((t) => t + 1)
+
+      if (usedFallbackRate) {
+        setRateWarning("Saved with an approximate exchange rate — live rate unavailable")
+      }
 
       // Show success state in button
       setShowSuccess(true)
@@ -580,6 +592,12 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       {error && (
         <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {error}
+        </div>
+      )}
+
+      {rateWarning && (
+        <div className="px-2.5 py-2 bg-[hsl(36,40%,94%)] border border-[hsl(36,30%,78%)] rounded-md text-xs text-[hsl(24,85%,42%)]">
+          {rateWarning}
         </div>
       )}
 

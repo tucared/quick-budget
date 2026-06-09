@@ -109,54 +109,6 @@ export async function getMonthlyBudgetTarget(
 }
 
 /**
- * Server-side function to fetch expenses for a given month.
- * RLS filters by the caller's household — no explicit household_id needed.
- */
-export async function getMonthlyExpenses(
-  budgetMonth: string
-): Promise<Expense[]> {
-  const supabase = await getSupabase()
-
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("*")
-    .gte("expense_date", budgetMonth)
-    .lt("expense_date", nextMonthString(budgetMonth))
-    .order("expense_date", { ascending: true })
-
-  if (error) {
-    console.error("Failed to fetch monthly expenses:", error)
-    return []
-  }
-
-  return (data || []) as Expense[]
-}
-
-/**
- * Server-side function to fetch recent expenses.
- * RLS filters by the caller's household — no explicit household_id needed.
- */
-export async function getRecentExpenses(
-  limit: number = 20
-): Promise<ExpenseWithDetails[]> {
-  const supabase = await getSupabase()
-
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("*")
-    .order("expense_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(limit)
-
-  if (error) {
-    console.error("Failed to fetch recent expenses:", error)
-    return []
-  }
-
-  return data || []
-}
-
-/**
  * Combined fetch: expenses + active categories in a single RPC round trip.
  *
  * Mode 'recent' returns the top N expenses ordered by date desc (for
@@ -340,26 +292,6 @@ export async function getTricountLinkBalances(): Promise<Record<string, Tricount
     result[linkId] = { paid: acc.paid / 100, share: acc.share / 100 }
   }
   return result
-}
-
-/**
- * Server-side function to fetch active categories.
- * RLS filters by the caller's household — no explicit household_id needed.
- */
-export async function getCategories(): Promise<Category[]> {
-  const supabase = await getSupabase()
-
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("is_active", true)
-
-  if (error) {
-    console.error("Failed to fetch categories:", error)
-    return []
-  }
-
-  return data || []
 }
 
 /**
