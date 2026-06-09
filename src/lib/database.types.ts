@@ -302,7 +302,7 @@ export type Database = {
         Insert: {
           content_hash: string
           created_at?: string
-          entry_date?: string
+          entry_date: string
           expense_id?: string | null
           household_id: string
           id?: string
