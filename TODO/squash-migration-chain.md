@@ -1,6 +1,6 @@
 # Squash `supabase/migrations/` to a fresh baseline
 
-Collapse the 23 migrations (Mar 8 → May 16, 2026) into one canonical `<ts>_baseline.sql` that represents current Prod state byte-for-byte. Delete the rest. Future migrations resume on top of the new baseline using the existing schema-flow.
+Collapse the migration chain (28 files as of 2026-06-09 and still growing — the counts in "Current state" below are a snapshot from the original scoping, re-inventory before executing) into one canonical `<ts>_baseline.sql` that represents current Prod state byte-for-byte. Delete the rest. Future migrations resume on top of the new baseline using the existing schema-flow.
 
 Designed to be **executed fully locally** — Docker + Supabase CLI on your machine, linked to Dev and Prod via `supabase link --project-ref <ref>`. No cloud Claude env, no MCP. Pure CLI + `psql`.
 

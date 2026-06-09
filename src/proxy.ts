@@ -10,6 +10,19 @@ export const config = {
 
 const PUBLIC_PATHS = new Set(["/login"])
 
+// Default-deny for anything not in PUBLIC_PATHS: pages bounce to /login, API
+// routes get a JSON 401 (a redirect would confuse fetch callers). Per-route
+// auth checks (getServerUser, verifyAccessToken in the API routes) stay as
+// defense-in-depth, but a future route added without one is no longer public.
+function deny(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  const url = request.nextUrl.clone()
+  url.pathname = "/login"
+  return NextResponse.redirect(url)
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -32,32 +45,35 @@ export async function proxy(request: NextRequest) {
     }
   )
 
+  const isPublic = PUBLIC_PATHS.has(request.nextUrl.pathname)
+
   // getSession is a cookie read, no network — fine here; verify step gates trust.
   const {
     data: { session },
   } = await supabase.auth.getSession()
-  if (!session) return supabaseResponse
+  if (!session) return isPublic ? supabaseResponse : deny(request)
 
   const verdict = await verifyAccessToken(session.access_token)
   if (verdict.ok) return supabaseResponse // hot path — zero network
 
   if (verdict.reason === "expired") {
-    await supabase.auth.refreshSession() // single /token POST on expiry
+    // Single /token POST on expiry. A failed refresh means the session is
+    // genuinely gone (revoked, refresh token expired) — treat like no session.
+    const { data, error } = await supabase.auth.refreshSession()
+    if (error || !data.session) {
+      return isPublic ? supabaseResponse : deny(request)
+    }
     return supabaseResponse
   }
 
   // "transient" — JWKS fetch / Supabase auth outage. Don't sign out: real
   // sessions are still real, just unverifiable right now. Let the request
-  // through; the next navigation re-tries once the JWKS cache cooldown
-  // (30s) clears.
+  // through (pages still render nothing useful — getServerUser also treats
+  // transient as unauthenticated); the next navigation re-tries once the
+  // JWKS cache cooldown (30s) clears.
   if (verdict.reason === "transient") return supabaseResponse
 
   // "invalid" — tampered cookie or malformed token
   await supabase.auth.signOut()
-  if (!PUBLIC_PATHS.has(request.nextUrl.pathname)) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/login"
-    return NextResponse.redirect(url)
-  }
-  return supabaseResponse
+  return isPublic ? supabaseResponse : deny(request)
 }

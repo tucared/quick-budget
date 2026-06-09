@@ -7,7 +7,7 @@ import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type BudgetSummary, type Category, type Expense } from "@/lib/types"
 import { fetchExchangeRateFromAPI } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
-import { deriveCapState, partitionSplitSiblings } from "@/lib/split-utils"
+import { deriveCapState, partitionSplitSiblings, round2 } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
@@ -134,13 +134,18 @@ function EditExpenseForm({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  // Non-blocking notice shown when a save had to use a static fallback
+  // exchange rate (rate API down). The save still goes through; the dialog
+  // stays open so the warning is actually seen.
+  const [rateWarning, setRateWarning] = useState("")
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const amount = centsRaw > 0 ? centsRaw / 100 : NaN
 
   // Edit dialog uses a static exchange_rate derived from the row at log time —
-  // re-fetched on save against the (possibly edited) date. For preview we use
-  // the stored rate as the best available reference.
+  // re-fetched on save only when the currency or date changed (see
+  // handleSave). For preview we use the stored rate as the best available
+  // reference.
   const previewExchangeRate = Number(primaryRow.exchange_rate) || 1
 
   const selectedCategoryObj = useMemo(
@@ -300,6 +305,7 @@ function EditExpenseForm({
 
   const handleSave = async () => {
     setError("")
+    setRateWarning("")
     setFormErrors({})
 
     const result = expenseSchema.safeParse({
@@ -326,7 +332,20 @@ function EditExpenseForm({
 
     try {
       const cur = data.currency || "EUR"
-      const exchangeRate = await fetchExchangeRateFromAPI(cur, data.expense_date)
+      // Re-fetch the rate only when the inputs that determine it changed.
+      // Editing unrelated fields (description, category, amount) reuses the
+      // row's stored historical rate — an unconditional re-fetch could
+      // silently rewrite a correct rate with a static fallback whenever the
+      // rate API happens to be down.
+      const rateInputsChanged =
+        cur !== primaryRow.currency || data.expense_date !== primaryRow.expense_date
+      let exchangeRate = Number(primaryRow.exchange_rate) || 1
+      let usedFallbackRate = false
+      if (rateInputsChanged) {
+        const fetched = await fetchExchangeRateFromAPI(cur, data.expense_date)
+        exchangeRate = fetched.rate
+        usedFallbackRate = fetched.isFallback
+      }
       const supabase = createClient()
 
       const sharedFields = {
@@ -357,7 +376,7 @@ function EditExpenseForm({
           .update({
             ...sharedFields,
             amount: data.amount,
-            converted_amount: data.amount * exchangeRate,
+            converted_amount: round2(data.amount * exchangeRate),
             category_id: data.category_id,
           })
           .eq("id", primaryRow.id)
@@ -367,25 +386,13 @@ function EditExpenseForm({
         onSaved?.(updated as Expense)
       }
 
-      // Case 2: was not split → now split. Update primary to the capped
-      // amount + mint split_group_id, then insert the overflow sibling. Run
-      // the update first so a failed insert leaves the row in a consistent
-      // (non-split, full-amount-on-primary) state.
+      // Case 2: was not split → now split. Insert the overflow sibling first,
+      // then shrink the primary to the capped amount + split_group_id. This
+      // order means a partial failure can only leave a transient double-count
+      // (visible, fixable), never silently lose the overflow portion of the
+      // spend — which is what update-first would do if the insert failed.
       else if (!wasSplit && wantsSplitNow) {
         const splitGroupId = crypto.randomUUID()
-        const { data: updated, error: updateError } = await supabase
-          .from("expenses")
-          .update({
-            ...sharedFields,
-            amount: submitDerivation.primaryOriginal,
-            converted_amount: submitDerivation.primaryEUR,
-            category_id: data.category_id,
-            split_group_id: splitGroupId,
-          })
-          .eq("id", primaryRow.id)
-          .select()
-          .single()
-        if (updateError) throw updateError
         const { data: inserted, error: insertError } = await supabase
           .from("expenses")
           .insert({
@@ -400,6 +407,25 @@ function EditExpenseForm({
           .select()
           .single()
         if (insertError) throw insertError
+        const { data: updated, error: updateError } = await supabase
+          .from("expenses")
+          .update({
+            ...sharedFields,
+            amount: submitDerivation.primaryOriginal,
+            converted_amount: submitDerivation.primaryEUR,
+            category_id: data.category_id,
+            split_group_id: splitGroupId,
+          })
+          .eq("id", primaryRow.id)
+          .select()
+          .single()
+        if (updateError) {
+          // Best-effort rollback of the just-inserted overflow so the failure
+          // state is the original single full-amount row; if the delete also
+          // fails, the double-count is at least visible in the list.
+          await supabase.from("expenses").delete().eq("id", (inserted as Expense).id)
+          throw updateError
+        }
         onSaved?.([updated as Expense, inserted as Expense])
       }
 
@@ -436,15 +462,19 @@ function EditExpenseForm({
         onSaved?.([primaryRes.data as Expense, overflowRes.data as Expense])
       }
 
-      // Case 4: was split → no longer split. Update primary to full amount +
-      // clear split_group_id, then delete the overflow sibling.
+      // Case 4: was split → no longer split. Update primary to the full
+      // amount + clear split_group_id FIRST, then delete the overflow
+      // sibling. If the delete fails, the failure state is a transient
+      // double-count (visible, and self-healing — the thrown error keeps the
+      // dialog open so retrying re-runs the same update + delete). The
+      // reverse order would lose the overflow portion if the update failed.
       else if (wasSplit && !wantsSplitNow && initialOverflowRow) {
         const { data: updated, error: updateError } = await supabase
           .from("expenses")
           .update({
             ...sharedFields,
             amount: data.amount,
-            converted_amount: data.amount * exchangeRate,
+            converted_amount: round2(data.amount * exchangeRate),
             category_id: data.category_id,
             split_group_id: null,
           })
@@ -476,7 +506,13 @@ function EditExpenseForm({
       }
 
       setSaving(false)
-      onOpenChange(false)
+      if (usedFallbackRate) {
+        // The save went through, but with an approximate rate — keep the
+        // dialog open so the notice is seen rather than closing silently.
+        setRateWarning("Saved with an approximate exchange rate — live rate unavailable")
+      } else {
+        onOpenChange(false)
+      }
     } catch (err) {
       setError(getErrorMessage(err))
       setSaving(false)
@@ -493,6 +529,12 @@ function EditExpenseForm({
         {error && (
           <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
             {error}
+          </div>
+        )}
+
+        {rateWarning && (
+          <div className="px-2.5 py-2 bg-[hsl(36,40%,94%)] border border-[hsl(36,30%,78%)] rounded-md text-xs text-[hsl(24,85%,42%)]">
+            {rateWarning}
           </div>
         )}
 

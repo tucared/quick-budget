@@ -9,6 +9,14 @@ on:
       - "supabase/**"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# A cron run and a push-to-main run can otherwise overlap mid-reset.
+concurrency:
+  group: reset-dev
+  cancel-in-progress: false
+
 jobs:
   reset:
     runs-on: ubuntu-latest
@@ -28,3 +36,25 @@ jobs:
         run: |
           supabase link --project-ref "${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
           echo y | supabase db reset --linked
+
+      # The repo is public and cloud Dev is internet-reachable, so the seed
+      # password (`password1`) in supabase/seeds/01_create_users.sql is a
+      # working credential for anyone who reads the repo. This step replaces
+      # it after every reset with a private one. Opt-in: it only runs when
+      # both secrets exist —
+      #   DEV_SEED_PASSWORD     the password Dev logins should actually use
+      #   SUPABASE_DEV_DB_URL   a postgres:// connection string for Dev
+      #                         (session pooler URL from the dashboard)
+      # Until they're set, Dev keeps the public seed password (status quo).
+      # If you set them, use the same DEV_SEED_PASSWORD when dogfooding
+      # against Dev (Claude Code env config, Vercel previews).
+      - name: Rotate seed user passwords (skipped until secrets are set)
+        env:
+          SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+          DEV_SEED_PASSWORD: ${{ secrets.DEV_SEED_PASSWORD }}
+        if: env.SUPABASE_DEV_DB_URL != '' && env.DEV_SEED_PASSWORD != ''
+        run: |
+          psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 -v pw="$DEV_SEED_PASSWORD" -c \
+            "UPDATE auth.users
+               SET encrypted_password = extensions.crypt(:'pw', extensions.gen_salt('bf'))
+             WHERE email IN ('user1@example.com', 'user2@example.com');"

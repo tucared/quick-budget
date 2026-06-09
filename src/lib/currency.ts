@@ -22,8 +22,20 @@ interface ExchangeRateResponse {
   currency: string
   date: string
   rate: number
-  source: 'cache' | 'api' | 'fixed'
+  source: 'cache' | 'api' | 'fixed' | 'fallback'
   cachedAt?: string
+}
+
+export interface ExchangeRateResult {
+  rate: number
+  /**
+   * True when the rate is a static hardcoded fallback — either the API route
+   * exhausted its real sources (`source: 'fallback'`) or the request itself
+   * failed and FALLBACK_RATES_TO_EUR was used. Callers writing the rate to an
+   * expense row must surface this rather than silently storing an
+   * approximate rate as if it were historical truth.
+   */
+  isFallback: boolean
 }
 
 /**
@@ -35,9 +47,9 @@ interface ExchangeRateResponse {
 export async function fetchExchangeRateFromAPI(
   currency: string,
   date?: string
-): Promise<number> {
+): Promise<ExchangeRateResult> {
   if (currency === 'EUR') {
-    return 1.0
+    return { rate: 1.0, isFallback: false }
   }
 
   const dateParam = date || new Date().toISOString().split('T')[0]
@@ -50,11 +62,11 @@ export async function fetchExchangeRateFromAPI(
     }
 
     const data: ExchangeRateResponse = await response.json()
-    return data.rate
+    return { rate: data.rate, isFallback: data.source === 'fallback' }
   } catch (error) {
     console.error('Failed to fetch exchange rate from API:', error)
     // Fall back to hardcoded rate
-    return FALLBACK_RATES_TO_EUR[currency] || 1.0
+    return { rate: FALLBACK_RATES_TO_EUR[currency] || 1.0, isFallback: true }
   }
 }
 

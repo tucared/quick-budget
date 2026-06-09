@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import type { Category, ExpenseWithDetails, SplitGroup } from "./types"
-import { deriveCapState, groupSplitSiblings, partitionSplitSiblings, isSplitGroupItem } from "./split-utils"
+import { deriveCapState, groupSplitSiblings, partitionSplitSiblings, isSplitGroupItem, round2 } from "./split-utils"
 import { isSplitGroup } from "./types"
 
 function makeCategory(overrides: Partial<Category> = {}): Category {
@@ -100,6 +100,36 @@ describe("groupSplitSiblings", () => {
     expect(out[2]).toBe(middle)
     expect(out[3]).toBe(tail)
   })
+
+  it("passes the 3rd+ rows of an over-populated group through as plain expenses", () => {
+    const s1 = makeExpense({ id: "s1", split_group_id: "g1" })
+    const s2 = makeExpense({ id: "s2", split_group_id: "g1" })
+    const s3 = makeExpense({ id: "s3", split_group_id: "g1" })
+    const tail = makeExpense({ id: "tail" })
+    const out = groupSplitSiblings([s1, s2, s3, tail])
+    // First two siblings form the group; the extra stays visible as a plain
+    // expense at its original position — nothing is dropped from the list.
+    expect(out).toHaveLength(3)
+    expect(isSplitGroup(out[0])).toBe(true)
+    expect((out[0] as SplitGroup).siblings.map((s) => s.id)).toEqual(["s1", "s2"])
+    expect(out[1]).toBe(s3)
+    expect(isSplitGroup(out[1])).toBe(false)
+    expect(out[2]).toBe(tail)
+  })
+
+  it("keeps extras of an over-populated group in original order across mixed input", () => {
+    const s1 = makeExpense({ id: "s1", split_group_id: "g1" })
+    const middle = makeExpense({ id: "middle" })
+    const s2 = makeExpense({ id: "s2", split_group_id: "g1" })
+    const s3 = makeExpense({ id: "s3", split_group_id: "g1" })
+    const s4 = makeExpense({ id: "s4", split_group_id: "g1" })
+    const out = groupSplitSiblings([s1, middle, s2, s3, s4])
+    expect(out).toHaveLength(4)
+    expect(isSplitGroup(out[0])).toBe(true)
+    expect(out[1]).toBe(middle)
+    expect(out[2]).toBe(s3)
+    expect(out[3]).toBe(s4)
+  })
 })
 
 describe("partitionSplitSiblings", () => {
@@ -189,6 +219,49 @@ describe("deriveCapState", () => {
     expect(deriveCapState(cat, NaN, 1).exceedsCap).toBe(false)
     expect(deriveCapState(cat, 25, 0).exceedsCap).toBe(false)
     expect(deriveCapState(cat, 25, NaN).exceedsCap).toBe(false)
+  })
+
+  it("does not split when the EUR overflow rounds to 0.00 (would create a zero-amount sibling)", () => {
+    const cat = makeCategory({ cap_amount: 10 })
+    // 10.004 exceeds the cap by 0.004 — rounds to €0.00, which the DB CHECK
+    // (amount <> 0) would reject. Must collapse to a no-split derivation.
+    const result = deriveCapState(cat, 10.004, 1)
+    expect(result.exceedsCap).toBe(false)
+    expect(result.capEUR).toBe(10)
+  })
+
+  it("does not split when the original-currency overflow rounds to 0.00", () => {
+    const cat = makeCategory({ cap_amount: 10 })
+    // Strong currency: 1 unit = €5, so the cap is 2.00 in original currency.
+    // 2.004 leaves €0.02 of EUR overflow but only 0.004 of original-currency
+    // overflow — the original-side sibling amount would round to 0.00.
+    const result = deriveCapState(cat, 2.004, 5)
+    expect(result.exceedsCap).toBe(false)
+    expect(result.capEUR).toBe(10)
+  })
+
+  it("still splits when both the EUR and original-currency overflows are >= 0.01", () => {
+    const cat = makeCategory({ cap_amount: 10 })
+    const result = deriveCapState(cat, 2.01, 5)
+    expect(result.exceedsCap).toBe(true)
+    expect(result.primaryOriginal).toBe(2)
+    expect(result.primaryEUR).toBe(10)
+    expect(result.overflowOriginal).toBe(0.01)
+    expect(result.overflowEUR).toBe(0.05)
+  })
+})
+
+describe("round2", () => {
+  it("rounds long floats to 2 decimals (DECIMAL column convention)", () => {
+    expect(round2(10.498949999999999)).toBe(10.5)
+    expect(round2(0.005000000000000782)).toBe(0.01)
+    expect(round2(12.344999)).toBe(12.34)
+  })
+
+  it("leaves already-rounded values unchanged", () => {
+    expect(round2(10)).toBe(10)
+    expect(round2(10.55)).toBe(10.55)
+    expect(round2(0)).toBe(0)
   })
 })
 

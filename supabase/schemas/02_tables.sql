@@ -46,10 +46,11 @@ CREATE TRIGGER on_auth_user_created
 -- Must come after the users table is defined.
 --
 -- Reads household_id from the JWT custom claim populated by the
--- public.custom_access_token_hook auth hook (see 01_functions.sql). Falls
--- back to a users table lookup when the claim is absent — covers legacy
--- access tokens issued before the hook was enabled and any environment
--- where the hook isn't yet configured in the Supabase dashboard.
+-- private.custom_access_token_hook auth hook (defined below). There is NO
+-- users-table fallback: when the claim is absent the function returns NULL,
+-- every household-scoped policy matches zero rows, and the app bounces the
+-- session to /login. The hook must therefore be enabled before this schema
+-- serves traffic (see the rollout notes in the drop migration).
 --
 -- Source of truth: the hand-authored migrations
 -- supabase/migrations/20260514120000_add_household_id_to_jwt_claims.sql
@@ -197,7 +198,9 @@ CREATE TABLE categories (
 );
 
 CREATE INDEX idx_categories_household ON categories(household_id);
-CREATE INDEX idx_categories_household_active ON categories(household_id, is_active) WHERE is_active = TRUE;
+-- idx_categories_household_active dropped: idx_categories_household already
+-- serves the household-scoped lookups; the is_active filter is cheap on the
+-- handful of rows a household owns.
 
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -211,14 +214,22 @@ REVOKE SELECT ON public.categories FROM anon;
 -- ============================================================================
 CREATE TABLE expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  logged_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- Audit trail of who entered the row (DATA_MODEL.md decision #1) — it never
+  -- restricts visibility, so it must never destroy data either: SET NULL on
+  -- user deletion preserves the household's shared expense history (a CASCADE
+  -- here would silently erase every expense the departing partner logged).
+  logged_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
-  category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
+  -- NOT NULL: a null-category row would silently vanish from budget_summary
+  -- (the view filters category_id IS NOT NULL) — spend that no budget sees.
+  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
   is_cash BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Amounts may be negative (refunds) but original and converted must agree
+  -- in sign — see expenses_amount_signs_match below.
   amount DECIMAL(12, 2) NOT NULL CHECK (amount <> 0),
-  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency ~ '^[A-Z]{3}$'),
   converted_amount DECIMAL(12, 2) NOT NULL CHECK (converted_amount <> 0),
-  converted_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(converted_currency) = 3),
+  converted_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (converted_currency ~ '^[A-Z]{3}$'),
   exchange_rate DECIMAL(12, 6) NOT NULL DEFAULT 1.0 CHECK (exchange_rate > 0),
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
   description TEXT,
@@ -230,12 +241,14 @@ CREATE TABLE expenses (
   -- the app (see src/lib/split-utils.ts).
   split_group_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT expenses_amount_signs_match CHECK (sign(amount) = sign(converted_amount))
 );
 
 CREATE INDEX idx_expenses_household_date ON expenses(household_id, expense_date DESC);
 CREATE INDEX idx_expenses_logged_by ON expenses(logged_by_user_id);
-CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
+-- idx_expenses_date dropped: every query path is household-scoped (RLS), so
+-- idx_expenses_household_date already covers date-ordered access.
 CREATE INDEX idx_expenses_category ON expenses(category_id);
 -- Partial index: only the small fraction of rows that are split members are
 -- indexed. Used to fetch the sibling row when editing or deleting a split.
@@ -258,15 +271,21 @@ REVOKE SELECT ON public.expenses FROM anon;
 -- EXCHANGE_RATES
 -- ============================================================================
 CREATE TABLE exchange_rates (
-  currency TEXT NOT NULL CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL CHECK (currency ~ '^[A-Z]{3}$'),
   rate_date DATE NOT NULL,
   rate_to_eur DECIMAL(12, 6) NOT NULL CHECK (rate_to_eur > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (currency, rate_date)
+  PRIMARY KEY (currency, rate_date),
+  -- This table is global (not household-scoped) and INSERT is open to any
+  -- authenticated user, so bound the poisoning surface: no pre-seeding rates
+  -- for arbitrary future dates. +1 day of slack because a client just past
+  -- midnight in a UTC+ timezone legitimately asks for its local "today".
+  CONSTRAINT exchange_rates_date_not_future CHECK (rate_date <= CURRENT_DATE + 1)
 );
 
-CREATE INDEX idx_exchange_rates_currency_date ON exchange_rates(currency, rate_date DESC);
+-- idx_exchange_rates_currency_date dropped: exact duplicate of the
+-- (currency, rate_date) primary key — btree scans backwards fine for DESC.
 
 CREATE TRIGGER update_exchange_rates_updated_at BEFORE UPDATE ON exchange_rates
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -282,9 +301,13 @@ CREATE TABLE budget_allocations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-  budget_month DATE NOT NULL,
+  -- Always the first of the month: budget_summary joins on
+  -- date_trunc('month', expense_date) = budget_month and the UNIQUE below
+  -- dedupes per month — a mid-month value would create an allocation no
+  -- expense ever matches.
+  budget_month DATE NOT NULL CHECK (budget_month = date_trunc('month', budget_month)::date),
   allocated_amount DECIMAL(12, 2) NOT NULL CHECK (allocated_amount <> 0),
-  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency ~ '^[A-Z]{3}$'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(household_id, category_id, budget_month)
@@ -319,9 +342,10 @@ REVOKE SELECT ON public.budget_allocations FROM anon;
 CREATE TABLE monthly_budget_targets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
-  budget_month DATE NOT NULL,
+  -- First-of-month invariant, same reasoning as budget_allocations.
+  budget_month DATE NOT NULL CHECK (budget_month = date_trunc('month', budget_month)::date),
   target_amount DECIMAL(12, 2) NOT NULL CHECK (target_amount > 0),
-  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (LENGTH(currency) = 3),
+  currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency ~ '^[A-Z]{3}$'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(household_id, budget_month)
@@ -374,7 +398,8 @@ CREATE TABLE tricount_links (
   UNIQUE(household_id, public_identifier_token)
 );
 
-CREATE INDEX idx_tricount_links_household ON tricount_links(household_id);
+-- idx_tricount_links_household dropped: prefix of the
+-- UNIQUE(household_id, public_identifier_token) constraint's index.
 -- Covering index for the default_category_id FK (ON DELETE SET NULL) so a
 -- category delete doesn't sequential-scan this table.
 CREATE INDEX idx_tricount_links_default_category ON tricount_links(default_category_id);
@@ -418,7 +443,10 @@ CREATE TABLE tricount_entry_map (
   tricount_entry_id BIGINT NOT NULL,
   expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE,
   content_hash TEXT NOT NULL,
-  entry_date DATE NOT NULL DEFAULT '1970-01-01',
+  -- No default: the sync always writes the entry's own date. (A '1970-01-01'
+  -- backfill sentinel used to live here; a default would let a future code
+  -- path silently write epoch dates into owe/owed aggregation.)
+  entry_date DATE NOT NULL,
   paid_converted_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
   share_converted_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -426,7 +454,8 @@ CREATE TABLE tricount_entry_map (
   UNIQUE(link_id, tricount_entry_id)
 );
 
-CREATE INDEX idx_tricount_entry_map_link ON tricount_entry_map(link_id);
+-- idx_tricount_entry_map_link dropped: prefix of the
+-- UNIQUE(link_id, tricount_entry_id) constraint's index.
 CREATE INDEX idx_tricount_entry_map_expense ON tricount_entry_map(expense_id);
 -- Covering index for the household_id FK (ON DELETE CASCADE) so a household
 -- delete doesn't sequential-scan this table.

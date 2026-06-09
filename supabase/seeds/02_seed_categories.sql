@@ -38,24 +38,14 @@ BEGIN
 
   -- Illustrative caps for JTBD #8. The expense form surfaces an inline toggle
   -- when a logged amount exceeds these. Caps are EUR-denominated.
-  --
-  -- Guarded by a constraint-absence check because `supabase db start` runs
-  -- seeds AFTER existing migrations but BEFORE `supabase db diff` generates
-  -- the schema-delta migration. On a clean checkout the OLD both-or-neither
-  -- CHECK still exists, so setting `cap_amount` without `overflow_category_id`
-  -- would fail; this branch no-ops on the first pass and applies once the
-  -- auto-generated migration drops the constraint.
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conname = 'categories_cap_both_or_neither'
-       AND conrelid = 'public.categories'::regclass
-  ) THEN
-    UPDATE public.categories SET cap_amount = 10.00
-     WHERE household_id = shared_household_id AND name = 'Dining Out';
+  -- (A constraint-absence guard used to wrap these while the legacy
+  -- both-or-neither CHECK was still in the migration chain; that constraint
+  -- is long gone, so plain UPDATEs are safe.)
+  UPDATE public.categories SET cap_amount = 10.00
+   WHERE household_id = shared_household_id AND name = 'Dining Out';
 
-    UPDATE public.categories SET cap_amount = 15.00
-     WHERE household_id = shared_household_id AND name = 'Entertainment';
-  END IF;
+  UPDATE public.categories SET cap_amount = 15.00
+   WHERE household_id = shared_household_id AND name = 'Entertainment';
 
   RAISE NOTICE '  ✓ Created categories';
 END $$;

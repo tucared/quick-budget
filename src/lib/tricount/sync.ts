@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/database.types"
 import { fetchExchangeRate } from "@/lib/exchange-rate-api"
-import { FALLBACK_RATES_TO_EUR } from "@/lib/currency"
+import { getErrorMessage } from "@/lib/error-handler"
 import { fetchRegistry } from "./client"
 import {
   resolveMembers,
@@ -25,7 +25,31 @@ export interface SyncResult {
   updated: number
   deleted: number
   skipped: number
+  // Entries left untouched because no confirmed EUR rate could be fetched this
+  // run (Frankfurter down / unknown currency) — retried on the next sync.
+  skippedForRate: number
   unmatchedMembers: string[]
+}
+
+/**
+ * Raised by the shape-drift guard in {@link runSync}: the fetched registry
+ * parsed to zero reconcilable entries while the ledger still has rows, which
+ * would otherwise mass-delete every mirrored expense. Its message is surfaced
+ * verbatim to the user (unlike other sync errors, which are laundered) because
+ * the situation needs a human decision.
+ */
+export class EmptyRegistryError extends Error {}
+
+/**
+ * User-facing message for a failed sync. Raw error detail (Postgres text,
+ * upstream HTTP bodies) must never reach the client — callers log it
+ * server-side via console.error; everything else is laundered through the
+ * shared getErrorMessage() patterns. The shape-drift abort keeps its own
+ * distinct, self-explanatory message.
+ */
+export function publicSyncErrorMessage(error: unknown): string {
+  if (error instanceof EmptyRegistryError) return error.message
+  return getErrorMessage(error)
 }
 
 function round2(n: number): number {
@@ -34,19 +58,22 @@ function round2(n: number): number {
 
 /**
  * Resolve currency → rate_to_eur for a date, reusing the exchange_rates cache
- * (and Frankfurter, with a hardcoded fallback) exactly like /api/exchange-rates.
- * `cache` memoizes within a single sync run to avoid duplicate lookups.
+ * (and Frankfurter) exactly like /api/exchange-rates. Returns null when no
+ * confirmed rate is available (Frankfurter down / unknown currency) — never a
+ * hardcoded fallback: contentHash excludes the rate, so a fallback written now
+ * would be baked in forever. Callers skip the entry and retry next sync.
+ * `cache` memoizes within a single sync run (including misses) to avoid
+ * duplicate lookups.
  */
 async function getRateToEur(
   supabase: DB,
   currency: string,
   date: string,
-  cache: Map<string, number>
-): Promise<number> {
+  cache: Map<string, number | null>
+): Promise<number | null> {
   if (currency === "EUR") return 1
   const key = `${currency}:${date}`
-  const memo = cache.get(key)
-  if (memo != null) return memo
+  if (cache.has(key)) return cache.get(key) ?? null
 
   const { data: cached } = await supabase
     .from("exchange_rates")
@@ -68,14 +95,22 @@ async function getRateToEur(
     cache.set(key, rate)
     return rate
   } catch {
-    const rate = FALLBACK_RATES_TO_EUR[currency] ?? 1
-    cache.set(key, rate)
-    return rate
+    // No confirmed rate this run — memoize the miss so we don't re-hit a dead
+    // Frankfurter for every entry sharing this (currency, date).
+    cache.set(key, null)
+    return null
   }
 }
 
-/** Build the expense column values for a mapped entry at a resolved rate. */
-function expenseFields(
+/**
+ * Build the expense column values for a mapped entry at a resolved rate, or
+ * null when the converted EUR amount rounds to 0 (sub-cent share, e.g. a
+ * 0.02 BRL allocation). Such an entry must not produce an expense row — the DB
+ * CHECK `converted_amount <> 0` would reject the insert and wedge every
+ * subsequent sync on the same entry — so it is reconciled ledger-only, like
+ * INCOME. Exported for unit tests.
+ */
+export function expenseFields(
   m: MappedEntry,
   description: string | null,
   rate: number,
@@ -83,6 +118,7 @@ function expenseFields(
 ) {
   const amount = round2(m.shareCents / 100)
   const convertedAmount = round2(amount * rate)
+  if (convertedAmount === 0) return null
   return {
     amount,
     currency: m.currency,
@@ -108,7 +144,9 @@ function expenseFields(
  * INCOME — gets a ledger row carrying the signed owe/owed amounts (paid vs
  * consumed). NORMAL expenses with a non-zero household share also mirror a budget
  * expense in the shared Tricount category (the row's `expense_id`); INCOME is
- * reconciled for owe/owed only, never mirrored as spend (`expense_id` null). The
+ * reconciled for owe/owed only, never mirrored as spend (`expense_id` null), as
+ * are sub-cent shares whose EUR amount rounds to 0. Entries needing a rate that
+ * couldn't be confirmed this run are left untouched (`skippedForRate`). The
  * tricount title is surfaced as a read-only UI tag, not prefixed into the
  * description. Runs in the caller's session, so RLS scopes every write to their
  * household.
@@ -182,7 +220,21 @@ export async function runSync(
     })
   }
 
-  const rateCache = new Map<string, number>()
+  // Shape-drift guard: a registry that parses to zero reconcilable entries
+  // while the ledger still has rows would make the removal loop below delete
+  // every mirrored expense. That pattern almost always means Tricount's
+  // undocumented response shape drifted (or the fetch silently degraded), not
+  // a genuinely emptied tricount — abort this link and let a later good sync
+  // self-heal.
+  if (desired.size === 0 && existing.size > 0) {
+    throw new EmptyRegistryError(
+      `"${registry.title}" returned no entries while ${existing.size} synced ` +
+        `${existing.size === 1 ? "entry exists" : "entries exist"} — sync aborted to avoid ` +
+        `deleting them. If this tricount was genuinely emptied, use Unlink & delete.`
+    )
+  }
+
+  const rateCache = new Map<string, number | null>()
 
   // A reconcilable entry is unchanged (skippable) when its prior ledger row's
   // hash matches. Shared by the prefetch and write loops below so the two
@@ -214,6 +266,7 @@ export async function runSync(
   let updated = 0
   let deleted = 0
   let skipped = 0
+  let skippedForRate = 0
 
   for (const [entryId, { rc, exp, description, hash }] of desired) {
     const prior = existing.get(entryId)
@@ -224,6 +277,18 @@ export async function runSync(
     }
 
     const rate = await getRateToEur(supabase, rc.currency, rc.entryDate, rateCache)
+    if (rate == null) {
+      // No confirmed rate this run — leave the entry untouched (no ledger row,
+      // no expense) so the next sync retries it with a real rate. Writing now
+      // would bake the wrong rate in forever, since contentHash excludes the
+      // rate and a hash-unchanged entry is never re-reconciled.
+      skippedForRate++
+      continue
+    }
+    // The mirrored budget expense for this entry, or null when there shouldn't
+    // be one: INCOME (`exp` null) or a sub-cent share whose EUR amount rounds
+    // to 0 (expenseFields null).
+    const fields = exp ? expenseFields(exp, description, rate, link.default_category_id) : null
     // Signed EUR reconciliation amounts, stored on the ledger row.
     const ledgerFields = {
       entry_date: rc.entryDate,
@@ -235,13 +300,13 @@ export async function runSync(
     if (prior) {
       // Changed entry — reconcile the mirrored expense to the desired presence.
       let expenseId = prior.expense_id
-      if (exp) {
-        const fields = expenseFields(exp, description, rate, link.default_category_id)
+      if (fields) {
         if (expenseId) {
           const { error } = await supabase.from("expenses").update(fields).eq("id", expenseId)
           if (error) throw new Error(`Failed to update expense: ${error.message}`)
         } else {
-          // Entry gained a budget expense (e.g. INCOME → NORMAL).
+          // Entry gained a budget expense (e.g. INCOME → NORMAL, or a sub-cent
+          // share that grew past €0.01).
           expenseId = randomUUID()
           const { error } = await supabase.from("expenses").insert({
             id: expenseId,
@@ -252,8 +317,9 @@ export async function runSync(
           if (error) throw new Error(`Failed to insert expense: ${error.message}`)
         }
       } else if (expenseId) {
-        // Entry lost its budget expense (e.g. NORMAL → INCOME). Deleting it
-        // cascades the ledger row away, so we re-insert a fresh income-only row.
+        // Entry lost its budget expense (e.g. NORMAL → INCOME, or the share
+        // dropped to a sub-cent EUR amount). Deleting it cascades the ledger
+        // row away, so we re-insert a fresh expense-less row.
         const { error } = await supabase.from("expenses").delete().eq("id", expenseId)
         if (error) throw new Error(`Failed to delete expense: ${error.message}`)
         expenseId = null
@@ -278,11 +344,11 @@ export async function runSync(
       }
       updated++
     } else {
-      // New entry — insert the expense (NORMAL only), then claim it in the ledger.
+      // New entry — insert the expense (NORMAL with a non-sub-cent share only),
+      // then claim it in the ledger.
       let expenseId: string | null = null
-      if (exp) {
+      if (fields) {
         expenseId = randomUUID()
-        const fields = expenseFields(exp, description, rate, link.default_category_id)
         const { error: insErr } = await supabase.from("expenses").insert({
           id: expenseId,
           household_id: householdId,
@@ -339,7 +405,7 @@ export async function runSync(
     })
     .eq("id", link.id)
 
-  return { title: registry.title, created, updated, deleted, skipped, unmatchedMembers }
+  return { title: registry.title, created, updated, deleted, skipped, skippedForRate, unmatchedMembers }
 }
 
 /** Reconcile every *active* tricount linked to a household (paused ones are skipped). */
@@ -382,10 +448,13 @@ export async function runSyncAll(
       const result = await runSync(supabase, { userId: opts.userId, householdId: opts.householdId, link })
       out.push({ linkId: link.id, title: result.title, result })
     } catch (e) {
+      // Raw detail stays server-side; the Sync tab gets a laundered message
+      // (the shape-drift "registry empty" abort keeps its distinct text).
+      console.error(`Tricount sync failed for link ${link.id}:`, e)
       out.push({
         linkId: link.id,
         title: link.title ?? "tricount",
-        error: e instanceof Error ? e.message : "Sync failed",
+        error: publicSyncErrorMessage(e),
       })
     }
   }

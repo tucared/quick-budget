@@ -16,7 +16,10 @@ interface FrankfurterResponse {
  * @returns Adjusted date as YYYY-MM-DD
  */
 export function adjustToWorkingDay(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
+  // Parse as UTC midnight so getUTCDay()/toISOString() below stay consistent
+  // regardless of the server's timezone (a local-time parse would shift every
+  // date on a non-UTC server).
+  const date = new Date(dateStr + 'T00:00:00Z')
   const dayOfWeek = date.getUTCDay() // 0 = Sunday, 6 = Saturday
 
   // If Saturday (6), go back 1 day to Friday

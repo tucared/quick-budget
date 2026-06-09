@@ -39,6 +39,10 @@ export async function verifyAccessToken(
   try {
     const { payload } = await jwtVerify(token, jwks, {
       audience: "authenticated",
+      // Defense-in-depth: the JWKS is project-bound so a foreign project's
+      // token can't pass signature verification anyway, but pin the issuer
+      // against future key-reuse or multi-project mistakes.
+      issuer: `${supabaseUrl}/auth/v1`,
       clockTolerance: 5,
     })
     return { ok: true, claims: payload as unknown as SupabaseAccessTokenClaims }
