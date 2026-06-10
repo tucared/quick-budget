@@ -13,18 +13,12 @@ import {
   type RegistryMember,
   type MemberMap,
 } from "@/lib/tricount/mapping"
+// Type-only import — erased at compile time, so the server-only sync module
+// (node:crypto etc.) never enters the client bundle.
+import type { SyncResult } from "@/lib/tricount/sync"
 
 /** Per-link signed owe/owed totals (EUR). Mirrors getTricountLinkBalances. */
 type LinkBalance = { paid: number; share: number }
-
-interface SyncResult {
-  title: string
-  created: number
-  updated: number
-  deleted: number
-  skipped: number
-  unmatchedMembers: string[]
-}
 type LinkResult = { linkId: string; title: string; result?: SyncResult; error?: string }
 
 const EXCLUDE = "__exclude__"
@@ -446,6 +440,11 @@ function LinkCard({
           <Check className="h-3.5 w-3.5" />
           {result.result.created} added · {result.result.updated} updated ·{" "}
           {result.result.deleted} removed · {result.result.skipped} unchanged
+          {result.result.skippedForRate > 0 && (
+            <span className="text-[hsl(24,85%,42%)]">
+              · {result.result.skippedForRate} awaiting exchange rate (retried next sync)
+            </span>
+          )}
         </div>
       )}
       {result?.error && (
