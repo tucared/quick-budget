@@ -53,8 +53,12 @@ jobs:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
           DEV_SEED_PASSWORD: ${{ secrets.DEV_SEED_PASSWORD }}
         if: env.SUPABASE_DEV_DB_URL != '' && env.DEV_SEED_PASSWORD != ''
+        # The SQL goes in via stdin, not -c: psql only interpolates :'pw'-style
+        # variables in scripts (stdin/-f) — a -c string is sent to the server
+        # verbatim and the :'pw' placeholder would be a syntax error.
         run: |
-          psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 -v pw="$DEV_SEED_PASSWORD" -c \
-            "UPDATE auth.users
-               SET encrypted_password = extensions.crypt(:'pw', extensions.gen_salt('bf'))
-             WHERE email IN ('user1@example.com', 'user2@example.com');"
+          psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 -v pw="$DEV_SEED_PASSWORD" <<'SQL'
+          UPDATE auth.users
+             SET encrypted_password = extensions.crypt(:'pw', extensions.gen_salt('bf'))
+           WHERE email IN ('user1@example.com', 'user2@example.com');
+          SQL
