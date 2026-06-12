@@ -44,6 +44,7 @@ export default function LoginForm() {
         return
       }
 
+      setLoading(false)
       router.replace("/expenses")
     } catch (_err) {
       setError("An unexpected error occurred")
