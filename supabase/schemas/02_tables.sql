@@ -381,7 +381,11 @@ REVOKE SELECT ON public.monthly_budget_targets FROM anon;
 -- household pause a finished tricount:
 -- paused links are skipped by sync-all / auto-sync, freezing their mirrored
 -- expenses as a historical record (per-link manual sync still works on resume).
--- `last_synced_at` records the most recent successful reconcile.
+-- `last_synced_at` records the most recent successful reconcile. `timezone` is
+-- the IANA zone used to resolve each entry's UTC timestamp to a calendar date
+-- (Tricount serves timestamps in UTC with no zone in the payload, and its app
+-- displays them in the device's local zone); set per tricount on the Sync tab,
+-- validated against Intl.supportedValuesOf at the API layer.
 CREATE TABLE tricount_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -391,6 +395,7 @@ CREATE TABLE tricount_links (
   members JSONB NOT NULL DEFAULT '[]'::jsonb,
   member_map JSONB NOT NULL DEFAULT '{}'::jsonb,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  timezone TEXT NOT NULL DEFAULT 'Europe/Paris',
   last_synced_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

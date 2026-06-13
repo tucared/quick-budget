@@ -201,9 +201,9 @@ export async function runSync(
     { rc: ReconcileEntry; exp: MappedEntry | null; description: string | null; hash: string }
   >()
   for (const entry of registry.entries) {
-    const rc = mapReconcileEntry(entry, householdIdSet)
+    const rc = mapReconcileEntry(entry, householdIdSet, link.timezone)
     if (!rc) continue
-    const exp = mapEntry(entry, householdIdSet)
+    const exp = mapEntry(entry, householdIdSet, link.timezone)
     // The mirrored row's description is the raw entry description; the tricount
     // name is surfaced as a tag in the UI (not prefixed here).
     const description = rc.description

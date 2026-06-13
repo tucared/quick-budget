@@ -127,8 +127,24 @@ describe("householdShareCents", () => {
 })
 
 describe("entryDateOnly", () => {
-  it("extracts YYYY-MM-DD", () => {
-    expect(entryDateOnly("2026-06-07 13:33:31.295000")).toBe("2026-06-07")
+  it("keeps a mid-day UTC timestamp on its day in a UTC+ zone", () => {
+    expect(entryDateOnly("2026-06-07 13:33:31.295000", "Europe/Paris")).toBe("2026-06-07")
+  })
+
+  it("rolls a late-UTC timestamp forward into the next local day (Europe)", () => {
+    // 22:30 UTC is 00:30 the next day in CEST — the reported 'a day earlier in
+    // QB' bug: a naive slice would keep 2026-06-07.
+    expect(entryDateOnly("2026-06-07 22:30:00", "Europe/Paris")).toBe("2026-06-08")
+  })
+
+  it("rolls an early-UTC timestamp back into the previous local day (Brazil)", () => {
+    // 00:30 UTC is 21:30 the previous day in BRT (UTC-3).
+    expect(entryDateOnly("2026-06-08 00:30:00", "America/Sao_Paulo")).toBe("2026-06-07")
+  })
+
+  it("falls back to a plain slice for date-only or malformed input", () => {
+    expect(entryDateOnly("2026-06-07", "Europe/Paris")).toBe("2026-06-07")
+    expect(entryDateOnly("", "Europe/Paris")).toBe("")
   })
 })
 
@@ -200,6 +216,12 @@ describe("mapEntry", () => {
   })
   it("returns null for BALANCE settlements", () => {
     expect(mapEntry(entry({ type_transaction: "BALANCE" }), new Set([1, 2]))).toBeNull()
+  })
+  it("resolves the expense date in the passed timezone (near-midnight UTC)", () => {
+    // 22:30 UTC is 00:30 the next day in CEST.
+    const e = entry({ date: "2026-06-07 22:30:00.000000" })
+    expect(mapEntry(e, new Set([1, 2]), "Europe/Paris")!.expenseDate).toBe("2026-06-08")
+    expect(mapEntry(e, new Set([1, 2]), "America/Sao_Paulo")!.expenseDate).toBe("2026-06-07")
   })
 })
 

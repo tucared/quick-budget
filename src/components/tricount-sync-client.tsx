@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check, Pause, Play } from "lucide-react"
+import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check, Pause, Play, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { TricountLink } from "@/lib/types"
@@ -39,6 +39,7 @@ export function TricountSyncClient({
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<Record<string, LinkResult>>({})
   const [editing, setEditing] = useState<string | null>(null)
+  const [tzEditing, setTzEditing] = useState<string | null>(null)
 
   async function refetchLinks() {
     const res = await fetch("/api/tricount/link")
@@ -201,6 +202,33 @@ export function TricountSyncClient({
     }
   }
 
+  async function saveTimezone(linkId: string, timezone: string) {
+    setBusy(`tz:${linkId}`)
+    setError(null)
+    try {
+      const res = await fetch("/api/tricount/link", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: linkId, timezone }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || "Could not save timezone")
+        return
+      }
+      setTzEditing(null)
+      // Re-sync so corrected calendar dates land immediately — content_hash
+      // includes the date, so shifted entries re-reconcile their expense_date.
+      await syncRequest(linkId)
+      await refetchLinks()
+      router.refresh()
+    } catch {
+      setError("Could not save timezone — network error")
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -234,11 +262,14 @@ export function TricountSyncClient({
               result={results[link.id]}
               busy={busy}
               editing={editing === link.id}
+              tzEditing={tzEditing === link.id}
               onToggleEdit={() => setEditing(editing === link.id ? null : link.id)}
+              onToggleTz={() => setTzEditing(tzEditing === link.id ? null : link.id)}
               onSync={() => syncOne(link.id)}
               onSetActive={(a) => setActive(link.id, a)}
               onDisconnect={() => disconnect(link.id)}
               onSaveMapping={(m) => saveMapping(link.id, m)}
+              onSaveTimezone={(tz) => saveTimezone(link.id, tz)}
             />
           ))}
         </div>
@@ -284,11 +315,14 @@ function LinkCard({
   result,
   busy,
   editing,
+  tzEditing,
   onToggleEdit,
+  onToggleTz,
   onSync,
   onSetActive,
   onDisconnect,
   onSaveMapping,
+  onSaveTimezone,
 }: {
   link: TricountLink
   householdUsers: HouseholdUser[]
@@ -296,11 +330,14 @@ function LinkCard({
   result?: LinkResult
   busy: string | null
   editing: boolean
+  tzEditing: boolean
   onToggleEdit: () => void
+  onToggleTz: () => void
   onSync: () => void
   onSetActive: (active: boolean) => void
   onDisconnect: () => void
   onSaveMapping: (m: MemberMap) => void
+  onSaveTimezone: (tz: string) => void
 }) {
   const paused = !link.is_active
   const [confirmRemove, setConfirmRemove] = useState(false)
@@ -330,6 +367,8 @@ function LinkCard({
             {link.last_synced_at
               ? `Last synced ${new Date(link.last_synced_at).toLocaleString()}`
               : "Not synced yet"}
+            {" · "}
+            {link.timezone}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -369,6 +408,16 @@ function LinkCard({
             aria-label="Edit member mapping"
           >
             <Users className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={onToggleTz}
+            disabled={busy !== null || paused}
+            size="sm"
+            variant="ghost"
+            className="gap-1 text-muted-foreground"
+            aria-label="Edit timezone"
+          >
+            <Globe className="h-4 w-4" />
           </Button>
           <Button
             onClick={() => setConfirmRemove((v) => !v)}
@@ -464,6 +513,15 @@ function LinkCard({
           onSave={onSaveMapping}
         />
       )}
+
+      {tzEditing && (
+        <TimezoneEditor
+          current={link.timezone}
+          saving={busy === `tz:${link.id}`}
+          onCancel={onToggleTz}
+          onSave={onSaveTimezone}
+        />
+      )}
     </div>
   )
 }
@@ -537,6 +595,70 @@ function MappingEditor({
       </div>
       <div className="flex items-center gap-2 pt-1">
         <Button onClick={save} disabled={saving} size="sm" className="gap-2">
+          {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
+          Save &amp; re-sync
+        </Button>
+        <Button onClick={onCancel} disabled={saving} size="sm" variant="ghost">
+          Cancel
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// All IANA zones the runtime knows, for the per-tricount timezone picker.
+// Computed once; falls back to an empty list on older runtimes (the current
+// zone is always merged in below so the select still shows it).
+const TIME_ZONES: string[] = (() => {
+  const f = (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] })
+    .supportedValuesOf
+  try {
+    return f ? f("timeZone") : []
+  } catch {
+    return []
+  }
+})()
+
+function TimezoneEditor({
+  current,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  current: string
+  saving: boolean
+  onCancel: () => void
+  onSave: (tz: string) => void
+}) {
+  const [value, setValue] = useState(current)
+  // Always include the current zone even if the runtime's list omits it.
+  const zones = TIME_ZONES.includes(current) ? TIME_ZONES : [current, ...TIME_ZONES]
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <div className="text-xs font-medium">Timezone for dates</div>
+      <p className="text-xs text-muted-foreground">
+        Tricount records each expense&apos;s time in UTC. Pick the zone this tricount&apos;s
+        dates should follow so synced expenses land on the same day they show in Tricount.
+      </p>
+      <select
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+      >
+        {zones.map((z) => (
+          <option key={z} value={z}>
+            {z}
+          </option>
+        ))}
+      </select>
+      <div className="flex items-center gap-2 pt-1">
+        <Button
+          onClick={() => onSave(value)}
+          disabled={saving || value === current}
+          size="sm"
+          className="gap-2"
+        >
           {saving && <RefreshCw className="h-4 w-4 animate-spin" />}
           Save &amp; re-sync
         </Button>

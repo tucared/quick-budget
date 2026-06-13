@@ -149,9 +149,34 @@ export function paidByHouseholdCents(
   return 0
 }
 
-/** Date-only (YYYY-MM-DD) from a Tricount timestamp like "2026-06-07 13:33:31.295". */
-export function entryDateOnly(dateStr: string): string {
-  return (dateStr ?? "").slice(0, 10)
+// Default IANA zone for resolving a Tricount entry's calendar date when a link
+// carries no explicit timezone (and for the unit tests' implicit calls). Each
+// link stores its own `timezone`; sync passes it through.
+export const DEFAULT_TRICOUNT_TIME_ZONE = "Europe/Paris"
+
+/**
+ * Local calendar date (YYYY-MM-DD) for a Tricount entry timestamp like
+ * "2026-06-07 13:33:31.295000", resolved in `timeZone`. Tricount serves the
+ * timestamp in UTC with no zone in the payload, and its app renders each entry
+ * in the device's local zone — so a naive slice keeps the UTC day and lands
+ * evening/near-midnight entries on the wrong date. We parse the timestamp as UTC
+ * and reformat the date in the household's chosen zone (`en-CA` → YYYY-MM-DD).
+ * Date-only or unexpected input falls back to a plain slice.
+ */
+export function entryDateOnly(
+  dateStr: string,
+  timeZone: string = DEFAULT_TRICOUNT_TIME_ZONE
+): string {
+  const m = (dateStr ?? "").match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2}):(\d{2})/)
+  if (!m) return (dateStr ?? "").slice(0, 10)
+  const utc = new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`)
+  if (Number.isNaN(utc.getTime())) return (dateStr ?? "").slice(0, 10)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(utc)
 }
 
 /**
@@ -221,10 +246,11 @@ export interface MappedEntry {
  */
 export function mapEntry(
   entry: Entry,
-  householdMemberIds: Set<number>
+  householdMemberIds: Set<number>,
+  timeZone: string = DEFAULT_TRICOUNT_TIME_ZONE
 ): MappedEntry | null {
   if (!isSyncableEntry(entry)) return null
-  const expenseDate = entryDateOnly(entry.date)
+  const expenseDate = entryDateOnly(entry.date, timeZone)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expenseDate)) return null
   const shareCents = householdShareCents(entry, householdMemberIds)
   if (shareCents === 0) return null
@@ -256,10 +282,11 @@ export interface ReconcileEntry {
  */
 export function mapReconcileEntry(
   entry: Entry,
-  householdMemberIds: Set<number>
+  householdMemberIds: Set<number>,
+  timeZone: string = DEFAULT_TRICOUNT_TIME_ZONE
 ): ReconcileEntry | null {
   if (!isReconcilableEntry(entry)) return null
-  const entryDate = entryDateOnly(entry.date)
+  const entryDate = entryDateOnly(entry.date, timeZone)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) return null
   const shareCents = signedHouseholdShareCents(entry, householdMemberIds)
   const paidCents = paidByHouseholdCents(entry, householdMemberIds)
