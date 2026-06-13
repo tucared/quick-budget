@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,15 +14,10 @@ import {
 } from "@/components/ui/card"
 
 export default function LoginForm() {
-  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    router.prefetch("/expenses")
-  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,8 +38,12 @@ export default function LoginForm() {
         return
       }
 
-      setLoading(false)
-      router.replace("/expenses")
+      // Full-document navigation (not a soft router.replace): sends the freshly
+      // set auth cookies in a top-level request and re-runs middleware with no
+      // stale Router Cache, so the first post-login navigation lands on
+      // /expenses instead of bouncing back to /login. Leave the button on
+      // "Logging in…" until the document unloads (prevents a double submit).
+      window.location.replace("/expenses")
     } catch (_err) {
       setError("An unexpected error occurred")
       setLoading(false)
