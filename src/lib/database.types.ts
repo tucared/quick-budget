@@ -360,6 +360,7 @@ export type Database = {
           member_map: Json
           members: Json
           public_identifier_token: string
+          timezone: string
           title: string | null
           updated_at: string
         }
@@ -373,6 +374,7 @@ export type Database = {
           member_map?: Json
           members?: Json
           public_identifier_token: string
+          timezone?: string
           title?: string | null
           updated_at?: string
         }
@@ -386,6 +388,7 @@ export type Database = {
           member_map?: Json
           members?: Json
           public_identifier_token?: string
+          timezone?: string
           title?: string | null
           updated_at?: string
         }

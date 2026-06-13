@@ -6,11 +6,22 @@ import { parseTricountToken } from "@/lib/tricount/client"
 // Manage the household's Tricount links (a household may connect several).
 // GET    — list connected links
 // POST   — connect a new link from a share URL or bare code
-// PATCH  — update a link's manual member mapping / pause flag
+// PATCH  — update a link's manual member mapping / pause flag / timezone
 // DELETE — unlink: remove the link AND every expense it imported (no
 //          orphan-leaving "keep" variant; pause to freeze a finished tricount)
 
 const TRICOUNT_CATEGORY_NAME = "Tricount"
+
+/** True when the runtime recognizes `tz` as an IANA timezone. */
+function isValidTimeZone(tz: string): boolean {
+  if (!tz) return false
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz })
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function GET() {
   const user = await getServerUser()
@@ -97,7 +108,12 @@ export async function PATCH(request: NextRequest) {
   const user = await getServerUser()
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
 
-  let body: { id?: string; member_map?: Record<string, unknown>; is_active?: boolean }
+  let body: {
+    id?: string
+    member_map?: Record<string, unknown>
+    is_active?: boolean
+    timezone?: string
+  }
   try {
     body = await request.json()
   } catch {
@@ -108,7 +124,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "id is required" }, { status: 400 })
   }
 
-  const update: { member_map?: Record<string, string | null>; is_active?: boolean } = {}
+  const update: {
+    member_map?: Record<string, string | null>
+    is_active?: boolean
+    timezone?: string
+  } = {}
 
   if (body.member_map !== undefined) {
     if (typeof body.member_map !== "object" || body.member_map === null) {
@@ -124,6 +144,15 @@ export async function PATCH(request: NextRequest) {
 
   if (body.is_active !== undefined) {
     update.is_active = Boolean(body.is_active)
+  }
+
+  if (body.timezone !== undefined) {
+    // Resolve each entry's UTC timestamp to a calendar date in this zone — must
+    // be a valid IANA name the runtime understands.
+    if (typeof body.timezone !== "string" || !isValidTimeZone(body.timezone)) {
+      return NextResponse.json({ error: "Invalid timezone" }, { status: 400 })
+    }
+    update.timezone = body.timezone
   }
 
   if (Object.keys(update).length === 0) {
