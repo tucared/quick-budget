@@ -70,6 +70,39 @@ export async function fetchExchangeRateFromAPI(
   }
 }
 
+/**
+ * Fetch the conversion rate from `fromCurrency` into a household's
+ * `baseCurrency` for a date, as a cross-rate off the EUR-pivoted
+ * exchange_rates table: rate(from → base) = rate_to_eur(from) / rate_to_eur(base).
+ *
+ * Generalizes the old "EUR is always rate 1" shortcut to "the base currency is
+ * always rate 1": when `fromCurrency === baseCurrency` no lookup happens. EUR as
+ * a *foreign* currency for a non-EUR base resolves a real rate (its EUR leg is 1,
+ * the base leg is fetched). `isFallback` is true when either leg fell back to a
+ * hardcoded rate.
+ */
+export async function fetchConversionRate(
+  fromCurrency: string,
+  baseCurrency: string,
+  date?: string
+): Promise<ExchangeRateResult> {
+  if (fromCurrency === baseCurrency) {
+    return { rate: 1.0, isFallback: false }
+  }
+
+  const [from, base] = await Promise.all([
+    fetchExchangeRateFromAPI(fromCurrency, date),
+    fetchExchangeRateFromAPI(baseCurrency, date),
+  ])
+
+  // base.rate is rate_to_eur(base) > 0 in every path (EUR=1, cache/api/fallback
+  // are all positive), so this division is safe.
+  return {
+    rate: from.rate / base.rate,
+    isFallback: from.isFallback || base.isFallback,
+  }
+}
+
 // European number formatting utilities
 // Format: €120 000,99 (space as thousands separator, comma as decimal separator)
 

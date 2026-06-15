@@ -2,7 +2,7 @@ import { cache } from "react"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { format, startOfMonth, subDays } from "date-fns"
 import { nextMonthString } from "@/lib/date-utils"
-import { partitionBudgetSummary, tricountCashflowAdjustmentEuros } from "@/lib/budget-utils"
+import { partitionBudgetSummary, tricountCashflowAdjustment } from "@/lib/budget-utils"
 import { verifyAccessToken } from "@/lib/server/jwt-verify"
 import type {
   BudgetSummary,
@@ -49,11 +49,22 @@ export const getServerUser = cache(async (): Promise<UserData | null> => {
   const householdId = claims.app_metadata?.household_id
   if (!householdId) return null
 
+  // Base/secondary currency live on the households row (not the JWT) so a
+  // currency change takes effect without a token refresh. One request-cached
+  // query — RLS scopes it to the caller's own household.
+  const { data: household } = await supabase
+    .from("households")
+    .select("base_currency, secondary_currency")
+    .eq("id", householdId)
+    .maybeSingle()
+
   return {
     id: claims.sub,
     email: claims.email,
     fullName: claims.user_metadata?.full_name || claims.email?.split("@")[0] || "User",
     householdId,
+    baseCurrency: household?.base_currency ?? "EUR",
+    secondaryCurrency: household?.secondary_currency ?? "BRL",
   }
 })
 
@@ -251,7 +262,7 @@ export async function getTricountCashflowAdjustment(
     console.error("Failed to fetch tricount cashflow adjustment:", error)
     return null
   }
-  return tricountCashflowAdjustmentEuros(data ?? [])
+  return tricountCashflowAdjustment(data ?? [])
 }
 
 /** Per-link signed owe/owed totals (paid & consumed, EUR) for the Sync tab. */

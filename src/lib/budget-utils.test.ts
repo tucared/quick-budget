@@ -6,7 +6,7 @@ import {
   getBudgetStatusLabel,
   getBudgetStatusTheme,
   partitionBudgetSummary,
-  tricountCashflowAdjustmentEuros,
+  tricountCashflowAdjustment,
 } from "@/lib/budget-utils"
 import type { BudgetSummary, Expense } from "@/lib/types"
 
@@ -79,13 +79,13 @@ describe("partitionBudgetSummary", () => {
   })
 })
 
-describe("tricountCashflowAdjustmentEuros", () => {
+describe("tricountCashflowAdjustment", () => {
   it("returns null for empty input", () => {
-    expect(tricountCashflowAdjustmentEuros([])).toBeNull()
+    expect(tricountCashflowAdjustment([])).toBeNull()
   })
 
   it("sums paid − share for mirrored rows (expense_id set)", () => {
-    const result = tricountCashflowAdjustmentEuros([
+    const result = tricountCashflowAdjustment([
       { paid_converted_amount: 30, share_converted_amount: 10, expense_id: "exp-1" },
       { paid_converted_amount: 0, share_converted_amount: 5, expense_id: "exp-2" },
     ])
@@ -94,7 +94,7 @@ describe("tricountCashflowAdjustmentEuros", () => {
   })
 
   it("counts full paid for income rows (expense_id null), ignoring share", () => {
-    const result = tricountCashflowAdjustmentEuros([
+    const result = tricountCashflowAdjustment([
       { paid_converted_amount: -20, share_converted_amount: -8, expense_id: null },
     ])
     // income: paid only (share ignored) → -20
@@ -102,7 +102,7 @@ describe("tricountCashflowAdjustmentEuros", () => {
   })
 
   it("mixes mirrored expenses and income", () => {
-    const result = tricountCashflowAdjustmentEuros([
+    const result = tricountCashflowAdjustment([
       { paid_converted_amount: 30, share_converted_amount: 10, expense_id: "exp-1" },
       { paid_converted_amount: -20, share_converted_amount: -8, expense_id: null },
     ])
@@ -113,7 +113,7 @@ describe("tricountCashflowAdjustmentEuros", () => {
   it("rounds in integer cents (no float drift)", () => {
     // 0.1 + 0.2 = 0.30000000000000004 under naive float sum; the integer-cents
     // reduce must yield exactly 0.3.
-    const result = tricountCashflowAdjustmentEuros([
+    const result = tricountCashflowAdjustment([
       { paid_converted_amount: 0.1, share_converted_amount: 0, expense_id: "exp-1" },
       { paid_converted_amount: 0.2, share_converted_amount: 0, expense_id: "exp-2" },
     ])
@@ -121,7 +121,7 @@ describe("tricountCashflowAdjustmentEuros", () => {
   })
 
   it("coerces string amounts (DB numeric arrives as string)", () => {
-    const result = tricountCashflowAdjustmentEuros([
+    const result = tricountCashflowAdjustment([
       { paid_converted_amount: "30.00", share_converted_amount: "10.00", expense_id: "exp-1" },
     ])
     expect(result).toBe(20)

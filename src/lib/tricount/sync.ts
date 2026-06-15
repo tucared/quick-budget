@@ -25,8 +25,9 @@ export interface SyncResult {
   updated: number
   deleted: number
   skipped: number
-  // Entries left untouched because no confirmed EUR rate could be fetched this
-  // run (Frankfurter down / unknown currency) — retried on the next sync.
+  // Entries left untouched because no confirmed rate could be fetched this run
+  // (Frankfurter down / unknown currency, on either the entry currency or the
+  // household base currency leg of the cross-rate) — retried on the next sync.
   skippedForRate: number
   unmatchedMembers: string[]
 }
@@ -108,18 +109,44 @@ async function getRateToEur(
 }
 
 /**
- * Build the expense column values for a mapped entry at a resolved rate, or
- * null when the converted EUR amount rounds to 0 (sub-cent share, e.g. a
- * 0.02 BRL allocation). Such an entry must not produce an expense row — the DB
- * CHECK `converted_amount <> 0` would reject the insert and wedge every
- * subsequent sync on the same entry — so it is reconciled ledger-only, like
- * INCOME. Exported for unit tests.
+ * Resolve the cross-rate from `currency` into the household's `baseCurrency` for
+ * a date: rate(currency → base) = rate_to_eur(currency) / rate_to_eur(base),
+ * off the EUR-pivoted exchange_rates cache. Returns 1 when the entry is already
+ * in the base currency, and null when *either* leg can't be confirmed this run
+ * (so the caller skips the entry and retries next sync, exactly like a missing
+ * entry-currency rate). The base currency is EUR for the original household, so
+ * its leg short-circuits to 1 with no lookup.
+ */
+async function getRateToBase(
+  supabase: DB,
+  currency: string,
+  baseCurrency: string,
+  date: string,
+  cache: Map<string, number | null>
+): Promise<number | null> {
+  if (currency === baseCurrency) return 1
+  const fromRate = await getRateToEur(supabase, currency, date, cache)
+  if (fromRate == null) return null
+  const baseRate = await getRateToEur(supabase, baseCurrency, date, cache)
+  if (baseRate == null || baseRate === 0) return null
+  return fromRate / baseRate
+}
+
+/**
+ * Build the expense column values for a mapped entry at a resolved cross-rate
+ * (entry currency → household base currency), or null when the converted
+ * base-currency amount rounds to 0 (sub-cent share, e.g. a 0.02 BRL allocation).
+ * Such an entry must not produce an expense row — the DB CHECK
+ * `converted_amount <> 0` would reject the insert and wedge every subsequent
+ * sync on the same entry — so it is reconciled ledger-only, like INCOME.
+ * Exported for unit tests.
  */
 export function expenseFields(
   m: MappedEntry,
   description: string | null,
   rate: number,
-  categoryId: string
+  categoryId: string,
+  baseCurrency: string
 ) {
   const amount = round2(m.shareCents / 100)
   const convertedAmount = round2(amount * rate)
@@ -128,7 +155,7 @@ export function expenseFields(
     amount,
     currency: m.currency,
     converted_amount: convertedAmount,
-    converted_currency: "EUR",
+    converted_currency: baseCurrency,
     exchange_rate: rate,
     expense_date: m.expenseDate,
     description,
@@ -158,9 +185,9 @@ export function expenseFields(
  */
 export async function runSync(
   supabase: DB,
-  opts: { userId: string; householdId: string; link: TricountLink }
+  opts: { userId: string; householdId: string; baseCurrency: string; link: TricountLink }
 ): Promise<SyncResult> {
-  const { userId, householdId, link } = opts
+  const { userId, householdId, baseCurrency, link } = opts
 
   // expenses.category_id is NOT NULL, but default_category_id is ON DELETE
   // SET NULL — a link whose Tricount category was deleted can't mirror
@@ -262,16 +289,23 @@ export async function runSync(
   }
 
   // Warm the rate cache before the write loop: resolve the distinct
-  // (currency, date) pairs of entries that will actually be written (skipping
-  // unchanged and EUR ones, which need no lookup) concurrently, so the
-  // sequential loop below reads them from cache instead of awaiting a lookup
-  // per entry. Writes stay sequential — the unique-ledger rollback guard
-  // depends on that ordering.
+  // (currency, date) rate_to_eur lookups that will actually be needed (skipping
+  // unchanged entries, and currencies equal to the base — which need no lookup)
+  // concurrently, so the sequential loop below reads them from cache instead of
+  // awaiting a lookup per entry. Both legs of the cross-rate are warmed: the
+  // entry currency and the household base currency (unless base is EUR, which
+  // resolves to 1 without a lookup). Writes stay sequential — the unique-ledger
+  // rollback guard depends on that ordering.
   const rateKeys = new Map<string, { currency: string; date: string }>()
+  const warm = (currency: string, date: string) => {
+    if (currency === "EUR") return
+    rateKeys.set(`${currency}:${date}`, { currency, date })
+  }
   for (const [entryId, { rc, hash }] of desired) {
     if (isUnchanged(entryId, hash)) continue
-    if (rc.currency === "EUR") continue
-    rateKeys.set(`${rc.currency}:${rc.entryDate}`, { currency: rc.currency, date: rc.entryDate })
+    if (rc.currency === baseCurrency) continue
+    warm(rc.currency, rc.entryDate)
+    warm(baseCurrency, rc.entryDate)
   }
   await Promise.all(
     Array.from(rateKeys.values()).map((k) =>
@@ -293,20 +327,21 @@ export async function runSync(
       continue
     }
 
-    const rate = await getRateToEur(supabase, rc.currency, rc.entryDate, rateCache)
+    const rate = await getRateToBase(supabase, rc.currency, baseCurrency, rc.entryDate, rateCache)
     if (rate == null) {
-      // No confirmed rate this run — leave the entry untouched (no ledger row,
-      // no expense) so the next sync retries it with a real rate. Writing now
-      // would bake the wrong rate in forever, since contentHash excludes the
-      // rate and a hash-unchanged entry is never re-reconciled.
+      // No confirmed rate this run (entry-currency or base-currency leg) —
+      // leave the entry untouched (no ledger row, no expense) so the next sync
+      // retries it with a real rate. Writing now would bake the wrong rate in
+      // forever, since contentHash excludes the rate and a hash-unchanged entry
+      // is never re-reconciled.
       skippedForRate++
       continue
     }
     // The mirrored budget expense for this entry, or null when there shouldn't
-    // be one: INCOME (`exp` null) or a sub-cent share whose EUR amount rounds
-    // to 0 (expenseFields null).
-    const fields = exp ? expenseFields(exp, description, rate, defaultCategoryId) : null
-    // Signed EUR reconciliation amounts, stored on the ledger row.
+    // be one: INCOME (`exp` null) or a sub-cent share whose base-currency amount
+    // rounds to 0 (expenseFields null).
+    const fields = exp ? expenseFields(exp, description, rate, defaultCategoryId, baseCurrency) : null
+    // Signed base-currency reconciliation amounts, stored on the ledger row.
     const ledgerFields = {
       entry_date: rc.entryDate,
       paid_converted_amount: round2((rc.paidCents / 100) * rate),
@@ -445,6 +480,16 @@ export async function runSyncAll(
   supabase: DB,
   opts: { userId: string; householdId: string; auto?: boolean }
 ): Promise<LinkSyncOutcome[]> {
+  // Resolve the household's base currency once — every mirrored expense and
+  // ledger amount is denominated in it (EUR for the original household).
+  const { data: household, error: householdError } = await supabase
+    .from("households")
+    .select("base_currency")
+    .eq("id", opts.householdId)
+    .maybeSingle()
+  if (householdError) throw new Error(`Failed to load household: ${householdError.message}`)
+  const baseCurrency = household?.base_currency ?? "EUR"
+
   const { data: links, error } = await supabase
     .from("tricount_links")
     .select("*")
@@ -462,7 +507,7 @@ export async function runSyncAll(
       }
     }
     try {
-      const result = await runSync(supabase, { userId: opts.userId, householdId: opts.householdId, link })
+      const result = await runSync(supabase, { userId: opts.userId, householdId: opts.householdId, baseCurrency, link })
       out.push({ linkId: link.id, title: result.title, result })
     } catch (e) {
       // Raw detail stays server-side; the Sync tab gets a laundered message

@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/contexts/user-context"
 import { parseLocalDate } from "@/lib/date-utils"
 import { computeDailySpending } from "@/lib/budget-utils"
 import type { Expense } from "@/lib/types"
@@ -24,6 +25,7 @@ export function CategoryDailySpendingChart({
   expenses,
   budgetMonth,
 }: CategoryDailySpendingChartProps) {
+  const { baseCurrency } = useCurrency()
   const data = useMemo(
     () => computeDailySpending(expenses, budgetMonth),
     [expenses, budgetMonth]
@@ -54,7 +56,7 @@ export function CategoryDailySpendingChart({
               tick={{ fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: "var(--border)" }}
-              tickFormatter={(value) => formatCurrency(value, 0)}
+              tickFormatter={(value) => formatCurrency(value, 0, baseCurrency)}
               width={48}
             />
             <Tooltip
@@ -66,7 +68,7 @@ export function CategoryDailySpendingChart({
                 fontSize: "12px",
               }}
               formatter={(value) => [
-                typeof value === "number" ? formatCurrency(value) : "",
+                typeof value === "number" ? formatCurrency(value, 2, baseCurrency) : "",
                 "Spent",
               ]}
               labelFormatter={(value) =>

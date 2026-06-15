@@ -15,6 +15,7 @@ import { ExpenseCard } from "@/components/expense-card"
 import { EditExpenseDialog } from "@/components/edit-expense-dialog"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
 import { CategoryDailySpendingChart } from "@/components/category-daily-spending-chart"
+import { useCurrency } from "@/lib/contexts/user-context"
 
 interface CategoryExpenseDialogProps {
   open: boolean
@@ -36,6 +37,7 @@ export function CategoryExpenseDialog({
   categories,
   syncedExpenseTitles,
 }: CategoryExpenseDialogProps) {
+  const { baseCurrency } = useCurrency()
   const [editingExpenses, setEditingExpenses] = useState<Expense[] | null>(null)
 
   // Optimistic delete: track IDs removed in this session so they disappear immediately
@@ -133,6 +135,7 @@ export function CategoryExpenseDialog({
           isCurrentMonth={isCurrentMonth}
           dayOfMonth={dayOfMonth}
           daysInMonth={daysInMonth}
+          baseCurrency={baseCurrency}
         />
 
         <CategoryDailySpendingChart expenses={expenses} budgetMonth={budgetMonth} />

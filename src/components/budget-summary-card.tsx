@@ -8,11 +8,13 @@ interface BudgetSummaryCardProps {
   target?: { amount: number; unallocated: number }
   dayOfMonth?: number
   daysInMonth?: number
-  /** EUR delta from budget "spent" to actual cash flow (Tricount), or null when none. */
+  /** Base-currency delta from budget "spent" to actual cash flow (Tricount), or null when none. */
   cashflowAdjustment?: number | null
+  /** The household's base currency for all amounts on this card. */
+  baseCurrency?: string
 }
 
-export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, cashflowAdjustment }: BudgetSummaryCardProps) {
+export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, cashflowAdjustment, baseCurrency = "EUR" }: BudgetSummaryCardProps) {
   const totalAllocated = budgets.reduce((sum, b) => sum + Number(b.allocated_amount), 0)
   const totalSpent = budgets.reduce((sum, b) => sum + Number(b.spent_amount), 0)
   const paceBaseline = target ? target.amount : totalAllocated
@@ -34,7 +36,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
           <div>
             <div className="text-xs text-muted-foreground mb-0.5 font-medium">Remaining this month</div>
             <div className={`text-3xl font-bold ${statusColor}`}>
-              {formatCurrency(totalRemaining)}
+              {formatCurrency(totalRemaining, 2, baseCurrency)}
             </div>
           </div>
           <span className={`shrink-0 text-xs font-medium ${statusColor}`}>
@@ -54,9 +56,9 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
         <div className="flex justify-between items-center text-xs gap-3">
           <span className="text-muted-foreground">
             {showCashflow ? (
-              <>{formatCurrency(totalSpent)} / {formatCurrency(paceBaseline)} · {formatNumber(percentSpent, 0)}%</>
+              <>{formatCurrency(totalSpent, 2, baseCurrency)} / {formatCurrency(paceBaseline, 2, baseCurrency)} · {formatNumber(percentSpent, 0)}%</>
             ) : (
-              <>{formatCurrency(totalSpent)} of {formatCurrency(paceBaseline)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}</>
+              <>{formatCurrency(totalSpent, 2, baseCurrency)} of {formatCurrency(paceBaseline, 2, baseCurrency)} spent · {formatNumber(percentSpent, 0)}%{target ? " of target" : ""}</>
             )}
           </span>
           {showCashflow && (
@@ -64,7 +66,7 @@ export function BudgetSummaryCard({ budgets, target, dayOfMonth, daysInMonth, ca
               className="shrink-0 text-muted-foreground"
               title="Actual cash that left the wallet this month (Tricount share replaced by what you paid, income netted in)"
             >
-              <span className="text-foreground font-medium">{formatCurrency(cashOut)}</span> cash out
+              <span className="text-foreground font-medium">{formatCurrency(cashOut, 2, baseCurrency)}</span> cash out
             </span>
           )}
         </div>

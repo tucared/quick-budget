@@ -26,6 +26,7 @@ import { CategoryExpenseDialog } from "@/components/category-expense-dialog"
 import { Button } from "@/components/ui/button"
 import { useExpenseSubscription } from "@/lib/hooks/use-expense-subscription"
 import { useBudgetAllocationSubscription } from "@/lib/hooks/use-budget-allocation-subscription"
+import { useCurrency } from "@/lib/contexts/user-context"
 import { getErrorMessage } from "@/lib/error-handler"
 
 interface BudgetPageContentProps {
@@ -38,7 +39,7 @@ interface BudgetPageContentProps {
   budgetMonth: string
   /** expense id → tricount title for rows mirrored by sync (read-only in the drill-down). */
   syncedExpenseTitles?: Record<string, string>
-  /** EUR adjustment from budget "spent" to actual cash flow (Tricount), or null when none. */
+  /** Base-currency adjustment from budget "spent" to actual cash flow (Tricount), or null when none. */
   initialCashflowAdjustment?: number | null
 }
 
@@ -53,6 +54,7 @@ export function BudgetPageContent({
   syncedExpenseTitles,
   initialCashflowAdjustment,
 }: BudgetPageContentProps) {
+  const { baseCurrency } = useCurrency()
   const [budgets, setBudgets] = useState<BudgetSummary[]>(initialBudgets)
   const [allowances, setAllowances] = useState<BudgetSummary[]>(initialAllowances)
   const [target, setTarget] = useState<MonthlyBudgetTarget | null>(initialTarget)
@@ -220,6 +222,7 @@ export function BudgetPageContent({
             dayOfMonth={isCurrentMonth ? new Date().getDate() : undefined}
             daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
             cashflowAdjustment={cashflowAdjustment}
+            baseCurrency={baseCurrency}
           />
 
           {/* Burndown Chart */}
@@ -244,6 +247,7 @@ export function BudgetPageContent({
                   daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
                   onClick={handleCategoryClick}
                   onAddFunds={handleAddFunds}
+                  baseCurrency={baseCurrency}
                 />
               ))}
             </div>
@@ -264,6 +268,7 @@ export function BudgetPageContent({
                     daysInMonth={isCurrentMonth ? getDaysInMonth(new Date()) : undefined}
                     onClick={handleCategoryClick}
                     onAddFunds={handleAddFunds}
+                    baseCurrency={baseCurrency}
                   />
                 ))}
               </div>

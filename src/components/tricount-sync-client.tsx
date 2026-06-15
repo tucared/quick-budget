@@ -6,7 +6,7 @@ import { RefreshCw, Link2, Unlink, AlertTriangle, Users, Check, Pause, Play, Glo
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { TricountLink } from "@/lib/types"
-import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/contexts/user-context"
 import {
   resolveMembers,
   type HouseholdUser,
@@ -17,7 +17,7 @@ import {
 // (node:crypto etc.) never enters the client bundle.
 import type { SyncResult } from "@/lib/tricount/sync"
 
-/** Per-link signed owe/owed totals (EUR). Mirrors getTricountLinkBalances. */
+/** Per-link signed owe/owed totals (household base currency). Mirrors getTricountLinkBalances. */
 type LinkBalance = { paid: number; share: number }
 type LinkResult = { linkId: string; title: string; result?: SyncResult; error?: string }
 
@@ -339,6 +339,7 @@ function LinkCard({
   onSaveMapping: (m: MemberMap) => void
   onSaveTimezone: (tz: string) => void
 }) {
+  const { format: fmt } = useCurrency()
   const paused = !link.is_active
   const [confirmRemove, setConfirmRemove] = useState(false)
   const members = (link.members ?? []) as unknown as RegistryMember[]
@@ -347,8 +348,9 @@ function LinkCard({
   const mapped = resolved.filter((r) => r.status === "mapped").length
   const excluded = resolved.filter((r) => r.status === "excluded").length
   const needsMapping = resolved.filter((r) => r.status === "unset").length
-  // Net owe/owed = household cash paid − household share consumed (signed EUR,
-  // income included). Positive = you're owed, negative = you owe.
+  // Net owe/owed = household cash paid − household share consumed (signed, in
+  // the household base currency, income included). Positive = you're owed,
+  // negative = you owe.
   const net = balance ? Math.round((balance.paid - balance.share) * 100) / 100 : null
 
   return (
@@ -472,14 +474,14 @@ function LinkCard({
       {net != null && (
         <div className="rounded-md bg-muted/40 px-2.5 py-2 text-xs space-y-0.5">
           <div className="text-muted-foreground">
-            You paid {formatCurrency(balance!.paid)} · your share {formatCurrency(balance!.share)}
+            You paid {fmt(balance!.paid)} · your share {fmt(balance!.share)}
           </div>
           <div className="font-medium text-foreground">
             {Math.abs(net) < 0.005
               ? "Settled up"
               : net < 0
-                ? `You owe ${formatCurrency(Math.abs(net))}`
-                : `You're owed ${formatCurrency(net)}`}
+                ? `You owe ${fmt(Math.abs(net))}`
+                : `You're owed ${fmt(net)}`}
           </div>
         </div>
       )}

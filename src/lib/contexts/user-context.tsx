@@ -1,7 +1,8 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react"
 import { useUser as useUserHook, type UserData } from "@/lib/hooks/use-user"
+import { formatCurrency } from "@/lib/currency"
 
 interface UserContextValue {
   user: UserData | null
@@ -36,4 +37,25 @@ export function useUser() {
     throw new Error("useUser must be used within a UserProvider")
   }
   return context
+}
+
+/**
+ * Household-currency helpers bound to the current user's base/secondary
+ * currency. `format` denominates an amount in the household's base currency
+ * (what every `converted_amount`, allocation, and cap is stored in); pass an
+ * explicit currency to `formatCurrency` directly when rendering an original
+ * foreign amount instead. Defaults to EUR/BRL until the user resolves.
+ */
+export function useCurrency() {
+  const { user } = useUser()
+  const baseCurrency = user?.baseCurrency ?? "EUR"
+  const secondaryCurrency = user?.secondaryCurrency ?? "BRL"
+  const format = useCallback(
+    (value: number, decimals: number = 2) => formatCurrency(value, decimals, baseCurrency),
+    [baseCurrency],
+  )
+  return useMemo(
+    () => ({ baseCurrency, secondaryCurrency, format }),
+    [baseCurrency, secondaryCurrency, format],
+  )
 }

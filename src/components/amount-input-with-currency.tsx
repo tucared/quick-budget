@@ -2,7 +2,6 @@
 
 import { forwardRef, useImperativeHandle, useRef } from "react"
 import { formatCentsDisplay } from "@/components/ui/cents-input"
-import { SUPPORTED_CURRENCIES } from "@/lib/currency"
 
 const MAX_CENTS = 999_999_999 // ~10M cap
 
@@ -16,6 +15,10 @@ interface AmountInputWithCurrencyProps {
   onCentsChange: (cents: number) => void
   currency: string
   onCurrencyChange: (currency: string) => void
+  // The household's base + secondary currency — the two toggle options, in
+  // order (base first). Replaces the former hardcoded EUR/BRL list.
+  baseCurrency: string
+  secondaryCurrency: string
   error?: boolean
   autoFocus?: boolean
   // Override Enter behavior. Default: prevent submit, do nothing.
@@ -27,10 +30,21 @@ export const AmountInputWithCurrency = forwardRef<
   AmountInputHandle,
   AmountInputWithCurrencyProps
 >(function AmountInputWithCurrency(
-  { centsRaw, onCentsChange, currency, onCurrencyChange, error, autoFocus, onEnter },
+  {
+    centsRaw,
+    onCentsChange,
+    currency,
+    onCurrencyChange,
+    baseCurrency,
+    secondaryCurrency,
+    error,
+    autoFocus,
+    onEnter,
+  },
   ref
 ) {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const currencyOptions = [baseCurrency, secondaryCurrency]
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
@@ -97,9 +111,9 @@ export const AmountInputWithCurrency = forwardRef<
         {formatCentsDisplay(centsRaw)}
       </span>
       <div className="inline-flex rounded-md shrink-0" role="group">
-        {SUPPORTED_CURRENCIES.map((c, i) => {
+        {currencyOptions.map((c, i) => {
           const isFirst = i === 0
-          const isLast = i === SUPPORTED_CURRENCIES.length - 1
+          const isLast = i === currencyOptions.length - 1
           const radius = isFirst ? "rounded-l-md" : isLast ? "rounded-r-md" : ""
           const borderLeft = isFirst ? "" : "border-l-0"
           const isSelected = currency === c

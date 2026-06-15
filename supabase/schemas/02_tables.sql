@@ -6,6 +6,16 @@
 CREATE TABLE households (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  -- The household's accounting currency: every expense's converted_amount,
+  -- category cap, budget allocation, and Tricount-mirrored amount is
+  -- denominated in this. The global exchange_rates table stays EUR-pivoted;
+  -- conversion to base_currency is derived as a cross-rate
+  -- (rate_to_eur(input) / rate_to_eur(base_currency)). Defaults to EUR so the
+  -- original household is unchanged and no expense backfill is needed.
+  base_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (base_currency ~ '^[A-Z]{3}$'),
+  -- The secondary (foreign) currency offered alongside base_currency in the
+  -- expense form's currency toggle.
+  secondary_currency TEXT NOT NULL DEFAULT 'BRL' CHECK (secondary_currency ~ '^[A-Z]{3}$'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -183,11 +193,11 @@ CREATE TABLE categories (
   icon TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   -- Optional cap configuration (JTBD #8). When set, expenses logged against
-  -- this category in amounts exceeding `cap_amount` (EUR-equivalent) surface
-  -- an inline toggle in the expense form: ON splits into two sibling rows
-  -- (cap → this category, overflow → an allowance the user picks at log
-  -- time), OFF logs a single row at the full amount. Stored EUR-denominated
-  -- regardless of the expense's input currency.
+  -- this category in amounts exceeding `cap_amount` (in the household's base
+  -- currency) surface an inline toggle in the expense form: ON splits into two
+  -- sibling rows (cap → this category, overflow → an allowance the user picks
+  -- at log time), OFF logs a single row at the full amount. Stored in the
+  -- household's base currency regardless of the expense's input currency.
   cap_amount DECIMAL(12, 2),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

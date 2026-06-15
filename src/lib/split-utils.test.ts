@@ -164,7 +164,7 @@ describe("deriveCapState", () => {
     const cat = makeCategory()
     const result = deriveCapState(cat, 25, 1)
     expect(result.exceedsCap).toBe(false)
-    expect(result.capEUR).toBe(0)
+    expect(result.capBase).toBe(0)
   })
 
   it("returns exceedsCap=false when the category is an allowance", () => {
@@ -179,18 +179,18 @@ describe("deriveCapState", () => {
     const cat = makeCategory({ cap_amount: 10 })
     const result = deriveCapState(cat, 10, 1)
     expect(result.exceedsCap).toBe(false)
-    expect(result.capEUR).toBe(10)
+    expect(result.capBase).toBe(10)
   })
 
   it("splits cleanly in EUR when amount > cap", () => {
     const cat = makeCategory({ cap_amount: 10 })
     const result = deriveCapState(cat, 25, 1)
     expect(result.exceedsCap).toBe(true)
-    expect(result.capEUR).toBe(10)
+    expect(result.capBase).toBe(10)
     expect(result.primaryOriginal).toBe(10)
-    expect(result.primaryEUR).toBe(10)
+    expect(result.primaryBase).toBe(10)
     expect(result.overflowOriginal).toBe(15)
-    expect(result.overflowEUR).toBe(15)
+    expect(result.overflowBase).toBe(15)
   })
 
   it("splits BRL into primary cap-in-EUR + overflow with input sum preserved", () => {
@@ -200,17 +200,32 @@ describe("deriveCapState", () => {
     const result = deriveCapState(cat, amountBRL, rate)
 
     expect(result.exceedsCap).toBe(true)
-    expect(result.primaryEUR).toBe(10)
+    expect(result.primaryBase).toBe(10)
     expect(result.primaryOriginal + result.overflowOriginal).toBeCloseTo(amountBRL, 2)
-    expect(result.overflowEUR).toBeCloseTo(amountBRL * rate - 10, 2)
+    expect(result.overflowBase).toBeCloseTo(amountBRL * rate - 10, 2)
+  })
+
+  it("interprets cap + converted amounts in the household base currency (GBP base, BRL input)", () => {
+    // cap_amount is base-currency-denominated and `exchangeRate` is the
+    // cross-rate from the input currency into the base currency. For a GBP
+    // household a 100 BRL entry at 0.15 GBP/BRL converts to 15 GBP, which
+    // exceeds a 10 GBP cap. The split mirrors the EUR-base math exactly.
+    const cat = makeCategory({ cap_amount: 10 })
+    const rateBrlToGbp = 0.15
+    const result = deriveCapState(cat, 100, rateBrlToGbp)
+    expect(result.exceedsCap).toBe(true)
+    expect(result.capBase).toBe(10)
+    expect(result.primaryBase).toBe(10)
+    expect(result.primaryOriginal + result.overflowOriginal).toBeCloseTo(100, 2)
+    expect(result.overflowBase).toBeCloseTo(100 * rateBrlToGbp - 10, 2)
   })
 
   it("excludes allowance overflow when total just barely crosses cap (sub-cent)", () => {
     const cat = makeCategory({ cap_amount: 10 })
     const result = deriveCapState(cat, 10.005, 1)
     expect(result.exceedsCap).toBe(true)
-    expect(result.primaryEUR).toBe(10)
-    expect(result.overflowEUR).toBeCloseTo(0.01, 2)
+    expect(result.primaryBase).toBe(10)
+    expect(result.overflowBase).toBeCloseTo(0.01, 2)
   })
 
   it("returns exceedsCap=false for zero/negative/NaN inputs", () => {
@@ -227,7 +242,7 @@ describe("deriveCapState", () => {
     // (amount <> 0) would reject. Must collapse to a no-split derivation.
     const result = deriveCapState(cat, 10.004, 1)
     expect(result.exceedsCap).toBe(false)
-    expect(result.capEUR).toBe(10)
+    expect(result.capBase).toBe(10)
   })
 
   it("does not split when the original-currency overflow rounds to 0.00", () => {
@@ -237,7 +252,7 @@ describe("deriveCapState", () => {
     // overflow — the original-side sibling amount would round to 0.00.
     const result = deriveCapState(cat, 2.004, 5)
     expect(result.exceedsCap).toBe(false)
-    expect(result.capEUR).toBe(10)
+    expect(result.capBase).toBe(10)
   })
 
   it("still splits when both the EUR and original-currency overflows are >= 0.01", () => {
@@ -245,9 +260,9 @@ describe("deriveCapState", () => {
     const result = deriveCapState(cat, 2.01, 5)
     expect(result.exceedsCap).toBe(true)
     expect(result.primaryOriginal).toBe(2)
-    expect(result.primaryEUR).toBe(10)
+    expect(result.primaryBase).toBe(10)
     expect(result.overflowOriginal).toBe(0.01)
-    expect(result.overflowEUR).toBe(0.05)
+    expect(result.overflowBase).toBe(0.05)
   })
 })
 

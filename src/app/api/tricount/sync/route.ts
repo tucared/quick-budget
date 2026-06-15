@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       const result = await runSync(supabase, {
         userId: user.id,
         householdId: user.householdId,
+        baseCurrency: user.baseCurrency,
         link,
       })
       results = [{ linkId: link.id, title: result.title, result }]

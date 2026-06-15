@@ -5,6 +5,7 @@ import { format } from "date-fns"
 import { Pencil, Trash2 } from "lucide-react"
 import type { Category } from "@/lib/types"
 import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/contexts/user-context"
 import { parseLocalDate } from "@/lib/date-utils"
 
 interface ExpenseCardExpense {
@@ -48,6 +49,7 @@ function ExpenseCardImpl({
   onEdit,
   onDelete,
 }: ExpenseCardProps) {
+  const { baseCurrency, format: fmt } = useCurrency()
   // Imported (Tricount) rows are read-only here — managed on the Sync tab.
   const imported = !!importedFrom
   const showActions = !imported
@@ -114,9 +116,9 @@ function ExpenseCardImpl({
                   }`}
                 >
                   <div className="font-semibold text-lg">
-                    {formatCurrency(expense.converted_amount)}
+                    {fmt(expense.converted_amount)}
                   </div>
-                  {expense.currency !== "EUR" && (
+                  {expense.currency !== baseCurrency && (
                     <div className="text-xs text-muted-foreground">
                       {formatCurrency(expense.amount, 2, expense.currency)}
                     </div>
@@ -181,8 +183,9 @@ function SplitExpenseCardImpl({
   onEdit,
   onDelete,
 }: SplitExpenseCardProps) {
+  const { baseCurrency, format: fmt } = useCurrency()
   const totalConverted = Number(primary.converted_amount) + Number(overflow.converted_amount)
-  const showForeign = primary.currency !== "EUR"
+  const showForeign = primary.currency !== baseCurrency
   const foreignTotal = showForeign ? Number(primary.amount) + Number(overflow.amount) : 0
   // The two siblings share description, date, cash flag, currency — read them
   // from the primary row.
@@ -225,7 +228,7 @@ function SplitExpenseCardImpl({
                   isShowingDelete ? "mr-[4.5rem]" : "md:group-hover:mr-[4.5rem]"
                 }`}
               >
-                <div className="font-semibold text-lg">{formatCurrency(totalConverted)}</div>
+                <div className="font-semibold text-lg">{fmt(totalConverted)}</div>
                 {showForeign && (
                   <div className="text-xs text-muted-foreground">
                     {formatCurrency(foreignTotal, 2, primary.currency)}
@@ -266,7 +269,7 @@ function SplitExpenseCardImpl({
                 <span className="truncate">{primaryCategory?.name || "Uncategorized"}</span>
               </div>
               <span className="font-medium tabular-nums shrink-0 text-muted-foreground">
-                {formatCurrency(primary.converted_amount)}
+                {fmt(primary.converted_amount)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
@@ -275,7 +278,7 @@ function SplitExpenseCardImpl({
                 <span className="truncate">{overflowCategory?.name || "Uncategorized"}</span>
               </div>
               <span className="font-medium tabular-nums shrink-0 text-muted-foreground">
-                {formatCurrency(overflow.converted_amount)}
+                {fmt(overflow.converted_amount)}
               </span>
             </div>
           </div>

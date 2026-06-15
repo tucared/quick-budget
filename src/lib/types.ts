@@ -22,6 +22,10 @@ export interface UserData {
   email: string | undefined
   fullName: string
   householdId: string
+  // The household's accounting currency and the secondary (foreign) currency
+  // offered in the expense form. Read from the households row (not the JWT).
+  baseCurrency: string
+  secondaryCurrency: string
 }
 
 // Extended types with relations for displaying data

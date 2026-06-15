@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest"
-import { formatCurrency, formatNumber } from "@/lib/currency"
+import { describe, it, expect, vi, afterEach } from "vitest"
+import { formatCurrency, formatNumber, fetchConversionRate } from "@/lib/currency"
 
 describe("formatNumber", () => {
   it("formats positive integer with default 2 decimals", () => {
@@ -79,5 +79,58 @@ describe("formatCurrency", () => {
 
   it("handles -0 as positive (no minus sign)", () => {
     expect(formatCurrency(-0)).toBe("€0,00")
+  })
+})
+
+describe("fetchConversionRate", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // Stub the /api/exchange-rates route: return rate_to_eur per currency parsed
+  // from the request URL. EUR short-circuits inside fetchExchangeRateFromAPI
+  // without a fetch, so it never reaches here.
+  function stubRates(rates: Record<string, { rate: number; source?: string }>) {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      const currency = new URL(url, "http://localhost").searchParams.get("currency") ?? ""
+      const entry = rates[currency]
+      if (!entry) throw new Error(`no stub for ${currency}`)
+      return {
+        ok: true,
+        json: async () => ({ currency, date: "2026-06-15", rate: entry.rate, source: entry.source ?? "cache" }),
+      } as Response
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    return fetchMock
+  }
+
+  it("short-circuits to rate 1 when the input is already the base currency (no fetch)", async () => {
+    const fetchMock = stubRates({})
+    expect(await fetchConversionRate("GBP", "GBP", "2026-06-15")).toEqual({ rate: 1, isFallback: false })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("returns rate_to_eur directly for an EUR base (single leg)", async () => {
+    stubRates({ BRL: { rate: 0.16 } })
+    const { rate } = await fetchConversionRate("BRL", "EUR", "2026-06-15")
+    expect(rate).toBeCloseTo(0.16, 6)
+  })
+
+  it("computes a cross-rate for a non-EUR base (BRL → GBP)", async () => {
+    stubRates({ BRL: { rate: 0.16 }, GBP: { rate: 1.17 } })
+    const { rate } = await fetchConversionRate("BRL", "GBP", "2026-06-15")
+    expect(rate).toBeCloseTo(0.16 / 1.17, 6)
+  })
+
+  it("resolves EUR as a foreign currency for a GBP base (1 / rate_to_eur(GBP))", async () => {
+    stubRates({ GBP: { rate: 1.17 } })
+    const { rate } = await fetchConversionRate("EUR", "GBP", "2026-06-15")
+    expect(rate).toBeCloseTo(1 / 1.17, 6)
+  })
+
+  it("flags isFallback when either leg fell back", async () => {
+    stubRates({ BRL: { rate: 0.16, source: "fallback" }, GBP: { rate: 1.17 } })
+    expect((await fetchConversionRate("BRL", "GBP", "2026-06-15")).isFallback).toBe(true)
   })
 })
