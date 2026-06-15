@@ -56,11 +56,22 @@ export function useUser(initialUser?: UserData | null) {
           return
         }
 
+        // Base/secondary currency live on the households row. The server-
+        // hydrated initialUser carries them in the common case; this client
+        // fallback fetches them (RLS-scoped) and defaults to EUR/BRL if absent.
+        const { data: household } = await supabase
+          .from("households")
+          .select("base_currency, secondary_currency")
+          .eq("id", claimHouseholdId)
+          .maybeSingle()
+
         setUser({
           id: authUser.id,
           email: authUser.email,
           fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
           householdId: claimHouseholdId,
+          baseCurrency: household?.base_currency ?? "EUR",
+          secondaryCurrency: household?.secondary_currency ?? "BRL",
         })
         setLoading(false)
       } catch (_err) {

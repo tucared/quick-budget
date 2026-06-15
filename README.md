@@ -5,6 +5,7 @@ Fast expense tracking and flexible budgeting for partners. Used daily by a two-p
 Scope: running discretionary spending only. Rent, subscriptions, and other fixed costs are netted out upstream — the monthly target represents what's left to spend day-to-day, so even spending across the month is a realistic baseline.
 
 - Log expenses in seconds, including in foreign currency with automatic conversion
+- Per-household base currency (e.g. EUR or GBP) with a configurable secondary currency for foreign entries — set at household creation
 - Shared budget dashboard with real-time sync between partners
 - Mid-month rebalancing — move money between categories when priorities shift
 - Personal allowances tracked separately from shared spending

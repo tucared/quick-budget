@@ -5,9 +5,10 @@ import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type BudgetSummary, type Category, type Expense } from "@/lib/types"
-import { fetchExchangeRateFromAPI } from "@/lib/currency"
+import { fetchConversionRate } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState, partitionSplitSiblings, round2 } from "@/lib/split-utils"
+import { useUser } from "@/lib/contexts/user-context"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
@@ -80,6 +81,9 @@ function EditExpenseForm({
   onSaved,
   onDeleted,
 }: EditExpenseFormProps) {
+  const { user } = useUser()
+  const baseCurrency = user?.baseCurrency ?? "EUR"
+  const secondaryCurrency = user?.secondaryCurrency ?? "BRL"
   const excludeFlags = useMemo(() => {
     const map = new Map<string, boolean>()
     categories.forEach((c) => map.set(c.id, c.exclude_from_budget_total))
@@ -245,11 +249,11 @@ function EditExpenseForm({
   }, [isSplit, effectiveOverflowCategoryId, budgetMonth, primaryRow.household_id])
 
   // The expense being edited is already counted in budget_summary. Rebase a
-  // fetched bar by removing this expense's own existing EUR contribution to the
-  // category so the preview reflects the edited amount instead of double-
-  // counting it. A category the original rows never touched (e.g. the user
-  // moved this expense here) is returned unchanged.
-  const originalEurInCategory = (catId: string | null): number => {
+  // fetched bar by removing this expense's own existing base-currency
+  // contribution to the category so the preview reflects the edited amount
+  // instead of double-counting it. A category the original rows never touched
+  // (e.g. the user moved this expense here) is returned unchanged.
+  const originalBaseInCategory = (catId: string | null): number => {
     if (!catId) return 0
     let sum = 0
     if (primaryRow.category_id === catId) sum += Math.abs(Number(primaryRow.converted_amount))
@@ -262,7 +266,7 @@ function EditExpenseForm({
     catId: string | null,
   ): BudgetSummary | null => {
     if (!budget) return null
-    const own = originalEurInCategory(catId)
+    const own = originalBaseInCategory(catId)
     if (own === 0) return budget
     return {
       ...budget,
@@ -331,7 +335,7 @@ function EditExpenseForm({
     setSaving(true)
 
     try {
-      const cur = data.currency || "EUR"
+      const cur = data.currency || baseCurrency
       // Re-fetch the rate only when the inputs that determine it changed.
       // Editing unrelated fields (description, category, amount) reuses the
       // row's stored historical rate — an unconditional re-fetch could
@@ -342,7 +346,7 @@ function EditExpenseForm({
       let exchangeRate = Number(primaryRow.exchange_rate) || 1
       let usedFallbackRate = false
       if (rateInputsChanged) {
-        const fetched = await fetchExchangeRateFromAPI(cur, data.expense_date)
+        const fetched = await fetchConversionRate(cur, baseCurrency, data.expense_date)
         exchangeRate = fetched.rate
         usedFallbackRate = fetched.isFallback
       }
@@ -350,7 +354,7 @@ function EditExpenseForm({
 
       const sharedFields = {
         currency: cur,
-        converted_currency: "EUR",
+        converted_currency: baseCurrency,
         exchange_rate: exchangeRate,
         is_cash: data.is_cash ?? false,
         expense_date: data.expense_date,
@@ -400,7 +404,7 @@ function EditExpenseForm({
             household_id: primaryRow.household_id,
             category_id: overflowCategoryIdToUse,
             amount: submitDerivation.overflowOriginal,
-            converted_amount: submitDerivation.overflowEUR,
+            converted_amount: submitDerivation.overflowBase,
             split_group_id: splitGroupId,
             ...sharedFields,
           })
@@ -412,7 +416,7 @@ function EditExpenseForm({
           .update({
             ...sharedFields,
             amount: submitDerivation.primaryOriginal,
-            converted_amount: submitDerivation.primaryEUR,
+            converted_amount: submitDerivation.primaryBase,
             category_id: data.category_id,
             split_group_id: splitGroupId,
           })
@@ -439,7 +443,7 @@ function EditExpenseForm({
             .update({
               ...sharedFields,
               amount: submitDerivation.primaryOriginal,
-              converted_amount: submitDerivation.primaryEUR,
+              converted_amount: submitDerivation.primaryBase,
               category_id: data.category_id,
             })
             .eq("id", primaryRow.id)
@@ -450,7 +454,7 @@ function EditExpenseForm({
             .update({
               ...sharedFields,
               amount: submitDerivation.overflowOriginal,
-              converted_amount: submitDerivation.overflowEUR,
+              converted_amount: submitDerivation.overflowBase,
               category_id: overflowCategoryIdToUse,
             })
             .eq("id", initialOverflowRow.id)
@@ -545,6 +549,8 @@ function EditExpenseForm({
             onCentsChange={setCentsRaw}
             currency={currency}
             onCurrencyChange={setCurrency}
+            baseCurrency={baseCurrency}
+            secondaryCurrency={secondaryCurrency}
             error={!!formErrors.amount}
           />
           {formErrors.amount && (
@@ -597,6 +603,7 @@ function EditExpenseForm({
               daysInMonth={daysInMonth}
               additionalAmount={debouncedPrimaryPortion > 0 ? debouncedPrimaryPortion * previewExchangeRate : 0}
               loading={loadingBudget}
+              baseCurrency={baseCurrency}
             />
             {isSplit && (
               <CategoryBudgetCard
@@ -632,6 +639,7 @@ function EditExpenseForm({
                 dayOfMonth={dayOfMonth}
                 daysInMonth={daysInMonth}
                 additionalAmount={debouncedOverflowPortion > 0 ? debouncedOverflowPortion * previewExchangeRate : 0}
+                baseCurrency={baseCurrency}
               />
             )}
           </div>

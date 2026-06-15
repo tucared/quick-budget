@@ -98,6 +98,13 @@ BEGIN
   IF household1_id = household2_id THEN
     RAISE NOTICE '  → Users already share household, nothing to do';
   ELSE
+    -- The 'Home' household keeps the column defaults: base_currency 'EUR',
+    -- secondary_currency 'BRL'. To seed a non-EUR household for local testing,
+    -- set them explicitly, e.g.:
+    --   INSERT INTO public.households (name, base_currency, secondary_currency)
+    --   VALUES ('London', 'GBP', 'BRL');
+    -- (GBP→EUR rates are seeded in 04_seed_exchange_rates.sql so cross-rates
+    -- resolve offline.)
     INSERT INTO public.households (name) VALUES ('Home')
     RETURNING id INTO shared_household_id;
 

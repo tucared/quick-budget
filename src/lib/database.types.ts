@@ -228,21 +228,27 @@ export type Database = {
       }
       households: {
         Row: {
+          base_currency: string
           created_at: string
           id: string
           name: string
+          secondary_currency: string
           updated_at: string
         }
         Insert: {
+          base_currency?: string
           created_at?: string
           id?: string
           name: string
+          secondary_currency?: string
           updated_at?: string
         }
         Update: {
+          base_currency?: string
           created_at?: string
           id?: string
           name?: string
+          secondary_currency?: string
           updated_at?: string
         }
         Relationships: []

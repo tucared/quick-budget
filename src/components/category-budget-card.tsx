@@ -28,6 +28,9 @@ interface CategoryBudgetCardProps {
   // figure (the cap checkbox on the category bar, the person buttons on the
   // allowance bar).
   trailing?: ReactNode
+  // The household's base currency — all amounts on this card are denominated in
+  // it. Defaults to EUR for the original household / standalone usage.
+  baseCurrency?: string
 }
 
 function CategoryBudgetCardImpl({
@@ -43,6 +46,7 @@ function CategoryBudgetCardImpl({
   compact = false,
   showFraction = false,
   trailing,
+  baseCurrency = "EUR",
 }: CategoryBudgetCardProps) {
   if (loading) {
     return (
@@ -88,14 +92,14 @@ function CategoryBudgetCardImpl({
             <span className="truncate">{budget.category_name}</span>
             {showFraction && additionalAmount > 0 && (
               <span className="shrink-0 font-normal text-muted-foreground">
-                ({formatCurrency(additionalAmount)})
+                ({formatCurrency(additionalAmount, 2, baseCurrency)})
               </span>
             )}
           </span>
           <div className="flex items-center gap-2 shrink-0">
             {trailing}
             <span className={`text-xs font-semibold ${willOverspend ? "text-destructive" : statusColor.text}`}>
-              {formatCurrency(additionalAmount > 0 ? newRemaining : remaining)} left{willOverspend && " ⚠️"}
+              {formatCurrency(additionalAmount > 0 ? newRemaining : remaining, 2, baseCurrency)} left{willOverspend && " ⚠️"}
             </span>
           </div>
         </div>
@@ -169,10 +173,10 @@ function CategoryBudgetCardImpl({
       {/* Spent / allocated + remaining */}
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">
-          {formatCurrency(spent)} <span className="mx-0.5">/</span> {formatCurrency(allocated)}
+          {formatCurrency(spent, 2, baseCurrency)} <span className="mx-0.5">/</span> {formatCurrency(allocated, 2, baseCurrency)}
         </span>
         <span>
-          <span className="font-semibold">{formatCurrency(remaining)} left</span>
+          <span className="font-semibold">{formatCurrency(remaining, 2, baseCurrency)} left</span>
         </span>
       </div>
 
@@ -182,7 +186,7 @@ function CategoryBudgetCardImpl({
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">After this expense:</span>
             <span className={`font-bold ${willOverspend ? 'text-destructive' : statusColor.text}`}>
-              {formatCurrency(newRemaining)} left
+              {formatCurrency(newRemaining, 2, baseCurrency)} left
               {willOverspend && " ⚠️"}
             </span>
           </div>

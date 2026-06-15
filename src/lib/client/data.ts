@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { nextMonthString } from "@/lib/date-utils"
-import { partitionBudgetSummary, tricountCashflowAdjustmentEuros } from "@/lib/budget-utils"
+import { partitionBudgetSummary, tricountCashflowAdjustment } from "@/lib/budget-utils"
 import type {
   BudgetSummary,
   Expense,
@@ -89,5 +89,5 @@ export async function fetchTricountCashflowAdjustment(
     return { data: null, error }
   }
 
-  return { data: tricountCashflowAdjustmentEuros(data), error: null }
+  return { data: tricountCashflowAdjustment(data), error: null }
 }

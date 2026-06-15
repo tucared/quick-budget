@@ -29,14 +29,16 @@ type CashflowRow = {
 }
 
 /**
- * EUR adjustment that turns the budget's share-based "spent" into the month's
- * actual cash flow: per reconciled entry, `paid − share` for mirrored expenses
- * (expense_id set, in the budget total at their share) and `paid` for income
- * (expense_id null, not in the total, so only its cash counts). Summed in
- * integer cents to avoid float drift, then converted back to euros. Returns
- * null for an empty input (no reconciled entries) so the figure can be hidden.
+ * Base-currency adjustment that turns the budget's share-based "spent" into the
+ * month's actual cash flow: per reconciled entry, `paid − share` for mirrored
+ * expenses (expense_id set, in the budget total at their share) and `paid` for
+ * income (expense_id null, not in the total, so only its cash counts). The
+ * ledger's `*_converted_amount` columns are already denominated in the
+ * household base currency. Summed in integer cents to avoid float drift, then
+ * converted back to whole units. Returns null for an empty input (no reconciled
+ * entries) so the figure can be hidden.
  */
-export function tricountCashflowAdjustmentEuros(rows: CashflowRow[]): number | null {
+export function tricountCashflowAdjustment(rows: CashflowRow[]): number | null {
   if (rows.length === 0) return null
   const cents = rows.reduce((sum, r) => {
     const consumed = r.expense_id ? Number(r.share_converted_amount) : 0

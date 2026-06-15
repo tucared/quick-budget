@@ -13,12 +13,15 @@ export function round2(value: number): number {
 // Cap-with-overflow derivation (JTBD #8). Given the selected category's cap
 // configuration and the entered amount + exchange rate, returns whether the
 // expense exceeds the configured cap and — if so — the exact original- and
-// EUR-currency amounts that should be written to the primary (capped) and
-// overflow sibling rows. The overflow's target category is picked at log time
-// in the UI; this function only does the math.
+// base-currency amounts that should be written to the primary (capped) and
+// overflow sibling rows. The `exchangeRate` passed in is the cross-rate from the
+// input currency into the household's base currency (1 when the input *is* the
+// base currency), and `cap_amount` is base-currency-denominated. The overflow's
+// target category is picked at log time in the UI; this function only does the
+// math.
 //
 // Invariants on the returned values when exceedsCap is true:
-//   - primaryEUR === capEUR (no rounding loss on the budget side)
+//   - primaryBase === capBase (no rounding loss on the budget side)
 //   - primaryOriginal + overflowOriginal === amountOriginal (input sum preserved)
 //   - exchange_rate is unchanged; both siblings use the same rate
 //
@@ -26,22 +29,22 @@ export function round2(value: number): number {
 // edit dialog, and the matching tests.
 export interface CapDerivation {
   exceedsCap: boolean
-  capEUR: number
+  capBase: number
   primaryOriginal: number
-  primaryEUR: number
+  primaryBase: number
   overflowOriginal: number
-  overflowEUR: number
+  overflowBase: number
 }
 
 type CapConfigInput = Pick<Category, "cap_amount" | "exclude_from_budget_total">
 
 const EMPTY_DERIVATION: CapDerivation = {
   exceedsCap: false,
-  capEUR: 0,
+  capBase: 0,
   primaryOriginal: 0,
-  primaryEUR: 0,
+  primaryBase: 0,
   overflowOriginal: 0,
-  overflowEUR: 0,
+  overflowBase: 0,
 }
 
 export function deriveCapState(
@@ -55,33 +58,34 @@ export function deriveCapState(
   if (!Number.isFinite(amountOriginal) || amountOriginal <= 0) return EMPTY_DERIVATION
   if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return EMPTY_DERIVATION
 
-  const capEUR = Number(category.cap_amount)
-  const totalEUR = amountOriginal * exchangeRate
+  const capBase = Number(category.cap_amount)
+  const totalBase = amountOriginal * exchangeRate
 
-  if (totalEUR <= capEUR) {
-    return { ...EMPTY_DERIVATION, capEUR }
+  if (totalBase <= capBase) {
+    return { ...EMPTY_DERIVATION, capBase }
   }
 
-  const overflowEUR = round2(totalEUR - capEUR)
+  const overflowBase = round2(totalBase - capBase)
   const primaryOriginal =
-    exchangeRate === 1 ? capEUR : round2(capEUR / exchangeRate)
+    exchangeRate === 1 ? capBase : round2(capBase / exchangeRate)
   const overflowOriginal = round2(amountOriginal - primaryOriginal)
 
-  // A total that exceeds the cap by less than half a cent — in EUR or, for
-  // foreign-currency inputs, in the original currency — rounds one overflow
-  // side to 0.00, which the DB CHECK (amount <> 0) would reject with a
-  // cryptic error. Treat it as not exceeding the cap instead: no split.
-  if (overflowEUR < 0.01 || overflowOriginal < 0.01) {
-    return { ...EMPTY_DERIVATION, capEUR }
+  // A total that exceeds the cap by less than half a cent — in the base
+  // currency or, for foreign-currency inputs, in the original currency —
+  // rounds one overflow side to 0.00, which the DB CHECK (amount <> 0) would
+  // reject with a cryptic error. Treat it as not exceeding the cap instead: no
+  // split.
+  if (overflowBase < 0.01 || overflowOriginal < 0.01) {
+    return { ...EMPTY_DERIVATION, capBase }
   }
 
   return {
     exceedsCap: true,
-    capEUR,
+    capBase,
     primaryOriginal,
-    primaryEUR: capEUR,
+    primaryBase: capBase,
     overflowOriginal,
-    overflowEUR,
+    overflowBase,
   }
 }
 

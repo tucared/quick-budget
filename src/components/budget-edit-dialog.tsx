@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { parseLocalDate } from "@/lib/date-utils"
-import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/contexts/user-context"
 import { getErrorMessage } from "@/lib/error-handler"
 import type { Category, BudgetSummary, MonthlyBudgetTarget } from "@/lib/types"
 import {
@@ -45,6 +45,7 @@ export function BudgetEditDialog({
   initialAllocations,
   initialTarget,
 }: BudgetEditDialogProps) {
+  const { format: fmt } = useCurrency()
   const [entries, setEntries] = useState<CategoryAmountEntry[]>([])
   const [targetCents, setTargetCents] = useState(0)
   const [initialTargetExists, setInitialTargetExists] = useState(false)
@@ -242,19 +243,19 @@ export function BudgetEditDialog({
                 <div className="mt-2 space-y-1 border-t pt-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Allocated</span>
-                    <span className="font-medium">{formatCurrency(regularAllocated)}</span>
+                    <span className="font-medium">{fmt(regularAllocated)}</span>
                   </div>
                   {hasTarget && (
                     overBy > 0 ? (
                       <div className="flex justify-between text-destructive font-medium">
                         <span>Over by</span>
-                        <span>{formatCurrency(overBy)}</span>
+                        <span>{fmt(overBy)}</span>
                       </div>
                     ) : (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Unallocated</span>
                         <span className={unallocated > 0 ? "text-[hsl(160,40%,35%)] font-medium" : "text-muted-foreground"}>
-                          {formatCurrency(unallocated)}
+                          {fmt(unallocated)}
                         </span>
                       </div>
                     )

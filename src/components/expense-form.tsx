@@ -6,7 +6,7 @@ import { format, startOfMonth, getDaysInMonth } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { expenseSchema } from "@/lib/validations"
 import { getStorageKeys, type Category, type Expense, type BudgetSummary } from "@/lib/types"
-import { fetchExchangeRateFromAPI } from "@/lib/currency"
+import { fetchConversionRate } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState, round2 } from "@/lib/split-utils"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,11 @@ interface ExpenseFormProps {
 export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds, externalRefreshSignal }: ExpenseFormProps) {
   const { user } = useUser()
   const householdId = user?.householdId
+  // The household's accounting + secondary currency drive the form's currency
+  // toggle, conversion target, and all displayed amounts. Default to EUR/BRL
+  // until the user (server-hydrated in the common case) resolves.
+  const baseCurrency = user?.baseCurrency ?? "EUR"
+  const secondaryCurrency = user?.secondaryCurrency ?? "BRL"
   const storageKeys = useMemo(
     () => (householdId ? getStorageKeys(householdId) : null),
     [householdId]
@@ -95,7 +100,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // Form state (replaces React Hook Form)
   const [amount, setAmount] = useState<number>(NaN)
   const [categoryId, setCategoryId] = useState<string>("")
-  const [currency, setCurrency] = useState<string>("EUR")
+  const [currency, setCurrency] = useState<string>(baseCurrency)
   const [isCash, setIsCash] = useState<boolean>(false)
   const [expenseDate, setExpenseDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
   const [description, setDescription] = useState<string>("")
@@ -106,12 +111,13 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   const selectedCurrency = currency
   const expenseAmount = amount
 
-  // For EUR the rate is always 1; for non-EUR we wait for the API fetch to
-  // populate `previewExchangeRate`. `null` while loading prevents the toggle
-  // from briefly displaying nonsensical math (e.g., 60 BRL treated as €60
-  // before the rate resolves).
-  const isNonEuroCurrency = !!selectedCurrency && selectedCurrency !== "EUR"
-  const effectiveExchangeRate: number | null = isNonEuroCurrency ? previewExchangeRate : 1.0
+  // For the base currency the rate is always 1; for any other currency we wait
+  // for the API fetch to populate `previewExchangeRate` (the cross-rate into the
+  // base currency). `null` while loading prevents the toggle from briefly
+  // displaying nonsensical math (e.g., 60 BRL treated as 60 GBP before the rate
+  // resolves).
+  const isNonBaseCurrency = !!selectedCurrency && selectedCurrency !== baseCurrency
+  const effectiveExchangeRate: number | null = isNonBaseCurrency ? previewExchangeRate : 1.0
 
   const selectedCategoryObj = useMemo(
     () => categories.find((c) => c.id === selectedCategory) ?? null,
@@ -137,8 +143,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
 
   // Derive cap-split values from the category's configured cap_amount.
   // `exceedsCap` is true only when the configured cap is strictly less than
-  // the EUR-converted total. When the rate isn't loaded yet (non-EUR mid-
-  // fetch), short-circuit to no-split so the UI doesn't show misleading
+  // the base-currency-converted total. When the rate isn't loaded yet (non-base
+  // mid-fetch), short-circuit to no-split so the UI doesn't show misleading
   // preview math.
   const capDerivation = useMemo(
     () => effectiveExchangeRate == null
@@ -253,8 +259,13 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             setCategoryId(lastCategory)
           }
 
-          if (lastCurrency) {
+          // Only restore a stored currency if it's still one of this
+          // household's two options — a household that changed its currencies
+          // (or a shared browser) could otherwise restore a now-invalid code.
+          if (lastCurrency === baseCurrency || lastCurrency === secondaryCurrency) {
             setCurrency(lastCurrency)
+          } else {
+            setCurrency(baseCurrency)
           }
         } catch (_err) {
           // localStorage might be disabled (incognito mode, etc.)
@@ -346,19 +357,20 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // placeholder on next re-expand.
   const overflowBudgetToShow = isSplit ? overflowCategoryBudget : null
 
-  // Fetch exchange rate for budget preview when currency or date changes.
-  // Reset to `null` first so the cap toggle hides until the authoritative
-  // rate resolves — prevents flashing wrong amounts for BRL inputs.
+  // Fetch the cross-rate into the base currency for the budget preview when the
+  // currency or date changes. Reset to `null` first so the cap toggle hides
+  // until the authoritative rate resolves — prevents flashing wrong amounts for
+  // foreign inputs.
   useEffect(() => {
-    if (!selectedCurrency || selectedCurrency === "EUR") return
+    if (!selectedCurrency || selectedCurrency === baseCurrency) return
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviewExchangeRate(null)
-    fetchExchangeRateFromAPI(selectedCurrency, expenseDate).then(({ rate }) => {
+    fetchConversionRate(selectedCurrency, baseCurrency, expenseDate).then(({ rate }) => {
       if (!cancelled) setPreviewExchangeRate(rate)
     })
     return () => { cancelled = true }
-  }, [selectedCurrency, expenseDate])
+  }, [selectedCurrency, baseCurrency, expenseDate])
 
   // Refresh budget status when the parent signals an external expense change
   // (partner added/deleted/updated). The parent owns the realtime subscription
@@ -415,20 +427,21 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     try {
       const supabase = createClient()
 
-      // Convert to EUR for consistent tracking
-      const cur = data.currency || "EUR"
+      // Convert into the household's base currency for consistent tracking.
+      const cur = data.currency || baseCurrency
 
-      // Fetch exchange rate from API (with database caching). `isFallback`
-      // means a static hardcoded rate was used — still log the expense, but
-      // surface a notice afterwards instead of staying silent about it.
+      // Fetch the cross-rate (cur → base currency) from the API (with database
+      // caching). `isFallback` means a static hardcoded rate was used on at
+      // least one leg — still log the expense, but surface a notice afterwards
+      // instead of staying silent about it.
       const { rate: exchangeRate, isFallback: usedFallbackRate } =
-        await fetchExchangeRateFromAPI(cur, data.expense_date)
+        await fetchConversionRate(cur, baseCurrency, data.expense_date)
       const sharedFields = {
         logged_by_user_id: user.id,
         household_id: user.householdId,
         is_cash: data.is_cash ?? false,
         currency: cur,
-        converted_currency: "EUR",
+        converted_currency: baseCurrency,
         exchange_rate: exchangeRate,
         expense_date: data.expense_date,
         description: data.description || null,
@@ -451,14 +464,14 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
             ...sharedFields,
             category_id: data.category_id,
             amount: submitDerivation.primaryOriginal,
-            converted_amount: submitDerivation.primaryEUR,
+            converted_amount: submitDerivation.primaryBase,
             split_group_id: splitGroupId,
           },
           {
             ...sharedFields,
             category_id: overflowCategoryIdToUse,
             amount: submitDerivation.overflowOriginal,
-            converted_amount: submitDerivation.overflowEUR,
+            converted_amount: submitDerivation.overflowBase,
             split_group_id: splitGroupId,
           },
         ]
@@ -609,6 +622,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
           onCentsChange={handleCentsChange}
           currency={selectedCurrency}
           onCurrencyChange={setCurrency}
+          baseCurrency={baseCurrency}
+          secondaryCurrency={secondaryCurrency}
           error={!!formErrors.amount}
           autoFocus
           onEnter={() => descriptionRef.current?.focus()}
@@ -671,6 +686,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
                   additionalAmount={debouncedPrimaryPortion > 0 && effectiveExchangeRate != null ? debouncedPrimaryPortion * effectiveExchangeRate : 0}
                   loading={loadingBudget}
+                  baseCurrency={baseCurrency}
                 />
                 {/* Overflow allowance bar. The person buttons on this line pick
                     which allowance the overflow lands in (when >1 exists); the
@@ -709,6 +725,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                     dayOfMonth={new Date(expenseDate + 'T00:00:00').getDate()}
                     daysInMonth={getDaysInMonth(new Date(expenseDate + 'T00:00:00'))}
                     additionalAmount={debouncedOverflowAmount > 0 && effectiveExchangeRate != null ? debouncedOverflowAmount * effectiveExchangeRate : 0}
+                    baseCurrency={baseCurrency}
                   />
                 )}
               </>

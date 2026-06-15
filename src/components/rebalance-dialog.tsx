@@ -4,7 +4,7 @@ import { useState } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase"
 import { parseLocalDate } from "@/lib/date-utils"
-import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/contexts/user-context"
 import { getErrorMessage } from "@/lib/error-handler"
 import type { BudgetSummary } from "@/lib/types"
 import { Plus } from "lucide-react"
@@ -46,6 +46,7 @@ export function RebalanceDialog({
   hasTarget = false,
   unallocated = 0,
 }: RebalanceDialogProps) {
+  const { format: fmt } = useCurrency()
   const [step, setStep] = useState<Step>("source")
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [destId, setDestId] = useState<string | null>(null)
@@ -101,13 +102,13 @@ export function RebalanceDialog({
     if (!isPoolSource && sourceBudget) {
       const maxAmount = Number(sourceBudget.remaining_amount)
       if (transferAmount > maxAmount) {
-        setError(`Maximum available: ${formatCurrency(maxAmount)}`)
+        setError(`Maximum available: ${fmt(maxAmount)}`)
         return
       }
     }
     if (isPoolSource && hasTarget) {
       if (transferAmount > unallocated) {
-        setError(`Maximum available: ${formatCurrency(unallocated)}`)
+        setError(`Maximum available: ${fmt(unallocated)}`)
         return
       }
     }
@@ -201,7 +202,7 @@ export function RebalanceDialog({
               <span className="font-medium">{destBudgetForTitle.category_name}</span>
             </span>
             <span className={`font-semibold ${destBannerNeutral ? "text-foreground" : "text-destructive"}`}>
-              {formatCurrency(destRemaining)}
+              {fmt(destRemaining)}
             </span>
           </div>
         )}
@@ -234,7 +235,7 @@ export function RebalanceDialog({
                 </div>
                 {hasTarget && (
                   <span className="text-sm text-[hsl(160,40%,35%)] font-medium">
-                    {formatCurrency(unallocated)} left
+                    {fmt(unallocated)} left
                   </span>
                 )}
               </button>
@@ -256,7 +257,7 @@ export function RebalanceDialog({
                     <span className="text-sm font-medium">{b.category_name}</span>
                   </div>
                   <span className="text-sm text-[hsl(160,40%,35%)] font-medium">
-                    {formatCurrency(Number(b.remaining_amount))} left
+                    {fmt(Number(b.remaining_amount))} left
                   </span>
                 </button>
               ))
@@ -269,12 +270,12 @@ export function RebalanceDialog({
           <div className="space-y-4">
             {!isPoolSource && sourceBudget && (
               <div className="text-sm text-muted-foreground">
-                Available from {sourceBudget.category_name}: {formatCurrency(Number(sourceBudget.remaining_amount))}
+                Available from {sourceBudget.category_name}: {fmt(Number(sourceBudget.remaining_amount))}
               </div>
             )}
             {isPoolSource && hasTarget && (
               <div className="text-sm text-muted-foreground">
-                Available from unallocated pool: {formatCurrency(unallocated)}
+                Available from unallocated pool: {fmt(unallocated)}
               </div>
             )}
             <CentsInput
@@ -299,7 +300,7 @@ export function RebalanceDialog({
                           <span className="text-sm font-medium">{b.category_name}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {formatCurrency(Number(b.remaining_amount))} left
+                          {fmt(Number(b.remaining_amount))} left
                         </span>
                       </button>
                     ))}
@@ -336,7 +337,7 @@ export function RebalanceDialog({
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="text-muted-foreground">Amount</span>
-                <span className="font-semibold">{formatCurrency(transferAmount)}</span>
+                <span className="font-semibold">{fmt(transferAmount)}</span>
               </div>
             </div>
 

@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { format, getDaysInMonth } from "date-fns"
 import { formatCurrency } from "@/lib/currency"
+import { useCurrency } from "@/lib/contexts/user-context"
 import { parseLocalDate } from "@/lib/date-utils"
 import {
   LineChart,
@@ -43,6 +44,7 @@ export function BudgetBurndownChartClient({
   initialExpenses,
   target,
 }: BudgetBurndownChartClientProps) {
+  const { baseCurrency } = useCurrency()
   // expenses come from parent (kept live via parent's subscription)
   const expenses = initialExpenses
 
@@ -189,7 +191,7 @@ export function BudgetBurndownChartClient({
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: "var(--border)" }}
-                tickFormatter={(value) => formatCurrency(value, 0)}
+                tickFormatter={(value) => formatCurrency(value, 0, baseCurrency)}
                 width={60}
                 domain={[(min: number) => Math.min(0, min), paceBaseline]}
               />
@@ -199,7 +201,7 @@ export function BudgetBurndownChartClient({
                   border: "1px solid var(--border)",
                   borderRadius: "8px",
                 }}
-                formatter={(value, name) => [typeof value === "number" ? formatCurrency(value) : "", name]}
+                formatter={(value, name) => [typeof value === "number" ? formatCurrency(value, 2, baseCurrency) : "", name]}
                 labelStyle={{ color: "var(--foreground)" }}
               />
               <Legend />
