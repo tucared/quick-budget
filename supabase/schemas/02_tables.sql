@@ -14,10 +14,15 @@ CREATE TABLE households (
   -- original household is unchanged and no expense backfill is needed.
   base_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (base_currency ~ '^[A-Z]{3}$'),
   -- The secondary (foreign) currency offered alongside base_currency in the
-  -- expense form's currency toggle.
+  -- expense form's currency toggle. Must differ from base_currency — they are
+  -- the two options of the form's toggle, so an equal pair would render two
+  -- identical buttons (see households_currencies_distinct below).
   secondary_currency TEXT NOT NULL DEFAULT 'BRL' CHECK (secondary_currency ~ '^[A-Z]{3}$'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- The currency toggle needs two distinct options; equal base/secondary would
+  -- render duplicate buttons.
+  CONSTRAINT households_currencies_distinct CHECK (base_currency <> secondary_currency)
 );
 
 CREATE TRIGGER update_households_updated_at BEFORE UPDATE ON households
