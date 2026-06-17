@@ -8,7 +8,11 @@ export const config = {
   ],
 }
 
-const PUBLIC_PATHS = new Set(["/login"])
+// /auth/callback and /auth/update-password must be reachable WITHOUT a session:
+// a user recovering access has none until the callback exchanges the email
+// link's code for one. /auth/update-password additionally guards itself in its
+// server component (redirects to /login when getUser() is empty).
+const PUBLIC_PATHS = new Set(["/login", "/auth/callback", "/auth/update-password"])
 
 // Default-deny for anything not in PUBLIC_PATHS: pages bounce to /login, API
 // routes get a JSON 401 (a redirect would confuse fetch callers). Per-route

@@ -54,6 +54,30 @@ Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 > start` keeps signing with HS256, so login appears to work then redirects
 > straight back to `/login`.
 
+### Password recovery / onboarding
+
+Login is email + password (`signInWithPassword`). There is also a self-service
+password-recovery flow used both for forgotten passwords and for onboarding new
+users provisioned **without** a password (see the GBP-household example in
+`supabase/seeds/01_create_users.sql`):
+
+- "Forgot password?" on `/login` calls `resetPasswordForEmail` with a
+  `redirectTo` of `/auth/callback`.
+- `/auth/callback` (route handler) exchanges the link's `code` / `token_hash`
+  for a session, then forwards to `/auth/update-password`.
+- `/auth/update-password` calls `updateUser({ password })` and lands on
+  `/expenses`.
+
+**Project config required for the email to send and the link to work** (per
+environment — local `supabase/config.toml`, and the Dev/Prod dashboards under
+Authentication → URL Configuration):
+
+- The app origin + `/auth/callback` must be in the **redirect URL allowlist**
+  (locally, `[auth].additional_redirect_urls` plus the app's `site_url`).
+- Email delivery uses the project's SMTP. Supabase's built-in email is
+  rate-limited; configure custom SMTP for real users. Locally, recovery mail
+  lands in Mailpit (http://localhost:54324).
+
 ### Useful URLs
 
 | URL | What |

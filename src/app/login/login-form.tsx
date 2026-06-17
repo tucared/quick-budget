@@ -13,11 +13,15 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
-export default function LoginForm() {
+type Mode = "login" | "forgot"
+
+export default function LoginForm({ initialError }: { initialError?: string }) {
+  const [mode, setMode] = useState<Mode>("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+  const [error, setError] = useState(initialError ?? "")
   const [loading, setLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,51 +54,142 @@ export default function LoginForm() {
     }
   }
 
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    try {
+      const supabase = createClient()
+      // PKCE recovery: the email link returns to /auth/callback, which exchanges
+      // the code for a session and forwards to /auth/update-password where the
+      // user sets a new password. No password is ever sent here.
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/update-password`,
+      })
+
+      if (resetError) {
+        const isNetwork = resetError.message?.toLowerCase().includes("fetch")
+        setError(isNetwork ? "Unable to reach the server. Check your connection." : "Couldn't send the reset email. Try again.")
+        setLoading(false)
+        return
+      }
+
+      // Neutral confirmation regardless of whether the address is registered —
+      // resetPasswordForEmail intentionally doesn't reveal account existence.
+      setResetSent(true)
+      setLoading(false)
+    } catch (_err) {
+      setError("An unexpected error occurred")
+      setLoading(false)
+    }
+  }
+
+  const switchMode = (next: Mode) => {
+    setMode(next)
+    setError("")
+    setResetSent(false)
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md border-0 shadow-none bg-transparent">
         <CardHeader className="text-center">
           <CardTitle className="text-sm font-medium uppercase tracking-[0.15em]">Quick Budget</CardTitle>
         </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4">
-            {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                {error}
+
+        {mode === "login" ? (
+          <form onSubmit={handleLogin}>
+            <CardContent className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                  {error}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  autoFocus
+                />
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Log In"}
-            </Button>
-          </CardFooter>
-        </form>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex-col gap-3">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Logging in..." : "Log In"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => switchMode("forgot")}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Forgot password?
+              </button>
+            </CardFooter>
+          </form>
+        ) : (
+          <form onSubmit={handleForgot}>
+            <CardContent className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                  {error}
+                </div>
+              )}
+              {resetSent ? (
+                <div className="p-3 text-sm rounded-md bg-muted text-foreground">
+                  If an account exists for that email, we&apos;ve sent a link to set a
+                  new password. Check your inbox.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    name="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex-col gap-3">
+              {!resetSent && (
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Sending..." : "Send reset link"}
+                </Button>
+              )}
+              <button
+                type="button"
+                onClick={() => switchMode("login")}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Back to log in
+              </button>
+            </CardFooter>
+          </form>
+        )}
       </Card>
     </div>
   )

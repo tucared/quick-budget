@@ -105,6 +105,15 @@ BEGIN
     --   VALUES ('London', 'GBP', 'BRL');
     -- (GBP→EUR rates are seeded in 04_seed_exchange_rates.sql so cross-rates
     -- resolve offline.)
+    --
+    -- Provisioning REAL users (e.g. on Prod, by hand): create the auth.users
+    -- rows above WITHOUT a usable password — set
+    --   encrypted_password = extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'))
+    -- and email_confirmed_at = NOW() — then have each person use "Forgot
+    -- password?" on /login to set their own via the recovery flow
+    -- (/auth/callback → /auth/update-password). This keeps any plaintext
+    -- password out of the SQL. These local test seeds set a known password on
+    -- purpose so `supabase db reset` logins work offline.
     INSERT INTO public.households (name) VALUES ('Home')
     RETURNING id INTO shared_household_id;
 
