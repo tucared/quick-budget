@@ -45,6 +45,28 @@ In each Supabase project's Dashboard → Authentication → URL Configuration:
 - **Site URL**: `https://quick-budget-tucareds-projects.vercel.app`
 - **Redirect URLs**: `https://*-tucareds-projects.vercel.app/**` (wildcard covers all preview URLs)
 
+The self-service password flow returns to `/auth/callback`, which is already
+covered by the `/**` redirect entries above — no extra entry needed. If you ever
+narrow those wildcards, keep `<app-url>/auth/callback` allow-listed or Supabase
+silently rewrites the recovery link to the Site URL and the flow breaks.
+`localhost`/`127.0.0.1` are always implicitly allowed, so local dev needs no entry.
+
+### Email / SMTP for password recovery (manual, both projects)
+
+The app has a self-service password-recovery flow (`/auth/callback` →
+`/auth/update-password`) used for both forgotten passwords and for onboarding
+users provisioned **without** a password (see [Onboarding users](#onboarding-users-password-free)).
+It depends on recovery emails actually being delivered:
+
+- Recovery mail is sent by the project's email provider. Supabase's **built-in
+  sender is rate-limited** (a few emails/hour on shared infra) and is **not for
+  production** — even onboarding two users can hit `429 over_email_send_rate_limit`.
+- Configure **custom SMTP** on Prod: Dashboard → **Authentication → SMTP Settings**
+  (Resend / SendGrid / SES / Postmark, etc.). Set a sender the domain is allowed
+  to send as.
+- Locally, recovery mail lands in Mailpit (http://localhost:54324) — see
+  [README: Password recovery / onboarding](./README.md#password-recovery--onboarding).
+
 ### Customize Access Token (JWT) Claims hook (manual, both projects)
 
 Dashboard → **Authentication → Hooks**. Find the **"Customize Access Token (JWT) Claims"** hook (also linked as `/dashboard/project/<ref>/auth/hooks`). The hook ships in the migration chain, but enabling it is a project-level setting with no SQL knob and no Management API surface — it must be toggled in the dashboard for each project.
@@ -113,6 +135,33 @@ supabase db push --include-seed
 ```
 
 Seeds create two test users, categories, budget allocations, expenses, and exchange rates with fake data. Verify in Supabase Dashboard → Table Editor.
+
+### Onboarding users (password-free)
+
+There is no in-app signup (`[auth] enable_signup = false`). Provision each real
+user directly in the project, then let them set their own password via the
+recovery flow — no plaintext password ever leaves the SQL:
+
+1. Insert the `auth.users` row **without a usable password** —
+   `encrypted_password = extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'))`,
+   `email_confirmed_at = NOW()` — plus the matching `auth.identities` row
+   (mirror `supabase/seeds/01_create_users.sql`). The `on_auth_user_created`
+   trigger auto-creates a household + `public.users` row; repoint and delete the
+   orphan(s) to merge users into a shared or non-EUR household (same pattern the
+   seed uses for its GBP example).
+2. The user opens `/login` → **Forgot password?** → gets a link →
+   `/auth/callback` (exchanges the code) → `/auth/update-password` (sets the
+   password) → `/expenses`.
+
+Requires the [JWT claims hook](#customize-access-token-jwt-claims-hook-manual-both-projects)
+(so the new token carries `household_id`) and working [SMTP](#email--smtp-for-password-recovery-manual-both-projects).
+`resetPasswordForEmail` only mails **existing** users and never reveals whether
+an address is registered — a stranger entering an unknown email gets a neutral
+confirmation, no account, and no email sent. Use a real, deliverable domain;
+Supabase rejects obviously-invalid addresses (e.g. `example.com`) with
+`email_address_invalid`. Note providers that pre-scan links (e.g. DuckDuckGo
+Email) can consume the one-time token before the user clicks, showing "link
+invalid or expired" — request a fresh link and click promptly.
 
 ### Database Baseline
 
