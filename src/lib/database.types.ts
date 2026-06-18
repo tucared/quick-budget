@@ -226,6 +226,50 @@ export type Database = {
           },
         ]
       }
+      household_hdk_wrap: {
+        Row: {
+          created_at: string
+          ephemeral_public_key: string
+          household_id: string
+          id: string
+          updated_at: string
+          user_id: string
+          wrap_nonce: string
+          wrap_scheme: string
+          wrapped_hdk: string
+        }
+        Insert: {
+          created_at?: string
+          ephemeral_public_key: string
+          household_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          wrap_nonce: string
+          wrap_scheme?: string
+          wrapped_hdk: string
+        }
+        Update: {
+          created_at?: string
+          ephemeral_public_key?: string
+          household_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          wrap_nonce?: string
+          wrap_scheme?: string
+          wrapped_hdk?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_hdk_wrap_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       households: {
         Row: {
           base_currency: string
@@ -408,6 +452,50 @@ export type Database = {
           },
           {
             foreignKeyName: "tricount_links_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_key_material: {
+        Row: {
+          created_at: string
+          enc_private_key: string
+          enc_private_key_nonce: string
+          household_id: string
+          kdf_params: Json
+          kdf_salt: string
+          public_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enc_private_key: string
+          enc_private_key_nonce: string
+          household_id: string
+          kdf_params: Json
+          kdf_salt: string
+          public_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enc_private_key?: string
+          enc_private_key_nonce?: string
+          household_id?: string
+          kdf_params?: Json
+          kdf_salt?: string
+          public_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_key_material_household_id_fkey"
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"

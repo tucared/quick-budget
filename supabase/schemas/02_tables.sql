@@ -487,3 +487,77 @@ CREATE TRIGGER update_tricount_entry_map_updated_at BEFORE UPDATE ON tricount_en
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tricount_entry_map TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tricount_entry_map TO service_role;
 REVOKE SELECT ON public.tricount_entry_map FROM anon;
+
+-- ============================================================================
+-- USER_KEY_MATERIAL  (end-to-end encryption — admin-blind households)
+-- ============================================================================
+-- One row per user holding the client-generated key material that makes a
+-- household's data unreadable to anyone without a member's password (including
+-- the Supabase project owner). NOTHING here lets the server read household data:
+--   * kdf_params / kdf_salt   — parameters to re-derive the password KEK in the
+--                               browser (the password itself never reaches us).
+--   * public_key              — the user's ECDH public key (spki, base64). Other
+--                               household members read it to wrap the shared
+--                               Household Data Key (HDK) to this user.
+--   * enc_private_key (+nonce) — the user's ECDH private key (pkcs8), encrypted
+--                               by the password-derived KEK. Only the user's own
+--                               password can unwrap it.
+-- All encoded fields are base64 TEXT (not bytea) to match the row-blob codec and
+-- avoid PostgREST's bytea hex wire format. See DATA_MODEL decision on E2E.
+CREATE TABLE user_key_material (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  kdf_params JSONB NOT NULL,
+  kdf_salt TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  enc_private_key TEXT NOT NULL,
+  enc_private_key_nonce TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Covering index for the household_id FK (ON DELETE CASCADE) and for partners
+-- looking up each other's public_key by household.
+CREATE INDEX idx_user_key_material_household ON user_key_material(household_id);
+
+CREATE TRIGGER update_user_key_material_updated_at BEFORE UPDATE ON user_key_material
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_key_material TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_key_material TO service_role;
+REVOKE SELECT ON public.user_key_material FROM anon;
+
+-- ============================================================================
+-- HOUSEHOLD_HDK_WRAP  (end-to-end encryption — shared key, wrapped per member)
+-- ============================================================================
+-- The household's shared Household Data Key (HDK), wrapped once per member to
+-- that member's ECDH public key (ECIES: ephemeral pubkey + AES-GCM nonce +
+-- ciphertext, all base64 TEXT). Both partners hold a wrap, so both decrypt the
+-- same shared data; onboarding a new member (or recovering one who reset their
+-- password) is an existing member writing a fresh wrap to the newcomer's public
+-- key — no password sharing. Reading another member's wrap leaks nothing: it is
+-- ciphertext only that member's private key can open.
+CREATE TABLE household_hdk_wrap (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  ephemeral_public_key TEXT NOT NULL,
+  wrapped_hdk TEXT NOT NULL,
+  wrap_nonce TEXT NOT NULL,
+  wrap_scheme TEXT NOT NULL DEFAULT 'ECDH-P256-HKDF-SHA256-AESGCM',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- One wrap per member per household; re-wrap overwrites in place.
+  UNIQUE(household_id, user_id)
+);
+
+-- Covering index for the user_id FK (ON DELETE CASCADE). The
+-- UNIQUE(household_id, user_id) index already covers household_id lookups.
+CREATE INDEX idx_household_hdk_wrap_user ON household_hdk_wrap(user_id);
+
+CREATE TRIGGER update_household_hdk_wrap_updated_at BEFORE UPDATE ON household_hdk_wrap
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.household_hdk_wrap TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.household_hdk_wrap TO service_role;
+REVOKE SELECT ON public.household_hdk_wrap FROM anon;
