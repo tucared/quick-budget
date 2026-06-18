@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase"
+import { signInWithVaultAuth } from "@/lib/auth/vault-auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,14 +31,17 @@ export default function LoginForm({ initialError }: { initialError?: string }) {
 
     try {
       const supabase = createClient()
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      // Authenticates with the KDF-derived auth secret (E2E cutover), falling
+      // back to the raw password for not-yet-migrated accounts and upgrading
+      // them in place. See src/lib/auth/vault-auth.ts.
+      const result = await signInWithVaultAuth(supabase, email, password)
 
-      if (signInError) {
-        const isNetwork = signInError.message?.toLowerCase().includes("fetch")
-        setError(isNetwork ? "Unable to reach the server. Check your connection." : "Invalid email or password")
+      if (!result.ok) {
+        setError(
+          result.reason === "network"
+            ? "Unable to reach the server. Check your connection."
+            : "Invalid email or password",
+        )
         setLoading(false)
         return
       }
