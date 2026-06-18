@@ -44,6 +44,9 @@ export interface VaultStore {
   // A member's published ECDH public key (base64 spki), used to wrap the HDK to
   // them when granting access. Null when they haven't set up key material yet.
   getPublicKey(householdId: string, userId: string): Promise<string | null>
+  // User ids in the household that have published key material but hold no HDK
+  // wrap yet — i.e. joining members awaiting a grant from an unlocked member.
+  listMembersNeedingGrant(householdId: string): Promise<string[]>
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +111,21 @@ export function createSupabaseVaultStore(supabase: SupabaseClient): VaultStore {
         .maybeSingle()
       if (error) throw error
       return (data as { public_key: string } | null)?.public_key ?? null
+    },
+
+    async listMembersNeedingGrant(householdId) {
+      // Two household-scoped reads (RLS lets any member see both tables for their
+      // household), diffed client-side — avoids a PostgREST anti-join.
+      const [material, wraps] = await Promise.all([
+        supabase.from("user_key_material").select("user_id").eq("household_id", householdId),
+        supabase.from("household_hdk_wrap").select("user_id").eq("household_id", householdId),
+      ])
+      if (material.error) throw material.error
+      if (wraps.error) throw wraps.error
+      const wrapped = new Set((wraps.data as { user_id: string }[]).map((r) => r.user_id))
+      return (material.data as { user_id: string }[])
+        .map((r) => r.user_id)
+        .filter((id) => !wrapped.has(id))
     },
   }
 }

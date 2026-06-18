@@ -16,6 +16,7 @@ import {
   createSupabaseVaultStore,
   deriveAuthSecret,
   ensureVaultAuth,
+  grantPendingMembers,
   hasKeyMaterial,
   setupVault,
 } from "@/lib/crypto"
@@ -33,6 +34,7 @@ export async function signInWithVaultAuth(
 
   const derived = await supabase.auth.signInWithPassword({ email, password: authSecret })
   if (!derived.error) {
+    await runAutoGrant(supabase, password)
     return { ok: true, legacy: false }
   }
 
@@ -42,10 +44,13 @@ export async function signInWithVaultAuth(
   if (!raw.error) {
     try {
       await migrateLegacyLogin(supabase, email, password, authSecret)
-    } catch {
+    } catch (err) {
       // Best-effort — never block login on migration failure; it converges on a
-      // later login.
+      // later login. Surface it (the error carries no secrets) so a half-migrated
+      // account is observable rather than failing silently.
+      console.warn("Vault auth migration deferred to a later login:", err)
     }
+    await runAutoGrant(supabase, password)
     return { ok: true, legacy: true }
   }
 
@@ -76,6 +81,23 @@ async function migrateLegacyLogin(
       if (error) throw error
     },
   })
+}
+
+// After a successful sign-in, wrap the HDK to any household partner who set up
+// after this member (so their vault unlocks on their next login). Best-effort
+// and cheap: it only derives the KEK when there is actually someone to grant,
+// and never affects the login outcome.
+async function runAutoGrant(supabase: SupabaseClient, password: string): Promise<void> {
+  try {
+    const { user, householdId } = await currentUserAndHousehold(supabase)
+    if (!user || !householdId) return
+    const store = createSupabaseVaultStore(supabase)
+    await grantPendingMembers({ store, householdId, granterUserId: user.id, password })
+  } catch (err) {
+    // Best-effort — a partner simply gets granted on a later login. Surfaced
+    // (no secrets in the error) rather than swallowed silently.
+    console.warn("Partner auto-grant deferred to a later login:", err)
+  }
 }
 
 // Used by the set-password (recovery / onboarding) flow so a freshly set

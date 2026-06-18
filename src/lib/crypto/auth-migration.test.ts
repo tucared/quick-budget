@@ -28,6 +28,14 @@ function createMemoryStore() {
       const km = keyMaterial.get(userId)
       return km && km.household_id === householdId ? km.public_key : null
     },
+    async listMembersNeedingGrant(householdId) {
+      const wrapped = new Set(
+        [...wraps.values()].filter((w) => w.household_id === householdId).map((w) => w.user_id),
+      )
+      return [...keyMaterial.values()]
+        .filter((km) => km.household_id === householdId && !wrapped.has(km.user_id))
+        .map((km) => km.user_id)
+    },
   }
   return { store, keyMaterial }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { setupVault, unlockVault, VaultError, type SetupResult } from "./vault"
+import { grantPendingMembers, setupVault, unlockVault, VaultError, type SetupResult } from "./vault"
 import type { HdkWrapRow, UserKeyMaterialRow, VaultStore } from "./vault-repo"
 
 // In-memory VaultStore — exercises the real WebCrypto path (Node 24 / happy-dom)
@@ -29,6 +29,14 @@ function createMemoryStore(): VaultStore {
     async getPublicKey(householdId, userId) {
       const km = keyMaterial.get(userId)
       return km && km.household_id === householdId ? km.public_key : null
+    },
+    async listMembersNeedingGrant(householdId) {
+      const wrapped = new Set(
+        [...wraps.values()].filter((w) => w.household_id === householdId).map((w) => w.user_id),
+      )
+      return [...keyMaterial.values()]
+        .filter((km) => km.household_id === householdId && !wrapped.has(km.user_id))
+        .map((km) => km.user_id)
     },
   }
 }
@@ -111,5 +119,57 @@ describe("vault multi-member grant", () => {
       await setupVault({ store, userId: ALICE, householdId: HOUSEHOLD, password: "alice-pw" }),
     )
     await expect(alice.grantAccessTo(store, BOB)).rejects.toMatchObject({ code: "no-public-key" })
+  })
+})
+
+describe("grantPendingMembers (login-time auto-grant)", () => {
+  it("grants a pending partner, who can then unlock the shared HDK", async () => {
+    const store = createMemoryStore()
+    const alice = expectReady(
+      await setupVault({ store, userId: ALICE, householdId: HOUSEHOLD, password: "alice-pw" }),
+    )
+    const shared = await alice.encryptRow("expenses", "exp-1", { note: "shared" })
+
+    // Bob sets up after Alice — pending-grant, no wrap yet.
+    await setupVault({ store, userId: BOB, householdId: HOUSEHOLD, password: "bob-pw" })
+
+    // Alice's next login auto-grants Bob.
+    const granted = await grantPendingMembers({
+      store,
+      householdId: HOUSEHOLD,
+      granterUserId: ALICE,
+      password: "alice-pw",
+    })
+    expect(granted).toEqual([BOB])
+
+    const bob = await unlockVault({ store, userId: BOB, password: "bob-pw" })
+    expect(await bob.decryptRow("expenses", "exp-1", shared)).toEqual({ note: "shared" })
+  })
+
+  it("is a no-op (no KDF) when there is nobody to grant", async () => {
+    const store = createMemoryStore()
+    await setupVault({ store, userId: ALICE, householdId: HOUSEHOLD, password: "alice-pw" })
+
+    // No partner pending: returns empty and never needs the granter's password.
+    const granted = await grantPendingMembers({
+      store,
+      householdId: HOUSEHOLD,
+      granterUserId: ALICE,
+      password: "wrong-on-purpose",
+    })
+    expect(granted).toEqual([])
+  })
+
+  it("excludes the granter from the pending set", async () => {
+    const store = createMemoryStore()
+    await setupVault({ store, userId: ALICE, householdId: HOUSEHOLD, password: "alice-pw" })
+    // Alice already holds her own wrap, so she is never a grant target.
+    const granted = await grantPendingMembers({
+      store,
+      householdId: HOUSEHOLD,
+      granterUserId: ALICE,
+      password: "alice-pw",
+    })
+    expect(granted).toEqual([])
   })
 })

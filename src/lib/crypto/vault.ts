@@ -180,4 +180,38 @@ export async function hasKeyMaterial(store: VaultStore, userId: string): Promise
   return (await store.getUserKeyMaterial(userId)) !== null
 }
 
+interface GrantPendingParams {
+  store: VaultStore
+  householdId: string
+  granterUserId: string
+  // The granter's real password — only used to unlock their vault when there is
+  // actually someone to grant (so a normal login pays no extra KDF cost).
+  password: string
+}
+
+// Wrap the household HDK to every member who's published key material but lacks
+// a wrap (a partner who set up after the granter). Run at login by an already-
+// established member so a joining partner's vault unlocks on their next login —
+// no manual step. Idempotent: granted members drop out of the pending list, so
+// a re-run is a no-op. Returns the user ids granted this pass.
+export async function grantPendingMembers({
+  store,
+  householdId,
+  granterUserId,
+  password,
+}: GrantPendingParams): Promise<string[]> {
+  const pending = (await store.listMembersNeedingGrant(householdId)).filter(
+    (id) => id !== granterUserId,
+  )
+  if (pending.length === 0) return []
+
+  const vault = await unlockVault({ store, userId: granterUserId, password })
+  const granted: string[] = []
+  for (const targetId of pending) {
+    await vault.grantAccessTo(store, targetId)
+    granted.push(targetId)
+  }
+  return granted
+}
+
 export type { HdkWrapRow }
