@@ -29,7 +29,7 @@ export interface SealedExpenseFields {
 export interface DecryptableExpense {
   id: Expense["id"]
   description: Expense["description"]
-  enc_blob: unknown
+  enc_blob?: unknown
 }
 
 // Narrow an `enc_blob` JSON value to a usable StoredBlob, or null when it's
