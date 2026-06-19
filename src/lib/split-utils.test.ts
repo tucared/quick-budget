@@ -32,6 +32,7 @@ function makeExpense(overrides: Partial<ExpenseWithDetails> & { id: string }): E
     exchange_rate: 1,
     expense_date: overrides.expense_date ?? "2026-05-15",
     description: overrides.description ?? null,
+    enc_blob: overrides.enc_blob ?? null,
     split_group_id: overrides.split_group_id ?? null,
     created_at: overrides.created_at ?? "2026-05-15T10:00:00Z",
     updated_at: overrides.updated_at ?? "2026-05-15T10:00:00Z",

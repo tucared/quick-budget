@@ -255,6 +255,14 @@ CREATE TABLE expenses (
   -- client-side with crypto.randomUUID() and pair invariants are enforced by
   -- the app (see src/lib/split-utils.ts).
   split_group_id UUID,
+  -- E2E encryption (DATA_MODEL.md decision #10): the row's sensitive fields
+  -- sealed client-side with the household data key. One AES-GCM blob per row
+  -- ({v, nonce, ct}) covering the encrypted field set (currently the
+  -- description; amounts join it in a later milestone), pinned to this row via
+  -- AAD so the admin can't transplant it. NULL = not encrypted (Tricount-synced
+  -- rows, legacy rows pre-backfill); reads fall back to the plaintext columns
+  -- while encryption is dual-written. Stored as JSONB of base64 strings.
+  enc_blob JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT expenses_amount_signs_match CHECK (sign(amount) = sign(converted_amount))

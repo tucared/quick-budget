@@ -159,6 +159,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          enc_blob: Json | null
           exchange_rate: number
           expense_date: string
           household_id: string
@@ -176,6 +177,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          enc_blob?: Json | null
           exchange_rate?: number
           expense_date?: string
           household_id: string
@@ -193,6 +195,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          enc_blob?: Json | null
           exchange_rate?: number
           expense_date?: string
           household_id?: string

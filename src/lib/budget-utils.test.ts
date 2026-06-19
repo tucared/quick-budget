@@ -21,6 +21,7 @@ function mkExpense(date: string, amount: number, overrides: Partial<Expense> = {
     exchange_rate: 1,
     category_id: "cat-1",
     description: null,
+    enc_blob: null,
     is_cash: false,
     household_id: "hh-1",
     logged_by_user_id: "u-1",
