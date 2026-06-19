@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { grantPendingMembers, setupVault, unlockVault, VaultError, type SetupResult } from "./vault"
+import { grantPendingMembers, setupVault, unlockVault, Vault, VaultError, type SetupResult } from "./vault"
 import type { HdkWrapRow, UserKeyMaterialRow, VaultStore } from "./vault-repo"
 
 // In-memory VaultStore — exercises the real WebCrypto path (Node 24 / happy-dom)
@@ -119,6 +119,29 @@ describe("vault multi-member grant", () => {
       await setupVault({ store, userId: ALICE, householdId: HOUSEHOLD, password: "alice-pw" }),
     )
     await expect(alice.grantAccessTo(store, BOB)).rejects.toMatchObject({ code: "no-public-key" })
+  })
+})
+
+describe("vault cache rehydration (exportForCache / _fromHdk)", () => {
+  it("rebuilds a working vault from a non-extractable cached HDK", async () => {
+    const store = createMemoryStore()
+    const original = expectReady(
+      await setupVault({ store, userId: ALICE, householdId: HOUSEHOLD, password: "pw" }),
+    )
+    const blob = await original.encryptRow("expenses", "exp-1", { amount: 999 })
+
+    // exportForCache yields a key that can decrypt but never be re-exported —
+    // the property that lets it sit safely in IndexedDB across reloads.
+    const cachedKey = await original.exportForCache()
+    expect(cachedKey.extractable).toBe(false)
+
+    const rehydrated = Vault._fromHdk(HOUSEHOLD, ALICE, cachedKey)
+    expect(await rehydrated.decryptRow("expenses", "exp-1", blob)).toEqual({ amount: 999 })
+
+    // A cache-rehydrated vault both reads existing blobs and writes new ones the
+    // original (and other members) can read back.
+    const blob2 = await rehydrated.encryptRow("expenses", "exp-2", { note: "from-cache" })
+    expect(await original.decryptRow("expenses", "exp-2", blob2)).toEqual({ note: "from-cache" })
   })
 })
 

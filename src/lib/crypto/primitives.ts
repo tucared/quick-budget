@@ -142,6 +142,20 @@ function importHdkRaw(bytes: Bytes): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", bytes, AES_PARAMS, true, ["encrypt", "decrypt"])
 }
 
+// Re-import an (extractable) HDK as a NON-extractable AES-GCM key for at-rest
+// caching in IndexedDB (vault persistence across reloads). The result still
+// encrypts/decrypts row blobs but its raw bytes can no longer be exported, so an
+// XSS that reaches the cached key can use it on-page but cannot exfiltrate it.
+// Only call on a freshly-unlocked (extractable) HDK; a cache-rehydrated vault's
+// HDK is already non-extractable and must not be re-exported.
+export async function reimportHdkNonExtractable(hdk: CryptoKey): Promise<CryptoKey> {
+  const raw = await crypto.subtle.exportKey("raw", hdk)
+  return crypto.subtle.importKey("raw", new Uint8Array(raw), AES_PARAMS, false, [
+    "encrypt",
+    "decrypt",
+  ])
+}
+
 // ---------------------------------------------------------------------------
 // Wrapping the user's private key with their KEK
 // ---------------------------------------------------------------------------

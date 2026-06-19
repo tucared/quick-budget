@@ -19,6 +19,7 @@ import {
   generateUserKeyPair,
   importPublicKey,
   randomBytes,
+  reimportHdkNonExtractable,
   unwrapKeyWithPrivateKey,
   unwrapPrivateKey,
   wrapKeyForPublicKey,
@@ -52,17 +53,39 @@ export type SetupResult =
 export class Vault {
   // `hdk` and `privateKey` stay private: callers encrypt/decrypt through the
   // bound helpers and grant access through `grantAccessTo`, never touching the
-  // raw keys. Both are non-extractable beyond what the primitives require.
+  // raw keys. `privateKey` is null for a vault rehydrated from the IndexedDB
+  // cache (vault persistence across reloads): the private key is only needed to
+  // *unlock* the HDK at login, never afterward — encrypt/decrypt and grants both
+  // run off the HDK alone — so the cache stores only the HDK.
   private constructor(
     readonly householdId: string,
     readonly userId: string,
     private readonly hdk: CryptoKey,
-    private readonly privateKey: CryptoKey,
+    private readonly privateKey: CryptoKey | null,
   ) {}
 
   /** @internal — constructed only by setup/unlock in this module. */
   static _create(householdId: string, userId: string, hdk: CryptoKey, privateKey: CryptoKey): Vault {
     return new Vault(householdId, userId, hdk, privateKey)
+  }
+
+  /**
+   * @internal — rehydrate a vault from a cached HDK (no private key). Used by the
+   * IndexedDB vault cache so a reload doesn't re-prompt for the password. The HDK
+   * is the non-extractable cached key; encrypt/decrypt work, but `exportForCache`
+   * must not be called on it (its raw bytes can't be re-exported).
+   */
+  static _fromHdk(householdId: string, userId: string, hdk: CryptoKey): Vault {
+    return new Vault(householdId, userId, hdk, null)
+  }
+
+  /**
+   * Produce a non-extractable copy of the HDK to persist in IndexedDB. Call only
+   * on a freshly-unlocked vault (extractable HDK); the cached copy can decrypt on
+   * later reloads but can't be exfiltrated as raw bytes even by an XSS.
+   */
+  exportForCache(): Promise<CryptoKey> {
+    return reimportHdkNonExtractable(this.hdk)
   }
 
   // Encrypt a row's sensitive fields, pinning the blob to (table, id, household).

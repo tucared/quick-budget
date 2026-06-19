@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase"
 import { clearStorageKeys } from "@/lib/types"
 import { Receipt, Wallet, RefreshCw, LogOut } from "lucide-react"
 import { UserProvider } from "@/lib/contexts/user-context"
+import { VaultProvider } from "@/lib/contexts/vault-context"
+import { UnlockGate } from "@/components/vault/unlock-gate"
+import { clearCachedVault } from "@/lib/crypto/vault-cache"
 import type { UserData } from "@/lib/hooks/use-user"
 import { useKeyboardVisible } from "@/lib/hooks/use-keyboard-visible"
 
@@ -69,6 +72,8 @@ export default function AppLayoutClient({
 
   const handleLogout = async () => {
     clearStorageKeys()
+    // Drop the cached HDK so the next user on this browser can't reuse it.
+    await clearCachedVault()
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push("/")
@@ -77,6 +82,8 @@ export default function AppLayoutClient({
 
   return (
     <UserProvider initialUser={initialUser}>
+      <VaultProvider>
+      <UnlockGate>
       <div className="min-h-screen bg-background">
         {/* Top bar */}
         <header className="sticky top-0 z-10 bg-foreground text-primary-foreground">
@@ -118,6 +125,8 @@ export default function AppLayoutClient({
           </div>
         </nav>}
       </div>
+      </UnlockGate>
+      </VaultProvider>
     </UserProvider>
   )
 }

@@ -19,7 +19,9 @@ import {
   grantPendingMembers,
   hasKeyMaterial,
   setupVault,
+  unlockVault,
 } from "@/lib/crypto"
+import { cacheVault } from "@/lib/crypto/vault-cache"
 
 export type VaultSignInResult =
   | { ok: true; legacy: boolean }
@@ -35,6 +37,7 @@ export async function signInWithVaultAuth(
   const derived = await supabase.auth.signInWithPassword({ email, password: authSecret })
   if (!derived.error) {
     await runAutoGrant(supabase, password)
+    await cacheVaultForLogin(supabase, password)
     return { ok: true, legacy: false }
   }
 
@@ -51,6 +54,7 @@ export async function signInWithVaultAuth(
       console.warn("Vault auth migration deferred to a later login:", err)
     }
     await runAutoGrant(supabase, password)
+    await cacheVaultForLogin(supabase, password)
     return { ok: true, legacy: true }
   }
 
@@ -97,6 +101,24 @@ async function runAutoGrant(supabase: SupabaseClient, password: string): Promise
     // Best-effort — a partner simply gets granted on a later login. Surfaced
     // (no secrets in the error) rather than swallowed silently.
     console.warn("Partner auto-grant deferred to a later login:", err)
+  }
+}
+
+// After a successful sign-in, unlock the vault with the in-hand password and
+// persist the HDK to the IndexedDB cache, so the first app load rehydrates
+// silently instead of showing the unlock prompt. Best-effort: a pending-grant
+// joining member (no HDK wrap yet) or any failure just means the prompt appears
+// on first load. Browser-only — `cacheVault` no-ops without IndexedDB.
+async function cacheVaultForLogin(supabase: SupabaseClient, password: string): Promise<void> {
+  try {
+    const { user, householdId } = await currentUserAndHousehold(supabase)
+    if (!user || !householdId) return
+    const store = createSupabaseVaultStore(supabase)
+    const vault = await unlockVault({ store, userId: user.id, password })
+    await cacheVault(vault)
+  } catch (err) {
+    // Best-effort — the unlock prompt covers the miss. No secrets in the error.
+    console.warn("Vault key caching deferred to first app load:", err)
   }
 }
 
