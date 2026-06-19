@@ -10,6 +10,7 @@
 // The admin-blind flip (stop writing plaintext, backfill+null existing rows) is
 // a later, deliberate step.
 
+import type { Json } from "@/lib/database.types"
 import type { Expense } from "@/lib/types"
 import { type StoredBlob, type Vault } from "@/lib/crypto"
 
@@ -47,15 +48,17 @@ export function parseStoredBlob(value: unknown): StoredBlob | null {
  * when there's no unlocked vault — the caller then writes plaintext only
  * (pre-encryption / locked-vault fallback). The row `id` must be the one the row
  * will actually have (minted client-side before insert) so the AAD pins the blob
- * to it.
+ * to it. Returns the DB's `Json` shape so it drops straight into an insert/update
+ * object without a cast at the call site.
  */
 export async function sealExpenseFields(
   vault: Vault | null,
   id: string,
   fields: SealedExpenseFields,
-): Promise<StoredBlob | null> {
+): Promise<Json | null> {
   if (!vault) return null
-  return vault.encryptRow(TABLE, id, fields as unknown as Record<string, unknown>)
+  const blob = await vault.encryptRow(TABLE, id, fields as unknown as Record<string, unknown>)
+  return blob as unknown as Json
 }
 
 /**
