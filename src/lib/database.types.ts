@@ -226,6 +226,38 @@ export type Database = {
           },
         ]
       }
+      household_invites: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          household_id: string
+          id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          household_id: string
+          id?: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          household_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_invites_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       households: {
         Row: {
           base_currency: string

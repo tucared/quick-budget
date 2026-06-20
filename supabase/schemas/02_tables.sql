@@ -33,6 +33,37 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.households TO service_role;
 REVOKE SELECT ON public.households FROM anon;
 
 -- ============================================================================
+-- HOUSEHOLD_INVITES
+-- ============================================================================
+-- Pre-authorizes an email to join an existing household at signup. The founder
+-- lists partner email(s) when creating the household; handle_new_user() writes a
+-- row here per email. When that person later self-signs-up, handle_new_user()
+-- matches their email to an unconsumed invite and links them to this household
+-- (instead of creating a new one), then stamps consumed_at. There is no service-
+-- role key in this app, so accounts can't be admin-provisioned — invite routing
+-- via the public signUp + this trigger is how a second member joins.
+--
+-- Only the SECURITY DEFINER trigger writes this table; authenticated callers get
+-- SELECT only (future household-management UI), no INSERT/UPDATE/DELETE.
+CREATE TABLE household_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- At most one outstanding (unconsumed) invite per email, case-insensitive.
+CREATE UNIQUE INDEX idx_household_invites_email_pending
+  ON household_invites (lower(email)) WHERE consumed_at IS NULL;
+
+CREATE INDEX idx_household_invites_household ON household_invites(household_id);
+
+GRANT SELECT ON public.household_invites TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.household_invites TO service_role;
+REVOKE SELECT ON public.household_invites FROM anon;
+
+-- ============================================================================
 -- USERS
 -- ============================================================================
 CREATE TABLE users (

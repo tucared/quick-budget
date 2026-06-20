@@ -41,6 +41,17 @@ CREATE POLICY "Users can view own household" ON households
   );
 
 -- ============================================================================
+-- HOUSEHOLD_INVITES
+-- ============================================================================
+-- Read-only to household members (future management UI). All writes happen in
+-- the SECURITY DEFINER handle_new_user() trigger, which bypasses RLS — there is
+-- deliberately no authenticated INSERT/UPDATE/DELETE policy.
+ALTER TABLE household_invites ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Household members can view invites" ON household_invites
+  FOR SELECT USING (household_id = private.get_my_household_id());
+
+-- ============================================================================
 -- CATEGORIES
 -- ============================================================================
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;

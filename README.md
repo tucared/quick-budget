@@ -54,6 +54,33 @@ Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 > start` keeps signing with HS256, so login appears to work then redirects
 > straight back to `/login`.
 
+### Signup / create a household
+
+New households are self-service via `/signup` (linked from `/login` as "Create a
+household"). The founder enters their name, email + password, the household name
+and base/secondary currencies, and optionally partner email(s). The form calls
+Supabase's public `supabase.auth.signUp` with the household details in
+`options.data`, and the `handle_new_user()` DB trigger does the rest:
+
+- **Founder** → creates the household with the chosen name/currencies, seeds a
+  default starter set of categories (6 spending + a personal allowance per member),
+  and writes a `household_invites` row per partner email.
+- **Invited partner** → when someone signs up with an email that matches an
+  unconsumed invite, the trigger links them into that **existing** household
+  (no new household, no duplicate categories) and marks the invite consumed.
+
+This is the autonomous path: each person sets their own password via `signUp`,
+confirms their email, and lands in the app already scoped to the right household.
+There is **no** service-role key in this project, so accounts can't be
+admin-provisioned — invite routing through the public `signUp` is how a second
+member joins. Category and household *management* UIs are deferred; the seeded
+defaults are the starting point.
+
+**Supabase config required (per environment — Dev/Prod dashboards under
+Authentication):** enable **Signups**, turn **Confirm email** ON, and keep the
+app origin + `/auth/callback` in the redirect allowlist (see below). Custom
+SMTP is needed for real delivery; locally, confirmation mail lands in Mailpit.
+
 ### Password recovery / onboarding
 
 Login is email + password (`signInWithPassword`). There is also a self-service
@@ -73,10 +100,11 @@ environment — local `supabase/config.toml`, and the Dev/Prod dashboards under
 Authentication → URL Configuration):
 
 - The app origin + `/auth/callback` must be in the **redirect URL allowlist**
-  (locally, `[auth].additional_redirect_urls` plus the app's `site_url`).
+  (locally, `[auth].additional_redirect_urls` plus the app's `site_url`). The
+  same allowlist covers the signup email-confirmation link.
 - Email delivery uses the project's SMTP. Supabase's built-in email is
-  rate-limited; configure custom SMTP for real users. Locally, recovery mail
-  lands in Mailpit (http://localhost:54324).
+  rate-limited; configure custom SMTP for real users. Locally, recovery and
+  confirmation mail land in Mailpit (http://localhost:54324).
 
 ### Useful URLs
 

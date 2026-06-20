@@ -2,6 +2,13 @@
 
 ---
 
+## Onboarding & Signup
+
+### [x] JTBD #12: Create a household and get started without help
+When I discover the app, I want to create a household, set our currencies, and invite my partner myself, so we can both be logging expenses without anyone provisioning accounts for us. Self-service signup lives at `/signup` (linked from `/login`): the founder enters their name, email + password, household name, base/secondary currencies, and optional partner email(s), and Supabase's public `signUp` plus the `handle_new_user()` DB trigger create the household, seed a default starter set of categories (6 spending + a personal allowance per member), and pre-authorize each partner email. A partner later signs up with their own email and is auto-joined to the same household (routed by the invite, no duplicate household). Email confirmation is required; the link reuses `/auth/callback`. There is no service-role key, so this trigger-routed public signup *is* the multi-member onboarding path. Category and household management UIs are deferred — see DATA_MODEL.md decision #1 for the `household_invites` table and trigger branching.
+
+---
+
 ## Monthly Planning & Budget Setting
 
 

@@ -25,12 +25,21 @@ erDiagram
     tricount_links ||--o{ tricount_entry_map : "tracks"
     expenses ||--o| tricount_entry_map : "mirrored by"
     categories ||--o{ tricount_links : "default for"
+
+    households ||--o{ household_invites : "pre-authorizes"
 ```
 
 ## Key Design Decisions
 
 ### 1. Household-Based Sharing Model
 All financial data (categories, expenses, budget allocations, monthly targets) is scoped to households. Users belong to exactly one household via `users.household_id`. `expenses.logged_by_user_id` records who entered each row as an audit trail, without restricting visibility — every household member sees every expense. The column is nullable with `ON DELETE SET NULL`: deleting a user account anonymizes their audit trail but never deletes the household's shared expense history.
+
+**Signup & household creation.** Households are created self-service at `/signup` (no admin provisioning — there is no service-role key in the app). The single `handle_new_user()` trigger on `auth.users` (declared in `supabase/schemas/01_functions.sql`) branches on whether the new user's email matches an unconsumed `household_invites` row (case-insensitive):
+
+- **Founder path** (no matching invite): creates the household reading `household_name` / `base_currency` / `secondary_currency` from the signup form's `raw_user_meta_data` (falling back to `"<name>'s Household"` / `EUR` / `BRL`), inserts the `public.users` row, seeds a default starter set of categories (6 spending categories mirroring `supabase/seeds/02_seed_categories.sql`, plus one `exclude_from_budget_total` allowance per known member — founder by `full_name`, invitees by email local-part), and writes one `household_invites` row per partner email in `raw_user_meta_data.invite_emails` (lowercased/trimmed, skipping blanks and the founder's own address).
+- **Invited path** (email matches an unconsumed invite): inserts the `public.users` row pointed at that existing household and stamps the invite `consumed_at = NOW()` — no new household, no duplicate category seeding. This is how a second member self-joins.
+
+`household_invites` (`household_id`, `email`, `consumed_at`, `created_at`) is the join-authorization ledger: `ON DELETE CASCADE` to `households`, a partial unique index on `lower(email) WHERE consumed_at IS NULL` (at most one outstanding invite per email), and RLS that is **read-only** to household members — every write happens inside the `SECURITY DEFINER` trigger, which bypasses RLS, so there is deliberately no authenticated INSERT/UPDATE/DELETE policy. The trigger keeps `SET search_path = ''` (all references schema-qualified) and the `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated, service_role` that blocks direct REST/RPC calls. Signups require email confirmation (a Supabase auth setting); the confirmation link routes through the existing `/auth/callback`, so no callback changes were needed. Category and household *management* UIs are deferred — the seeded defaults are the starting point, and the legacy seed flow in `supabase/seeds/01_create_users.sql` (which makes throwaway per-user households via this same trigger, then merges both users into `'Home'`) stays compatible because those throwaways are cascade-deleted and `02_seed_categories.sql` is idempotent.
 
 ### 2. No Budgets Table - Monthly Cadence
 No separate budgets table. Monthly periods are represented by `budget_month` (date) fields on `budget_allocations`. Strongly oriented toward monthly planning cycle.

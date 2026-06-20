@@ -31,3 +31,46 @@ export const expenseSchema = z.object({
 })
 
 export type ExpenseFormValues = z.infer<typeof expenseSchema>
+
+// Signup / create-household form validation schema.
+//
+// The founder enters their credentials, the household name + currencies, and
+// optionally partner email(s) to pre-authorize. base_currency must differ from
+// secondary_currency — they are the two options of the expense form's toggle,
+// and the DB enforces it (households_currencies_distinct), so we reject an equal
+// pair up front for a clean message.
+export const MIN_PASSWORD_LENGTH = 8
+
+const currencyCode = z
+  .string()
+  .trim()
+  .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code")
+
+export const signupSchema = z
+  .object({
+    email: z.string().trim().email("Enter a valid email"),
+    password: z
+      .string()
+      .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
+    confirmPassword: z.string(),
+    fullName: z.string().trim().min(1, "Name is required"),
+    householdName: z.string().trim().max(100, "Household name is too long").optional(),
+    baseCurrency: currencyCode,
+    secondaryCurrency: currencyCode,
+    // Optional partner emails. Blanks are dropped before validation by the form.
+    inviteEmails: z.array(z.string().trim().email("Enter a valid email")).default([]),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  })
+  .refine((v) => v.baseCurrency !== v.secondaryCurrency, {
+    message: "Base and secondary currency must differ",
+    path: ["secondaryCurrency"],
+  })
+  .refine((v) => !v.inviteEmails.some((e) => e.toLowerCase() === v.email.toLowerCase()), {
+    message: "A partner email can't be your own email",
+    path: ["inviteEmails"],
+  })
+
+export type SignupFormValues = z.infer<typeof signupSchema>
