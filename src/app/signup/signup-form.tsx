@@ -25,6 +25,34 @@ const CURRENCIES = Object.keys(FALLBACK_RATES_TO_EUR)
 const selectClassName =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 
+// Map a Supabase auth signUp error to an actionable message. Several of these
+// surface project-level/Supabase limits rather than anything the form did wrong
+// — notably the built-in mailer's per-hour rate limit — so we spell out the wait
+// and the fix instead of echoing Supabase's terse text.
+function signupErrorMessage(error: { message?: string; code?: string; status?: number }): string {
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  const lower = message.toLowerCase()
+
+  if (lower.includes("fetch")) {
+    return "Unable to reach the server. Check your connection and try again."
+  }
+  if (error.status === 429 || code === "over_email_send_rate_limit" || lower.includes("rate limit")) {
+    return "Too many sign-up emails were sent recently, so the email service is rate-limited. Please try again in an hour or so (or ask the admin to configure custom SMTP)."
+  }
+  if (code === "email_address_invalid" || lower.includes("is invalid")) {
+    return "That email address looks invalid or undeliverable. Please use a real email you can receive mail at."
+  }
+  if (code === "signup_disabled" || lower.includes("not allowed")) {
+    return "Sign-ups aren't enabled for this app yet. Please check back later."
+  }
+  if (code === "user_already_exists" || lower.includes("already registered") || lower.includes("already been registered")) {
+    return "An account with this email already exists. Try logging in, or use “Forgot password?”"
+  }
+  // weak_password and anything else: Supabase's own message is already readable.
+  return message || "Couldn't create your household. Please try again."
+}
+
 export default function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -87,15 +115,7 @@ export default function SignupForm() {
       })
 
       if (signUpError) {
-        const isNetwork = signUpError.message?.toLowerCase().includes("fetch")
-        // Supabase auth errors carry a user-readable message (e.g. "Signups not
-        // allowed for this instance", weak-password reasons) — surface it
-        // directly rather than the DB-oriented getErrorMessage fallback.
-        setError(
-          isNetwork
-            ? "Unable to reach the server. Check your connection."
-            : signUpError.message || "Couldn't create your household. Try again."
-        )
+        setError(signupErrorMessage(signUpError))
         setLoading(false)
         return
       }
