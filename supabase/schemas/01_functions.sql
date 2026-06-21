@@ -28,13 +28,16 @@ AS $$
 DECLARE
   new_household_id UUID;
   invite_household_id UUID;
+  matched_invite_id UUID;
   founder_name TEXT := COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), '');
   invite_email TEXT;
 BEGIN
   -- ----------------------------------------------------------------
   -- Invited member: join the household that pre-authorized this email.
+  -- Invites are unique per (household, email), so the same address can be
+  -- invited by more than one household; the oldest pending invite wins.
   -- ----------------------------------------------------------------
-  SELECT household_id INTO invite_household_id
+  SELECT id, household_id INTO matched_invite_id, invite_household_id
   FROM public.household_invites
   WHERE lower(email) = lower(NEW.email) AND consumed_at IS NULL
   ORDER BY created_at
@@ -44,9 +47,11 @@ BEGIN
     INSERT INTO public.users (id, email, full_name, household_id)
     VALUES (NEW.id, NEW.email, founder_name, invite_household_id);
 
+    -- Consume only the invite we acted on, so any other household's pending
+    -- invite for this email stays open rather than being silently burned.
     UPDATE public.household_invites
     SET consumed_at = NOW()
-    WHERE lower(email) = lower(NEW.email) AND consumed_at IS NULL;
+    WHERE id = matched_invite_id;
 
     RETURN NEW;
   END IF;
@@ -98,8 +103,13 @@ BEGIN
       VALUES (new_household_id, invite_email)
       ON CONFLICT DO NOTHING;
 
-      INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
-      VALUES (new_household_id, split_part(invite_email, '@', 1) || '''s Allowance', '🧑', TRUE, TRUE);
+      -- Only seed the allowance when the invite row was actually created. A
+      -- duplicate pending invite for this household is a no-op, and seeding
+      -- unconditionally would leave an orphan allowance behind.
+      IF FOUND THEN
+        INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
+        VALUES (new_household_id, split_part(invite_email, '@', 1) || '''s Allowance', '🧑', TRUE, TRUE);
+      END IF;
     END LOOP;
   END IF;
 

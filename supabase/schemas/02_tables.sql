@@ -53,9 +53,12 @@ CREATE TABLE household_invites (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- At most one outstanding (unconsumed) invite per email, case-insensitive.
+-- At most one outstanding (unconsumed) invite per email per household,
+-- case-insensitive. Scoped to the household (not global) so two households can
+-- independently invite the same address; handle_new_user() resolves a sign-up
+-- to the oldest pending invite.
 CREATE UNIQUE INDEX idx_household_invites_email_pending
-  ON household_invites (lower(email)) WHERE consumed_at IS NULL;
+  ON household_invites (household_id, lower(email)) WHERE consumed_at IS NULL;
 
 CREATE INDEX idx_household_invites_household ON household_invites(household_id);
 
