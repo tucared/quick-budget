@@ -29,7 +29,7 @@ DECLARE
   new_household_id UUID;
   invite_household_id UUID;
   matched_invite_id UUID;
-  founder_name TEXT := COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), '');
+  signer_name TEXT := COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), '');
   invite_email TEXT;
 BEGIN
   -- ----------------------------------------------------------------
@@ -45,13 +45,24 @@ BEGIN
 
   IF invite_household_id IS NOT NULL THEN
     INSERT INTO public.users (id, email, full_name, household_id)
-    VALUES (NEW.id, NEW.email, founder_name, invite_household_id);
+    VALUES (NEW.id, NEW.email, signer_name, invite_household_id);
 
     -- Consume only the invite we acted on, so any other household's pending
     -- invite for this email stays open rather than being silently burned.
     UPDATE public.household_invites
     SET consumed_at = NOW()
     WHERE id = matched_invite_id;
+
+    -- Adopt the joiner's real name on the allowance the founder pre-seeded from
+    -- this email's local-part (we only knew the address back then). No-op if the
+    -- joiner gave no name or the founder renamed/removed the allowance.
+    IF signer_name <> '' THEN
+      UPDATE public.categories
+      SET name = signer_name || '''s Allowance'
+      WHERE household_id = invite_household_id
+        AND exclude_from_budget_total = TRUE
+        AND name = split_part(NEW.email, '@', 1) || '''s Allowance';
+    END IF;
 
     RETURN NEW;
   END IF;
@@ -63,7 +74,7 @@ BEGIN
   VALUES (
     COALESCE(
       NULLIF(NEW.raw_user_meta_data->>'household_name', ''),
-      COALESCE(NULLIF(founder_name, ''), NEW.email) || '''s Household'
+      COALESCE(NULLIF(signer_name, ''), NEW.email) || '''s Household'
     ),
     COALESCE(NULLIF(NEW.raw_user_meta_data->>'base_currency', ''), 'EUR'),
     COALESCE(NULLIF(NEW.raw_user_meta_data->>'secondary_currency', ''), 'BRL')
@@ -71,7 +82,7 @@ BEGIN
   RETURNING id INTO new_household_id;
 
   INSERT INTO public.users (id, email, full_name, household_id)
-  VALUES (NEW.id, NEW.email, founder_name, new_household_id);
+  VALUES (NEW.id, NEW.email, signer_name, new_household_id);
 
   -- Default spending categories (mirrors supabase/seeds/02_seed_categories.sql)
   -- so the app is usable immediately; customization waits for the category UI.
@@ -87,7 +98,7 @@ BEGIN
   INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
   VALUES (
     new_household_id,
-    COALESCE(NULLIF(founder_name, ''), split_part(NEW.email, '@', 1)) || '''s Allowance',
+    COALESCE(NULLIF(signer_name, ''), split_part(NEW.email, '@', 1)) || '''s Allowance',
     '🧑', TRUE, TRUE
   );
 

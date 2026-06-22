@@ -223,39 +223,46 @@ export default function SignupForm() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="baseCurrency">Base currency</Label>
-                  <select
-                    id="baseCurrency"
-                    name="baseCurrency"
-                    value={baseCurrency}
-                    onChange={(e) => setBaseCurrency(e.target.value)}
-                    className={cn(selectClassName)}
-                  >
-                    {CURRENCIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="baseCurrency">Base currency</Label>
+                    <select
+                      id="baseCurrency"
+                      name="baseCurrency"
+                      value={baseCurrency}
+                      onChange={(e) => setBaseCurrency(e.target.value)}
+                      className={cn(selectClassName)}
+                    >
+                      {CURRENCIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="secondaryCurrency">Secondary currency</Label>
+                    <select
+                      id="secondaryCurrency"
+                      name="secondaryCurrency"
+                      value={secondaryCurrency}
+                      onChange={(e) => setSecondaryCurrency(e.target.value)}
+                      className={cn(selectClassName)}
+                    >
+                      {CURRENCIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="secondaryCurrency">Secondary currency</Label>
-                  <select
-                    id="secondaryCurrency"
-                    name="secondaryCurrency"
-                    value={secondaryCurrency}
-                    onChange={(e) => setSecondaryCurrency(e.target.value)}
-                    className={cn(selectClassName)}
-                  >
-                    {CURRENCIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Base currency is used for every budget and total and can&apos;t
+                  be changed later. Secondary is the other option in the expense
+                  form&apos;s currency toggle.
+                </p>
               </div>
 
               <div className="space-y-2">
