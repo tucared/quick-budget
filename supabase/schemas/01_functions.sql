@@ -6,7 +6,7 @@
 -- to the PR branch. A comment-only change like this one is a no-op for
 -- the diff and serves as a smoke test that the workflow runs cleanly.
 
--- Automatically create (or join) a household on signup.
+-- Automatically create (or join) a household once a signup is CONFIRMED.
 --
 -- Two paths, keyed off whether the new user's email matches an unconsumed
 -- household_invites row (case-insensitive):
@@ -17,8 +17,20 @@
 --     starter set of categories + an allowance per known member, then write an
 --     invite row per partner email so the partner can self-join later.
 --
--- raw_user_meta_data is the `options.data` passed to supabase.auth.signUp().
--- Everything is schema-qualified because search_path is empty.
+-- Fires from two triggers (see DATA_MODEL decision #1, "Timing"):
+--   - on_auth_user_created (AFTER INSERT): acts only when the row is already
+--     confirmed — the seed path and SQL-provisioned users. A real signUp
+--     inserts unconfirmed and is a no-op here.
+--   - on_auth_user_confirmed (AFTER UPDATE, hand-authored migration): fires on
+--     the email_confirmed_at NULL→NOT NULL transition, i.e. when the user
+--     clicks the confirmation link. This is what materializes a real signup —
+--     an abandoned signup leaves only an unconfirmed auth.users row (no ghost
+--     household), and an invite can only be consumed by someone who can
+--     actually receive mail at the invited address.
+--
+-- raw_user_meta_data is the `options.data` passed to supabase.auth.signUp(),
+-- read at confirmation time. Everything is schema-qualified because
+-- search_path is empty.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -34,6 +46,21 @@ DECLARE
   base_ccy TEXT;
   secondary_ccy TEXT;
 BEGIN
+  -- Materialize nothing until the email is confirmed. Real signups INSERT
+  -- unconfirmed (no-op here) and run via the UPDATE trigger when the
+  -- confirmation link is clicked; seed-path/provisioned rows INSERT
+  -- pre-confirmed and run immediately.
+  IF NEW.email_confirmed_at IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Idempotence across the INSERT + UPDATE trigger pair (a pre-confirmed
+  -- INSERT fires both paths' conditions over its lifetime) and across any
+  -- repeated confirmation-shaped update.
+  IF EXISTS (SELECT 1 FROM public.users WHERE id = NEW.id) THEN
+    RETURN NEW;
+  END IF;
+
   -- ----------------------------------------------------------------
   -- Invited member: join the household that pre-authorized this email.
   -- Invites are unique per (household, email), so the same address can be

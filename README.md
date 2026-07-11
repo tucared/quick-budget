@@ -83,18 +83,21 @@ SMTP is needed for real delivery; locally, confirmation mail lands in Mailpit.
 
 #### Operating signup when you share the link
 
-`/signup` is a public, unauthenticated endpoint, and `handle_new_user()`
-materializes the household the moment the form is submitted — *before* the email
-is confirmed (see DATA_MODEL.md decision #1, "Timing"). When sharing the link
-with a handful of known people this is fine; two things to keep an eye on:
+`/signup` is a public, unauthenticated endpoint, but nothing is materialized
+until the confirmation link is clicked — `handle_new_user()` fires on the
+`email_confirmed_at` transition, so an abandoned signup leaves a single
+unconfirmed row under Auth → Users and no household (see DATA_MODEL.md
+decision #1, "Timing"). When sharing the link with a handful of known people,
+two things to keep an eye on:
 
 - **Email delivery is the real bottleneck.** Supabase's built-in mailer is
   rate-limited to a few sends/hour, so a cluster of signups will silently fail
   to deliver confirmations. Configure **custom SMTP** before sharing the link.
   (Captcha / bot protection isn't needed for a privately-shared link — only
   enable it if `/signup` ever gets linked publicly or indexed.)
-- **Stale rows accumulate.** Unconfirmed founders leave "ghost" households, and
-  invited partners may never sign up. Inspect periodically:
+- **Stale rows accumulate.** Unconfirmed signups linger in Auth → Users (delete
+  them there to free the address), and invited partners may never sign up.
+  Inspect pending invites periodically:
 
 ```sql
 -- Pending invites: who you invited that hasn't joined yet, and how long ago.
@@ -104,22 +107,7 @@ from public.household_invites hi
 join public.households h on h.id = hi.household_id
 where hi.consumed_at is null
 order by hi.created_at;
-
--- Ghost households: no member ever confirmed their email (cleanup candidates).
-select h.id, h.name, h.created_at,
-       count(u.id) as members,
-       count(*) filter (where au.email_confirmed_at is not null) as confirmed_members
-from public.households h
-left join public.users u  on u.household_id = h.id
-left join auth.users  au  on au.id = u.id
-group by h.id, h.name, h.created_at
-having count(*) filter (where au.email_confirmed_at is not null) = 0
-order by h.created_at;
 ```
-
-To clean a ghost: delete the `public.households` row (cascades to its
-categories, invites, and `public.users` rows), then delete the orphaned
-unconfirmed user from the dashboard (Auth → Users) to free the email address.
 
 ### Password recovery / onboarding
 

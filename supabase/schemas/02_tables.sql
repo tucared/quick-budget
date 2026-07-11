@@ -83,10 +83,23 @@ CREATE INDEX idx_users_household ON users(household_id);
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Auth trigger: create user profile on signup
+-- Auth triggers: materialize the household once a signup is confirmed.
+-- handle_new_user() no-ops while email_confirmed_at is NULL, so the INSERT
+-- trigger only acts on pre-confirmed rows (seeds, SQL-provisioned users) and
+-- real signups materialize at the confirmation click via the UPDATE trigger.
+-- Both live on auth.users, outside the `db diff --schema public` scope — these
+-- declarations are informational; the INSERT trigger is owned by the baseline
+-- migration and the UPDATE trigger by
+-- supabase/migrations/20260711160000_fire_handle_new_user_on_email_confirmation.sql.
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+CREATE TRIGGER on_auth_user_confirmed
+  AFTER UPDATE ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email_confirmed_at IS NULL AND NEW.email_confirmed_at IS NOT NULL)
+  EXECUTE FUNCTION public.handle_new_user();
 
 -- RLS helper: returns the caller's household_id without triggering RLS on
 -- public.users. Lives in the `private` schema (set up in 00_setup.sql) so
