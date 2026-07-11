@@ -10,12 +10,17 @@
 --
 -- Two paths, keyed off whether the new user's email matches an unconsumed
 -- household_invites row (case-insensitive):
---   - Invited member: link to that existing household, consume the invite, done.
---     No new household and no category seeding — they inherit the founder's.
+--   - Invited member: link to that existing household, consume the invite, and
+--     create their personal allowance from the display name they provided.
+--     No new household and no spending-category seeding — they inherit the
+--     founder's.
 --   - Founder: create a household reading name/currencies from the signup form's
 --     raw_user_meta_data (falling back to the legacy defaults), seed a default
---     starter set of categories + an allowance per known member, then write an
---     invite row per partner email so the partner can self-join later.
+--     starter set of spending categories + the founder's own allowance, then
+--     write an invite row per partner email (capped at 10) so the partner can
+--     self-join later. Partner allowances are NOT pre-seeded — each is created
+--     at join time from the joiner's own name, so there is no placeholder
+--     naming or rename-on-join to keep consistent.
 --
 -- Fires from two triggers (see DATA_MODEL decision #1, "Timing"):
 --   - on_auth_user_created (AFTER INSERT): acts only when the row is already
@@ -82,19 +87,17 @@ BEGIN
     SET consumed_at = NOW()
     WHERE id = matched_invite_id;
 
-    -- Adopt the joiner's real name on the allowance the founder pre-seeded from
-    -- this email's local-part (we only knew the address back then). No-op if the
-    -- joiner gave no name or the founder renamed/removed the allowance. The
-    -- founder path stored the invite email (and thus the allowance name)
-    -- lowercased, so lowercase NEW.email before matching — the seed path and
-    -- direct auth.users inserts can carry mixed-case emails.
-    IF signer_name <> '' THEN
-      UPDATE public.categories
-      SET name = signer_name || '''s Allowance'
-      WHERE household_id = invite_household_id
-        AND exclude_from_budget_total = TRUE
-        AND name = split_part(lower(NEW.email), '@', 1) || '''s Allowance';
-    END IF;
+    -- The joiner's personal allowance, named from the display name they
+    -- provided at signup (email local-part as a fallback). Created here, at
+    -- join time, rather than pre-seeded by the founder — so the name comes
+    -- from the person it belongs to and no fragile name-matching rename is
+    -- needed.
+    INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
+    VALUES (
+      invite_household_id,
+      COALESCE(NULLIF(signer_name, ''), split_part(lower(NEW.email), '@', 1)) || '''s Allowance',
+      '🧑', TRUE, TRUE
+    );
 
     RETURN NEW;
   END IF;
@@ -140,8 +143,9 @@ BEGIN
     (new_household_id, 'Shopping', '🛍️', FALSE, TRUE),
     (new_household_id, 'Bills', '📋', FALSE, TRUE);
 
-  -- One personal allowance for the founder. Lowercase the email fallback so it
-  -- matches the invitee allowances (invite emails are stored lowercased).
+  -- One personal allowance for the founder. Partner allowances are created
+  -- when each partner joins (invited path above), named from their own signup
+  -- name.
   INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
   VALUES (
     new_household_id,
@@ -149,25 +153,21 @@ BEGIN
     '🧑', TRUE, TRUE
   );
 
-  -- Partner emails: one invite row + one allowance each (named from the email's
-  -- local-part since we don't know their name yet). Skip blanks and self.
+  -- Partner emails: one invite row each. Skip blanks and self; a duplicate
+  -- within this household is a clean no-op (ON CONFLICT). The LIMIT mirrors
+  -- the signup form's 10-partner cap (MAX_PARTNER_EMAILS in
+  -- src/lib/validations.ts) and bounds what a crafted direct auth.signUp call
+  -- can write — raw_user_meta_data is caller-controlled.
   IF jsonb_typeof(NEW.raw_user_meta_data->'invite_emails') = 'array' THEN
     FOR invite_email IN
       SELECT DISTINCT lower(btrim(value))
       FROM jsonb_array_elements_text(NEW.raw_user_meta_data->'invite_emails') AS t(value)
       WHERE btrim(value) <> '' AND lower(btrim(value)) <> lower(NEW.email)
+      LIMIT 10
     LOOP
       INSERT INTO public.household_invites (household_id, email)
       VALUES (new_household_id, invite_email)
       ON CONFLICT DO NOTHING;
-
-      -- Only seed the allowance when the invite row was actually created. A
-      -- duplicate pending invite for this household is a no-op, and seeding
-      -- unconditionally would leave an orphan allowance behind.
-      IF FOUND THEN
-        INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
-        VALUES (new_household_id, split_part(invite_email, '@', 1) || '''s Allowance', '🧑', TRUE, TRUE);
-      END IF;
     END LOOP;
   END IF;
 

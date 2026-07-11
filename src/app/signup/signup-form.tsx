@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { FALLBACK_RATES_TO_EUR } from "@/lib/currency"
-import { signupSchema } from "@/lib/validations"
+import { MAX_PARTNER_EMAILS, signupSchema } from "@/lib/validations"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -79,7 +79,10 @@ export default function SignupForm() {
   const updatePartner = (index: number, value: string) => {
     setPartnerEmails((prev) => prev.map((e, i) => (i === index ? value : e)))
   }
-  const addPartner = () => setPartnerEmails((prev) => [...prev, ""])
+  const addPartner = () =>
+    setPartnerEmails((prev) =>
+      prev.length >= MAX_PARTNER_EMAILS ? prev : [...prev, ""]
+    )
   const removePartner = (index: number) =>
     setPartnerEmails((prev) => prev.filter((_, i) => i !== index))
 
@@ -285,7 +288,7 @@ export default function SignupForm() {
                 <Label>Invite partners (optional)</Label>
                 <p className="text-xs text-muted-foreground">
                   They&apos;ll join this household when they sign up with the email
-                  you enter.
+                  you enter. Up to {MAX_PARTNER_EMAILS} partners.
                 </p>
                 {partnerEmails.map((value, index) => (
                   <div key={index} className="flex gap-2">
@@ -310,13 +313,15 @@ export default function SignupForm() {
                     )}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={addPartner}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  + Add another partner
-                </button>
+                {partnerEmails.length < MAX_PARTNER_EMAILS && (
+                  <button
+                    type="button"
+                    onClick={addPartner}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    + Add another partner
+                  </button>
+                )}
               </div>
             </CardContent>
             <CardFooter className="flex-col gap-3">

@@ -63,11 +63,12 @@ Supabase's public `supabase.auth.signUp` with the household details in
 `options.data`, and the `handle_new_user()` DB trigger does the rest:
 
 - **Founder** → creates the household with the chosen name/currencies, seeds a
-  default starter set of categories (6 spending + a personal allowance per member),
-  and writes a `household_invites` row per partner email.
+  default starter set of categories (6 spending + the founder's personal
+  allowance), and writes a `household_invites` row per partner email (up to 10).
 - **Invited partner** → when someone signs up with an email that matches an
   unconsumed invite, the trigger links them into that **existing** household
-  (no new household, no duplicate categories) and marks the invite consumed.
+  (no new household, no duplicate categories), marks the invite consumed, and
+  creates their personal allowance from the name they entered.
 
 This is the autonomous path: each person sets their own password via `signUp`,
 confirms their email, and lands in the app already scoped to the right household.

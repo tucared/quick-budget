@@ -41,6 +41,12 @@ export type ExpenseFormValues = z.infer<typeof expenseSchema>
 // pair up front for a clean message.
 export const MIN_PASSWORD_LENGTH = 8
 
+// Hard cap on partner invites per signup. Enforced in the form (no extra rows
+// past this), here, and by the LIMIT in handle_new_user()'s invite loop —
+// raw_user_meta_data is caller-controlled, so the trigger can't trust this
+// client-side check alone. Keep the three in sync.
+export const MAX_PARTNER_EMAILS = 10
+
 const currencyCode = z
   .string()
   .trim()
@@ -58,7 +64,10 @@ export const signupSchema = z
     baseCurrency: currencyCode,
     secondaryCurrency: currencyCode,
     // Optional partner emails. Blanks are dropped before validation by the form.
-    inviteEmails: z.array(z.string().trim().email("Enter a valid email")).default([]),
+    inviteEmails: z
+      .array(z.string().trim().email("Enter a valid email"))
+      .max(MAX_PARTNER_EMAILS, `You can invite up to ${MAX_PARTNER_EMAILS} partners`)
+      .default([]),
   })
   .refine((v) => v.password === v.confirmPassword, {
     message: "Passwords don't match",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { signupSchema } from "@/lib/validations"
+import { MAX_PARTNER_EMAILS, signupSchema } from "@/lib/validations"
 
 const valid = {
   email: "founder@example.com",
@@ -75,5 +75,21 @@ describe("signupSchema", () => {
 
   it("requires a non-empty full name", () => {
     expect(signupSchema.safeParse({ ...valid, fullName: "  " }).success).toBe(false)
+  })
+
+  it("accepts up to MAX_PARTNER_EMAILS partner emails and rejects one more", () => {
+    const emails = (n: number) =>
+      Array.from({ length: n }, (_, i) => `partner${i}@example.com`)
+    expect(
+      signupSchema.safeParse({ ...valid, inviteEmails: emails(MAX_PARTNER_EMAILS) }).success
+    ).toBe(true)
+    const result = signupSchema.safeParse({
+      ...valid,
+      inviteEmails: emails(MAX_PARTNER_EMAILS + 1),
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("inviteEmails"))).toBe(true)
+    }
   })
 })
