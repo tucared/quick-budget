@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { FALLBACK_RATES_TO_EUR } from "@/lib/currency"
 import { signupSchema } from "@/lib/validations"
@@ -65,6 +65,16 @@ export default function SignupForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const errorRef = useRef<HTMLDivElement>(null)
+
+  // The error banner sits at the top of a form that is taller than a phone
+  // viewport, while the submit button sits at the bottom — without this, a
+  // validation failure lands off-screen and the tap appears to do nothing.
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
+  }, [error])
 
   const updatePartner = (index: number, value: string) => {
     setPartnerEmails((prev) => prev.map((e, i) => (i === index ? value : e)))
@@ -154,10 +164,16 @@ export default function SignupForm() {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               {error && (
-                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                <div ref={errorRef} className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
                   {error}
                 </div>
               )}
+
+              <p className="text-xs text-muted-foreground">
+                Invited by a partner? Sign up with the email address they
+                invited and you&apos;ll join their household automatically —
+                the household fields below won&apos;t apply.
+              </p>
 
               <div className="space-y-2">
                 <Label htmlFor="fullName">Your name</Label>

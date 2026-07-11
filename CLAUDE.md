@@ -17,8 +17,13 @@
 - **For `agent-browser` / `dogfood` testing, use `http://localhost:3000` — never the Vercel preview URL.** The startup hook starts the dev server on port 3000 and writes `.env.local` with `NEXT_PUBLIC_SUPABASE_URL` pointing at **Dev**, so local already hits the same Supabase project a preview deploy would. Going through Vercel preview adds deploy lag, makes auth-hook propagation harder to reason about, and puts Cloudflare in the request path for no benefit.
 - The cloud security proxy requires special browser launch flags for agent-browser:
   ```bash
-  npx agent-browser --proxy "$HTTP_PROXY" --proxy-bypass "localhost,127.0.0.1" --executable-path "$(find /opt/pw-browsers/chromium-*/chrome-linux -name chrome -type f 2>/dev/null | head -1)" open http://localhost:3000 --ignore-https-errors
+  export AGENT_BROWSER_EXECUTABLE_PATH="$(find /opt/pw-browsers/chromium-*/chrome-linux -name chrome -type f 2>/dev/null | head -1)"
+  export AGENT_BROWSER_ARGS="--ssl-version-max=tls1.2"
+  npx agent-browser --proxy "${HTTP_PROXY:-$HTTPS_PROXY}" --proxy-bypass "localhost,127.0.0.1" open http://localhost:3000 --ignore-https-errors
   ```
+  - `$HTTP_PROXY` can be **unset** in some sessions while `$HTTPS_PROXY` is set — an empty `--proxy` silently launches without the proxy and every external request gets `ERR_CONNECTION_RESET`.
+  - The `--ssl-version-max=tls1.2` browser arg is required: the proxy's TLS interception resets Chromium's default TLS 1.3 ClientHello (curl works, browser doesn't). Pass it via `AGENT_BROWSER_ARGS` — the `--args` CLI flag does not reliably reach the daemon.
+  - **Known limitation: CORS preflights (`OPTIONS`) fail through the proxy** even with the flags above, so any browser-side `supabase-js` call that needs one (POST/authed requests — signup, login, PostgREST writes) fails with "Failed to fetch". Simple GETs work. If a flow needs those calls, drive them from Node instead (undici `EnvHttpProxyAgent` + `NODE_TLS_REJECT_UNAUTHORIZED=0`, like `src/instrumentation.ts`) and verify effects via SQL, using the browser only for UI-state testing.
 - To test mobile viewports after opening, run:
   ```bash
   npx agent-browser set viewport 402 714   # Safari on iOS

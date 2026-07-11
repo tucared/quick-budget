@@ -31,6 +31,8 @@ DECLARE
   matched_invite_id UUID;
   signer_name TEXT := COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), '');
   invite_email TEXT;
+  base_ccy TEXT;
+  secondary_ccy TEXT;
 BEGIN
   -- ----------------------------------------------------------------
   -- Invited member: join the household that pre-authorized this email.
@@ -55,13 +57,16 @@ BEGIN
 
     -- Adopt the joiner's real name on the allowance the founder pre-seeded from
     -- this email's local-part (we only knew the address back then). No-op if the
-    -- joiner gave no name or the founder renamed/removed the allowance.
+    -- joiner gave no name or the founder renamed/removed the allowance. The
+    -- founder path stored the invite email (and thus the allowance name)
+    -- lowercased, so lowercase NEW.email before matching — the seed path and
+    -- direct auth.users inserts can carry mixed-case emails.
     IF signer_name <> '' THEN
       UPDATE public.categories
       SET name = signer_name || '''s Allowance'
       WHERE household_id = invite_household_id
         AND exclude_from_budget_total = TRUE
-        AND name = split_part(NEW.email, '@', 1) || '''s Allowance';
+        AND name = split_part(lower(NEW.email), '@', 1) || '''s Allowance';
     END IF;
 
     RETURN NEW;
@@ -70,14 +75,28 @@ BEGIN
   -- ----------------------------------------------------------------
   -- Founder: create the household with the chosen name + currencies.
   -- ----------------------------------------------------------------
+  -- Clamp the metadata-supplied currencies. The signup form only submits valid
+  -- distinct ISO codes, but raw_user_meta_data is caller-controlled (anyone can
+  -- call auth.signUp directly), and an invalid or equal pair would violate the
+  -- households CHECKs and abort the whole signup with an opaque "Database error
+  -- saving new user". Uppercase what we got and fall back to the defaults.
+  base_ccy := upper(btrim(COALESCE(NEW.raw_user_meta_data->>'base_currency', '')));
+  IF base_ccy !~ '^[A-Z]{3}$' THEN
+    base_ccy := 'EUR';
+  END IF;
+  secondary_ccy := upper(btrim(COALESCE(NEW.raw_user_meta_data->>'secondary_currency', '')));
+  IF secondary_ccy !~ '^[A-Z]{3}$' OR secondary_ccy = base_ccy THEN
+    secondary_ccy := CASE WHEN base_ccy = 'BRL' THEN 'EUR' ELSE 'BRL' END;
+  END IF;
+
   INSERT INTO public.households (name, base_currency, secondary_currency)
   VALUES (
     COALESCE(
       NULLIF(NEW.raw_user_meta_data->>'household_name', ''),
       COALESCE(NULLIF(signer_name, ''), NEW.email) || '''s Household'
     ),
-    COALESCE(NULLIF(NEW.raw_user_meta_data->>'base_currency', ''), 'EUR'),
-    COALESCE(NULLIF(NEW.raw_user_meta_data->>'secondary_currency', ''), 'BRL')
+    base_ccy,
+    secondary_ccy
   )
   RETURNING id INTO new_household_id;
 
@@ -94,11 +113,12 @@ BEGIN
     (new_household_id, 'Shopping', '🛍️', FALSE, TRUE),
     (new_household_id, 'Bills', '📋', FALSE, TRUE);
 
-  -- One personal allowance for the founder.
+  -- One personal allowance for the founder. Lowercase the email fallback so it
+  -- matches the invitee allowances (invite emails are stored lowercased).
   INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
   VALUES (
     new_household_id,
-    COALESCE(NULLIF(signer_name, ''), split_part(NEW.email, '@', 1)) || '''s Allowance',
+    COALESCE(NULLIF(signer_name, ''), split_part(lower(NEW.email), '@', 1)) || '''s Allowance',
     '🧑', TRUE, TRUE
   );
 
