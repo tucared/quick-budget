@@ -97,8 +97,10 @@ two things to keep an eye on:
   (Captcha / bot protection isn't needed for a privately-shared link — only
   enable it if `/signup` ever gets linked publicly or indexed.)
 - **Stale rows accumulate.** Unconfirmed signups linger in Auth → Users (delete
-  them there to free the address), and invited partners may never sign up.
-  Inspect pending invites periodically:
+  them there to free the address), and invited partners may never sign up — in
+  particular, an invite sent to someone who **already has an account** can never
+  be consumed (there is no "join a household" flow for existing users), so it
+  stays pending forever. Inspect pending invites periodically:
 
 ```sql
 -- Pending invites: who you invited that hasn't joined yet, and how long ago.

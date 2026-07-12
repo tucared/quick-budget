@@ -64,6 +64,14 @@ CREATE INDEX idx_household_invites_household ON household_invites(household_id);
 
 GRANT SELECT ON public.household_invites TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.household_invites TO service_role;
+-- Belt-and-braces only. `db diff` does not emit REVOKEs, so the generated
+-- migration carries just the GRANTs above and this statement never executes on
+-- Dev/Prod (declarative schema files only run against shadow/local databases).
+-- That is acceptable: hosted projects don't default-grant anon on
+-- migration-created tables (verified on Dev — anon holds no grants on peer
+-- tables like households either), and RLS is the actual gate regardless (the
+-- SELECT policy resolves private.get_my_household_id() to NULL for anon →
+-- zero rows). Invite emails are PII — keep both layers.
 REVOKE SELECT ON public.household_invites FROM anon;
 
 -- ============================================================================
