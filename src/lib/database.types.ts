@@ -512,6 +512,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      check_pending_invite: { Args: { check_email: string }; Returns: boolean }
       get_expenses_and_categories: {
         Args: { p_limit?: number; p_mode: string; p_month?: string }
         Returns: Json
