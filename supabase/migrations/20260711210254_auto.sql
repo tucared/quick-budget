@@ -146,12 +146,14 @@ BEGIN
   -- within this household is a clean no-op (ON CONFLICT). The LIMIT mirrors
   -- the signup form's 10-partner cap (MAX_PARTNER_EMAILS in
   -- src/lib/validations.ts) and bounds what a crafted direct auth.signUp call
-  -- can write — raw_user_meta_data is caller-controlled.
+  -- can write — raw_user_meta_data is caller-controlled; the ORDER BY makes
+  -- which 10 survive deterministic (alphabetical) instead of plan-dependent.
   IF jsonb_typeof(NEW.raw_user_meta_data->'invite_emails') = 'array' THEN
     FOR invite_email IN
       SELECT DISTINCT lower(btrim(value))
       FROM jsonb_array_elements_text(NEW.raw_user_meta_data->'invite_emails') AS t(value)
       WHERE btrim(value) <> '' AND lower(btrim(value)) <> lower(NEW.email)
+      ORDER BY 1
       LIMIT 10
     LOOP
       INSERT INTO public.household_invites (household_id, email)
