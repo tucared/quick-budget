@@ -8,13 +8,10 @@ interface PersonalFieldsProps {
   onPasswordChange: (value: string) => void
   confirmPassword: string
   onConfirmPasswordChange: (value: string) => void
-  allowanceName: string
-  onAllowanceNameChange: (value: string) => void
 }
 
 // Who's signing up. Always visible — unlike the household fields below it,
-// nothing here depends on whether the email turns out to be invited: an
-// invited joiner gets a personal allowance too, so the allowance name stays.
+// nothing here depends on whether the email turns out to be invited.
 export default function PersonalFields({
   email,
   onEmailChange,
@@ -22,13 +19,11 @@ export default function PersonalFields({
   onPasswordChange,
   confirmPassword,
   onConfirmPasswordChange,
-  allowanceName,
-  onAllowanceNameChange,
 }: PersonalFieldsProps) {
   return (
     <>
       <div className="space-y-1">
-        <p className="text-xs font-medium">Your account</p>
+        <p className="text-sm font-semibold">Your account</p>
         <p className="text-xs text-muted-foreground">
           How you&apos;ll log in to Quick Budget.
         </p>
@@ -71,23 +66,6 @@ export default function PersonalFields({
           onChange={(e) => onConfirmPasswordChange(e.target.value)}
           required
           autoComplete="new-password"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="allowanceName">Your personal allowance</Label>
-        <p className="text-xs text-muted-foreground">
-          Everyone gets a personal budget for guilt-free spending that stays
-          out of the shared totals. Name yours however you like.
-        </p>
-        <Input
-          id="allowanceName"
-          name="allowanceName"
-          value={allowanceName}
-          onChange={(e) => onAllowanceNameChange(e.target.value)}
-          placeholder="e.g. Sam's fun money — optional"
-          autoComplete="off"
-          maxLength={40}
         />
       </div>
     </>

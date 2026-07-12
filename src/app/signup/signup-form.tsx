@@ -19,6 +19,7 @@ import {
 import PersonalFields from "./personal-fields"
 import HouseholdFields from "./household-fields"
 import CategoryFields from "./category-fields"
+import AllowanceField from "./allowance-field"
 
 const INVITE_CHECK_DEBOUNCE_MS = 500
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -56,7 +57,6 @@ export default function SignupForm() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [allowanceName, setAllowanceName] = useState("")
-  const [householdName, setHouseholdName] = useState("")
   const [baseCurrency, setBaseCurrency] = useState("EUR")
   const [secondaryCurrency, setSecondaryCurrency] = useState("BRL")
   const [partnerEmails, setPartnerEmails] = useState<string[]>([""])
@@ -143,7 +143,6 @@ export default function SignupForm() {
       password,
       confirmPassword,
       allowanceName: allowanceName.trim() || undefined,
-      householdName: householdName.trim() || undefined,
       baseCurrency,
       secondaryCurrency,
       inviteEmails,
@@ -167,7 +166,9 @@ export default function SignupForm() {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/expenses`,
           data: {
             allowance_name: parsed.data.allowanceName ?? "",
-            household_name: parsed.data.householdName ?? "",
+            // No in-app household name; the DB trigger derives one from the
+            // founder's email.
+            household_name: "",
             base_currency: parsed.data.baseCurrency,
             secondary_currency: parsed.data.secondaryCurrency,
             invite_emails: parsed.data.inviteEmails,
@@ -230,24 +231,26 @@ export default function SignupForm() {
                 onPasswordChange={setPassword}
                 confirmPassword={confirmPassword}
                 onConfirmPasswordChange={setConfirmPassword}
-                allowanceName={allowanceName}
-                onAllowanceNameChange={setAllowanceName}
               />
 
               {invited && EMAIL_RE.test(email) ? (
-                <p
-                  className="text-xs text-muted-foreground pt-2 border-t border-border"
-                  aria-live="polite"
-                >
-                  You&apos;ve been invited to join an existing household —
-                  sign up to join it. The household and category fields
-                  don&apos;t apply.
-                </p>
+                <div className="space-y-4 pt-2 border-t border-border">
+                  <p
+                    className="text-xs text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    You&apos;ve been invited to join an existing household —
+                    sign up to join it. The household and category fields
+                    don&apos;t apply.
+                  </p>
+                  <AllowanceField
+                    allowanceName={allowanceName}
+                    onAllowanceNameChange={setAllowanceName}
+                  />
+                </div>
               ) : (
                 <>
                   <HouseholdFields
-                    householdName={householdName}
-                    onHouseholdNameChange={setHouseholdName}
                     baseCurrency={baseCurrency}
                     onBaseCurrencyChange={setBaseCurrency}
                     secondaryCurrency={secondaryCurrency}
@@ -262,6 +265,8 @@ export default function SignupForm() {
                     onAdd={addCategory}
                     onChange={updateCategory}
                     onRemove={removeCategory}
+                    allowanceName={allowanceName}
+                    onAllowanceNameChange={setAllowanceName}
                   />
                 </>
               )}

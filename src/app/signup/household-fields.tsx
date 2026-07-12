@@ -15,8 +15,6 @@ const selectClassName =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 
 interface HouseholdFieldsProps {
-  householdName: string
-  onHouseholdNameChange: (value: string) => void
   baseCurrency: string
   onBaseCurrencyChange: (value: string) => void
   secondaryCurrency: string
@@ -27,12 +25,10 @@ interface HouseholdFieldsProps {
   onRemovePartner: (index: number) => void
 }
 
-// Household setup — name, currencies, partner invites. The parent hides this
+// Household setup — currencies and partner invites. The parent hides this
 // entirely (rather than greying it out) once the email field is detected as
 // an existing invite, since none of it applies to someone joining.
 export default function HouseholdFields({
-  householdName,
-  onHouseholdNameChange,
   baseCurrency,
   onBaseCurrencyChange,
   secondaryCurrency,
@@ -45,23 +41,10 @@ export default function HouseholdFields({
   return (
     <div className="space-y-4 pt-2 border-t border-border">
       <div className="space-y-1">
-        <p className="text-xs font-medium">Your household</p>
+        <p className="text-sm font-semibold">Your household</p>
         <p className="text-xs text-muted-foreground">
           Budgets here are shared — one pot for you and anyone you invite.
-          Give it a name, or we&apos;ll make one from your email.
         </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="householdName">Household name</Label>
-        <Input
-          id="householdName"
-          name="householdName"
-          value={householdName}
-          onChange={(e) => onHouseholdNameChange(e.target.value)}
-          placeholder="e.g. Casa Silva — optional"
-          autoComplete="off"
-        />
       </div>
 
       <div className="space-y-2">
@@ -109,7 +92,7 @@ export default function HouseholdFields({
 
       <div className="space-y-2">
         <div className="space-y-1">
-          <p className="text-xs font-medium">Invite your partner</p>
+          <p className="text-sm font-semibold">Invite your partner</p>
           <p className="text-xs text-muted-foreground">
             When they sign up with this email, they&apos;ll join your household
             automatically — no code needed. Up to {MAX_PARTNER_EMAILS} partners.
