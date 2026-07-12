@@ -22,12 +22,7 @@ export default function PersonalFields({
 }: PersonalFieldsProps) {
   return (
     <>
-      <div className="space-y-1">
-        <p className="text-sm font-semibold">Your account</p>
-        <p className="text-xs text-muted-foreground">
-          How you&apos;ll log in to Quick Budget.
-        </p>
-      </div>
+      <p className="text-sm font-semibold">Your account</p>
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>

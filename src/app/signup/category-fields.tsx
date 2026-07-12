@@ -65,13 +65,12 @@ export default function CategoryFields({
   }
 
   return (
-    <div className="space-y-4 pt-2 border-t border-border">
+    <div className="space-y-4 pt-4 border-t border-border">
       <div className="space-y-1">
         <p className="text-sm font-semibold">Budget categories</p>
         <p className="text-xs text-muted-foreground">
-          Every expense lands in a category — they&apos;re the buckets your
-          monthly budget is split across. Tap the starters you want, then add
-          your own.
+          The buckets your budget splits across. Tap the starters you want, then
+          add your own.
         </p>
       </div>
 

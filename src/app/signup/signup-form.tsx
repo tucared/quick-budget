@@ -234,14 +234,14 @@ export default function SignupForm() {
               />
 
               {invited && EMAIL_RE.test(email) ? (
-                <div className="space-y-4 pt-2 border-t border-border">
+                <div className="space-y-4 pt-4 border-t border-border">
                   <p
                     className="text-xs text-muted-foreground"
                     aria-live="polite"
                   >
-                    You&apos;ve been invited to join an existing household —
-                    sign up to join it. The household and category fields
-                    don&apos;t apply.
+                    You&apos;ve been invited to an existing household. Set a
+                    password below to join — you&apos;ll share its budget and
+                    categories.
                   </p>
                   <AllowanceField
                     allowanceName={allowanceName}

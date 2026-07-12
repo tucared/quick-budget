@@ -18,8 +18,7 @@ export default function AllowanceField({
     <div className="space-y-2">
       <Label htmlFor="allowanceName">Your personal allowance</Label>
       <p className="text-xs text-muted-foreground">
-        A personal budget for guilt-free spending that stays out of the shared
-        totals. Name yours however you like.
+        A personal bucket that stays out of the shared totals.
       </p>
       <Input
         id="allowanceName"

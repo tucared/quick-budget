@@ -39,7 +39,7 @@ export default function HouseholdFields({
   onRemovePartner,
 }: HouseholdFieldsProps) {
   return (
-    <div className="space-y-4 pt-2 border-t border-border">
+    <div className="space-y-4 pt-4 border-t border-border">
       <div className="space-y-1">
         <p className="text-sm font-semibold">Your household</p>
         <p className="text-xs text-muted-foreground">
@@ -83,19 +83,22 @@ export default function HouseholdFields({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Every budget and total is shown in the base currency — it can&apos;t
-          be changed later, so pick the one you mostly spend in. The secondary
-          currency is the quick toggle on the expense form, for trips and
-          foreign spending.
+          Base is shown on every total and can&apos;t be changed later. Secondary
+          is the quick toggle on the expense form for foreign spending.
         </p>
       </div>
 
       <div className="space-y-2">
         <div className="space-y-1">
-          <p className="text-sm font-semibold">Invite your partner</p>
+          <p className="text-sm font-semibold">
+            Invite your partner{" "}
+            <span className="font-normal text-muted-foreground">
+              (optional)
+            </span>
+          </p>
           <p className="text-xs text-muted-foreground">
-            When they sign up with this email, they&apos;ll join your household
-            automatically — no code needed. Up to {MAX_PARTNER_EMAILS} partners.
+            They join automatically when they sign up with this email. Up to{" "}
+            {MAX_PARTNER_EMAILS}.
           </p>
         </div>
         {partnerEmails.map((value, index) => (
