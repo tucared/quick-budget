@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { MAX_PARTNER_EMAILS, signupSchema } from "@/lib/validations"
+import {
+  MAX_PARTNER_EMAILS,
+  MAX_SIGNUP_CATEGORIES,
+  signupSchema,
+  type SignupCategory,
+} from "@/lib/validations"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -13,6 +18,7 @@ import {
 } from "@/components/ui/card"
 import PersonalFields from "./personal-fields"
 import HouseholdFields from "./household-fields"
+import CategoryFields from "./category-fields"
 
 const INVITE_CHECK_DEBOUNCE_MS = 500
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -49,11 +55,12 @@ export default function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [fullName, setFullName] = useState("")
+  const [allowanceName, setAllowanceName] = useState("")
   const [householdName, setHouseholdName] = useState("")
   const [baseCurrency, setBaseCurrency] = useState("EUR")
   const [secondaryCurrency, setSecondaryCurrency] = useState("BRL")
   const [partnerEmails, setPartnerEmails] = useState<string[]>([""])
+  const [categories, setCategories] = useState<SignupCategory[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -108,20 +115,39 @@ export default function SignupForm() {
   const removePartner = (index: number) =>
     setPartnerEmails((prev) => prev.filter((_, i) => i !== index))
 
+  const addCategory = (category: SignupCategory) =>
+    setCategories((prev) =>
+      prev.length >= MAX_SIGNUP_CATEGORIES ? prev : [...prev, category]
+    )
+  const updateCategory = (index: number, patch: Partial<SignupCategory>) =>
+    setCategories((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, ...patch } : c))
+    )
+  const removeCategory = (index: number) =>
+    setCategories((prev) => prev.filter((_, i) => i !== index))
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
     const inviteEmails = partnerEmails.map((s) => s.trim()).filter(Boolean)
+    // The household/category sections are hidden (and don't apply) for an
+    // invited signup, so only the founder path submits categories — the
+    // schema's min-1 check must not fire for a joiner.
+    const founder = !invited
+    const trimmedCategories = categories
+      .map((c) => ({ name: c.name.trim(), icon: c.icon.trim() }))
+      .filter((c) => c.name || c.icon !== "🏷️")
     const parsed = signupSchema.safeParse({
       email,
       password,
       confirmPassword,
-      fullName: fullName.trim() || undefined,
+      allowanceName: allowanceName.trim() || undefined,
       householdName: householdName.trim() || undefined,
       baseCurrency,
       secondaryCurrency,
       inviteEmails,
+      categories: founder ? trimmedCategories : undefined,
     })
 
     if (!parsed.success) {
@@ -140,11 +166,14 @@ export default function SignupForm() {
           // household + categories are already created by the DB trigger.
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/expenses`,
           data: {
-            full_name: parsed.data.fullName ?? "",
+            allowance_name: parsed.data.allowanceName ?? "",
             household_name: parsed.data.householdName ?? "",
             base_currency: parsed.data.baseCurrency,
             secondary_currency: parsed.data.secondaryCurrency,
             invite_emails: parsed.data.inviteEmails,
+            ...(parsed.data.categories
+              ? { categories: parsed.data.categories }
+              : {}),
           },
         },
       })
@@ -195,14 +224,14 @@ export default function SignupForm() {
               )}
 
               <PersonalFields
-                fullName={fullName}
-                onFullNameChange={setFullName}
                 email={email}
                 onEmailChange={setEmail}
                 password={password}
                 onPasswordChange={setPassword}
                 confirmPassword={confirmPassword}
                 onConfirmPasswordChange={setConfirmPassword}
+                allowanceName={allowanceName}
+                onAllowanceNameChange={setAllowanceName}
               />
 
               {invited && EMAIL_RE.test(email) ? (
@@ -211,21 +240,30 @@ export default function SignupForm() {
                   aria-live="polite"
                 >
                   You&apos;ve been invited to join an existing household —
-                  sign up to join it. The household fields don&apos;t apply.
+                  sign up to join it. The household and category fields
+                  don&apos;t apply.
                 </p>
               ) : (
-                <HouseholdFields
-                  householdName={householdName}
-                  onHouseholdNameChange={setHouseholdName}
-                  baseCurrency={baseCurrency}
-                  onBaseCurrencyChange={setBaseCurrency}
-                  secondaryCurrency={secondaryCurrency}
-                  onSecondaryCurrencyChange={setSecondaryCurrency}
-                  partnerEmails={partnerEmails}
-                  onPartnerEmailChange={updatePartner}
-                  onAddPartner={addPartner}
-                  onRemovePartner={removePartner}
-                />
+                <>
+                  <HouseholdFields
+                    householdName={householdName}
+                    onHouseholdNameChange={setHouseholdName}
+                    baseCurrency={baseCurrency}
+                    onBaseCurrencyChange={setBaseCurrency}
+                    secondaryCurrency={secondaryCurrency}
+                    onSecondaryCurrencyChange={setSecondaryCurrency}
+                    partnerEmails={partnerEmails}
+                    onPartnerEmailChange={updatePartner}
+                    onAddPartner={addPartner}
+                    onRemovePartner={removePartner}
+                  />
+                  <CategoryFields
+                    categories={categories}
+                    onAdd={addCategory}
+                    onChange={updateCategory}
+                    onRemove={removeCategory}
+                  />
+                </>
               )}
             </CardContent>
             <CardFooter className="flex-col gap-3">

@@ -57,19 +57,23 @@ Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 ### Signup / create a household
 
 New households are self-service via `/signup` (linked from `/login` as "Sign
-up"). The founder enters their email + password, an optional name, and — unless
-the email is detected as already invited (see below) — the household name and
-base/secondary currencies, plus optionally partner email(s). The form calls
-Supabase's public `supabase.auth.signUp` with the household details in
-`options.data`, and the `handle_new_user()` DB trigger does the rest:
+up"). The founder enters their email + password, an optional name for their
+personal allowance, and — unless the email is detected as already invited (see
+below) — the household name, base/secondary currencies, their spending
+categories (starting blank, with one-tap suggestion chips for the classic six
+and free-form rows for custom ones; at least one required), plus optionally
+partner email(s). The form calls Supabase's public `supabase.auth.signUp` with
+the household details in `options.data`, and the `handle_new_user()` DB
+trigger does the rest:
 
-- **Founder** → creates the household with the chosen name/currencies, seeds a
-  default starter set of categories (6 spending + the founder's personal
-  allowance), and writes a `household_invites` row per partner email (up to 10).
+- **Founder** → creates the household with the chosen name/currencies, seeds
+  the categories picked on the form (falling back to the classic starter set
+  when a signup arrives without any) + the founder's personal allowance, and
+  writes a `household_invites` row per partner email (up to 10).
 - **Invited partner** → when someone signs up with an email that matches an
   unconsumed invite, the trigger links them into that **existing** household
   (no new household, no duplicate categories), marks the invite consumed, and
-  creates their personal allowance from the name they entered.
+  creates their personal allowance under the name they chose.
 
 As the visitor types their email, the form debounces a call to
 `POST /api/signup/check-invite` (a public, IP-rate-limited route backed by
@@ -81,8 +85,8 @@ This is the autonomous path: each person sets their own password via `signUp`,
 confirms their email, and lands in the app already scoped to the right household.
 There is **no** service-role key in this project, so accounts can't be
 admin-provisioned — invite routing through the public `signUp` is how a second
-member joins. Category and household *management* UIs are deferred; the seeded
-defaults are the starting point.
+member joins. Category and household *management* UIs are deferred; the
+categories chosen at signup are the starting point.
 
 **Supabase config required (per environment — Dev/Prod dashboards under
 Authentication):** enable **Signups**, turn **Confirm email** ON, and keep the

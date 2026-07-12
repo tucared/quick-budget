@@ -34,11 +34,12 @@ export type ExpenseFormValues = z.infer<typeof expenseSchema>
 
 // Signup / create-household form validation schema.
 //
-// The founder enters their credentials, the household name + currencies, and
-// optionally partner email(s) to pre-authorize. base_currency must differ from
-// secondary_currency — they are the two options of the expense form's toggle,
-// and the DB enforces it (households_currencies_distinct), so we reject an equal
-// pair up front for a clean message.
+// The founder enters their credentials, the household name + currencies,
+// their spending categories, and optionally partner email(s) to pre-authorize.
+// base_currency must differ from secondary_currency — they are the two options
+// of the expense form's toggle, and the DB enforces it
+// (households_currencies_distinct), so we reject an equal pair up front for a
+// clean message.
 export const MIN_PASSWORD_LENGTH = 8
 
 // Hard cap on partner invites per signup. Enforced in the form (no extra rows
@@ -47,10 +48,34 @@ export const MIN_PASSWORD_LENGTH = 8
 // client-side check alone. Keep the three in sync.
 export const MAX_PARTNER_EMAILS = 10
 
+// Hard cap on spending categories per signup. Same triple enforcement as
+// MAX_PARTNER_EMAILS: the form, this schema, and the LIMIT in
+// handle_new_user()'s category insert. Keep the three in sync.
+export const MAX_SIGNUP_CATEGORIES = 20
+
 const currencyCode = z
   .string()
   .trim()
   .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code")
+
+// One founder-chosen spending category. Length caps mirror the trigger's
+// clamps (left(name, 40) / left(icon, 16)); 16 chars leaves room for
+// multi-code-point ZWJ emoji sequences while still rejecting arbitrary text
+// as an icon.
+const signupCategorySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give the category a name")
+    .max(40, "Category name is too long"),
+  icon: z
+    .string()
+    .trim()
+    .min(1, "Pick an emoji for the category")
+    .max(16, "Icon must be a single emoji"),
+})
+
+export type SignupCategory = z.infer<typeof signupCategorySchema>
 
 export const signupSchema = z
   .object({
@@ -59,10 +84,19 @@ export const signupSchema = z
       .string()
       .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
     confirmPassword: z.string(),
-    // Optional — handle_new_user() falls back to the email local-part when
-    // blank, so this stays a nicety, not a hard requirement.
-    fullName: z.string().trim().max(100, "Name is too long").optional(),
+    // Optional — handle_new_user() falls back to "<email name>'s Allowance"
+    // when blank. Used verbatim when present (no suffix appended).
+    allowanceName: z.string().trim().max(40, "Allowance name is too long").optional(),
     householdName: z.string().trim().max(100, "Household name is too long").optional(),
+    // Founder path only — the form omits this entirely for an invited signup
+    // (the household/category sections are hidden), so absent is valid, but a
+    // present list needs at least one entry: there is no in-app category
+    // management yet, so a household without spending categories is stuck.
+    categories: z
+      .array(signupCategorySchema)
+      .min(1, "Add at least one spending category")
+      .max(MAX_SIGNUP_CATEGORIES, `You can add up to ${MAX_SIGNUP_CATEGORIES} categories`)
+      .optional(),
     baseCurrency: currencyCode,
     secondaryCurrency: currencyCode,
     // Optional partner emails. Blanks are dropped before validation by the form.
@@ -83,5 +117,14 @@ export const signupSchema = z
     message: "A partner email can't be your own email",
     path: ["inviteEmails"],
   })
+  .refine(
+    (v) =>
+      !v.categories ||
+      new Set(v.categories.map((c) => c.name.toLowerCase())).size === v.categories.length,
+    {
+      message: "You already have a category with that name",
+      path: ["categories"],
+    }
+  )
 
 export type SignupFormValues = z.infer<typeof signupSchema>

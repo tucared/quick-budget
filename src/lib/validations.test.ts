@@ -1,15 +1,23 @@
 import { describe, it, expect } from "vitest"
-import { MAX_PARTNER_EMAILS, signupSchema } from "@/lib/validations"
+import {
+  MAX_PARTNER_EMAILS,
+  MAX_SIGNUP_CATEGORIES,
+  signupSchema,
+} from "@/lib/validations"
 
 const valid = {
   email: "founder@example.com",
   password: "supersecret",
   confirmPassword: "supersecret",
-  fullName: "Founder One",
+  allowanceName: "Founder's fun money",
   householdName: "Our Home",
   baseCurrency: "EUR",
   secondaryCurrency: "BRL",
   inviteEmails: ["partner@example.com"],
+  categories: [
+    { name: "Groceries", icon: "🛒" },
+    { name: "Dining Out", icon: "🍽️" },
+  ],
 }
 
 describe("signupSchema", () => {
@@ -73,10 +81,58 @@ describe("signupSchema", () => {
     }
   })
 
-  it("treats fullName as optional", () => {
-    const { fullName: _drop, ...rest } = valid
+  it("treats allowanceName as optional", () => {
+    const { allowanceName: _drop, ...rest } = valid
     expect(signupSchema.safeParse(rest).success).toBe(true)
-    expect(signupSchema.safeParse({ ...valid, fullName: "  " }).success).toBe(true)
+    expect(signupSchema.safeParse({ ...valid, allowanceName: "  " }).success).toBe(true)
+  })
+
+  it("rejects an over-long allowanceName", () => {
+    expect(
+      signupSchema.safeParse({ ...valid, allowanceName: "x".repeat(41) }).success
+    ).toBe(false)
+  })
+
+  it("treats categories as optional (invited path) but rejects an empty list", () => {
+    const { categories: _drop, ...rest } = valid
+    expect(signupSchema.safeParse(rest).success).toBe(true)
+    expect(signupSchema.safeParse({ ...valid, categories: [] }).success).toBe(false)
+  })
+
+  it("rejects a category without a name or without an icon", () => {
+    expect(
+      signupSchema.safeParse({ ...valid, categories: [{ name: "", icon: "🛒" }] }).success
+    ).toBe(false)
+    expect(
+      signupSchema.safeParse({ ...valid, categories: [{ name: "Groceries", icon: "  " }] })
+        .success
+    ).toBe(false)
+  })
+
+  it("rejects duplicate category names case-insensitively", () => {
+    const result = signupSchema.safeParse({
+      ...valid,
+      categories: [
+        { name: "Groceries", icon: "🛒" },
+        { name: "groceries", icon: "🥦" },
+      ],
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("categories"))).toBe(true)
+    }
+  })
+
+  it("accepts up to MAX_SIGNUP_CATEGORIES categories and rejects one more", () => {
+    const cats = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ name: `Category ${i}`, icon: "🏷️" }))
+    expect(
+      signupSchema.safeParse({ ...valid, categories: cats(MAX_SIGNUP_CATEGORIES) }).success
+    ).toBe(true)
+    expect(
+      signupSchema.safeParse({ ...valid, categories: cats(MAX_SIGNUP_CATEGORIES + 1) })
+        .success
+    ).toBe(false)
   })
 
   it("accepts up to MAX_PARTNER_EMAILS partner emails and rejects one more", () => {

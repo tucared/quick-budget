@@ -11,16 +11,18 @@
 -- Two paths, keyed off whether the new user's email matches an unconsumed
 -- household_invites row (case-insensitive):
 --   - Invited member: link to that existing household, consume the invite, and
---     create their personal allowance from the display name they provided.
---     No new household and no spending-category seeding — they inherit the
---     founder's.
+--     create their personal allowance (named from the allowance_name they
+--     chose at signup, falling back to "<email name>'s Allowance"). No new
+--     household and no spending-category seeding — they inherit the founder's.
 --   - Founder: create a household reading name/currencies from the signup form's
---     raw_user_meta_data (falling back to the legacy defaults), seed a default
---     starter set of spending categories + the founder's own allowance, then
---     write an invite row per partner email (capped at 10) so the partner can
---     self-join later. Partner allowances are NOT pre-seeded — each is created
---     at join time from the joiner's own name, so there is no placeholder
---     naming or rename-on-join to keep consistent.
+--     raw_user_meta_data (falling back to the legacy defaults), seed the
+--     spending categories chosen on the signup form (clamped and deduped, max
+--     20; the classic 6-category starter set when none are usable) + the
+--     founder's own allowance, then write an invite row per partner email
+--     (capped at 10) so the partner can self-join later. Partner allowances are
+--     NOT pre-seeded — each is created at join time under the joiner's own
+--     chosen name, so there is no placeholder naming or rename-on-join to keep
+--     consistent.
 --
 -- Fires from two triggers (see DATA_MODEL decision #1, "Timing"):
 --   - on_auth_user_created (AFTER INSERT): acts only when the row is already
@@ -47,10 +49,24 @@ DECLARE
   invite_household_id UUID;
   matched_invite_id UUID;
   signer_name TEXT := COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), '');
+  -- Display name shown to the partner (e.g. Tricount member mapping). The
+  -- signup form no longer collects a name, so this usually resolves to the
+  -- email local-part; full_name is still honored for direct/legacy callers.
+  display_name TEXT;
+  -- Explicit personal-allowance name from the signup form; used verbatim when
+  -- present (no "'s Allowance" suffix), clamped like every metadata field.
+  allowance_name TEXT;
   invite_email TEXT;
   base_ccy TEXT;
   secondary_ccy TEXT;
+  seeded_category_count INTEGER := 0;
 BEGIN
+  display_name := COALESCE(NULLIF(signer_name, ''), split_part(lower(NEW.email), '@', 1));
+  allowance_name := COALESCE(
+    NULLIF(left(btrim(COALESCE(NEW.raw_user_meta_data->>'allowance_name', '')), 40), ''),
+    display_name || '''s Allowance'
+  );
+
   -- Materialize nothing until the email is confirmed. Real signups INSERT
   -- unconfirmed (no-op here) and run via the UPDATE trigger when the
   -- confirmation link is clicked; seed-path/provisioned rows INSERT
@@ -79,7 +95,7 @@ BEGIN
 
   IF invite_household_id IS NOT NULL THEN
     INSERT INTO public.users (id, email, full_name, household_id)
-    VALUES (NEW.id, NEW.email, signer_name, invite_household_id);
+    VALUES (NEW.id, NEW.email, display_name, invite_household_id);
 
     -- Consume only the invite we acted on, so any other household's pending
     -- invite for this email stays open rather than being silently burned.
@@ -87,17 +103,12 @@ BEGIN
     SET consumed_at = NOW()
     WHERE id = matched_invite_id;
 
-    -- The joiner's personal allowance, named from the display name they
-    -- provided at signup (email local-part as a fallback). Created here, at
-    -- join time, rather than pre-seeded by the founder — so the name comes
-    -- from the person it belongs to and no fragile name-matching rename is
-    -- needed.
+    -- The joiner's personal allowance, under the name they chose at signup.
+    -- Created here, at join time, rather than pre-seeded by the founder — so
+    -- the name comes from the person it belongs to and no fragile
+    -- name-matching rename is needed.
     INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
-    VALUES (
-      invite_household_id,
-      COALESCE(NULLIF(signer_name, ''), split_part(lower(NEW.email), '@', 1)) || '''s Allowance',
-      '🧑', TRUE, TRUE
-    );
+    VALUES (invite_household_id, allowance_name, '🧑', TRUE, TRUE);
 
     RETURN NEW;
   END IF;
@@ -123,7 +134,7 @@ BEGIN
   VALUES (
     COALESCE(
       NULLIF(NEW.raw_user_meta_data->>'household_name', ''),
-      COALESCE(NULLIF(signer_name, ''), NEW.email) || '''s Household'
+      display_name || '''s Household'
     ),
     base_ccy,
     secondary_ccy
@@ -131,27 +142,52 @@ BEGIN
   RETURNING id INTO new_household_id;
 
   INSERT INTO public.users (id, email, full_name, household_id)
-  VALUES (NEW.id, NEW.email, signer_name, new_household_id);
+  VALUES (NEW.id, NEW.email, display_name, new_household_id);
 
-  -- Default spending categories (mirrors supabase/seeds/02_seed_categories.sql)
-  -- so the app is usable immediately; customization waits for the category UI.
-  INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active) VALUES
-    (new_household_id, 'Groceries', '🛒', FALSE, TRUE),
-    (new_household_id, 'Dining Out', '🍽️', FALSE, TRUE),
-    (new_household_id, 'Transportation', '🚌', FALSE, TRUE),
-    (new_household_id, 'Entertainment', '🎭', FALSE, TRUE),
-    (new_household_id, 'Shopping', '🛍️', FALSE, TRUE),
-    (new_household_id, 'Bills', '📋', FALSE, TRUE);
+  -- Spending categories chosen on the signup form. raw_user_meta_data is
+  -- caller-controlled, so clamp: keep only objects with a non-empty name and
+  -- icon (categories_icon_not_empty CHECK), trim + cap lengths, dedupe
+  -- case-insensitively by name (first occurrence wins), preserve the form's
+  -- order, and LIMIT to the form's cap (MAX_SIGNUP_CATEGORIES in
+  -- src/lib/validations.ts — keep the two in sync).
+  IF jsonb_typeof(NEW.raw_user_meta_data->'categories') = 'array' THEN
+    INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
+    SELECT new_household_id, c.name, c.icon, FALSE, TRUE
+    FROM (
+      SELECT DISTINCT ON (lower(left(btrim(value->>'name'), 40)))
+        left(btrim(value->>'name'), 40) AS name,
+        left(btrim(value->>'icon'), 16) AS icon,
+        ordinality
+      FROM jsonb_array_elements(NEW.raw_user_meta_data->'categories') WITH ORDINALITY AS t(value, ordinality)
+      WHERE jsonb_typeof(value) = 'object'
+        AND btrim(COALESCE(value->>'name', '')) <> ''
+        AND btrim(COALESCE(value->>'icon', '')) <> ''
+      ORDER BY lower(left(btrim(value->>'name'), 40)), ordinality
+    ) c
+    ORDER BY c.ordinality
+    LIMIT 20;
+    GET DIAGNOSTICS seeded_category_count = ROW_COUNT;
+  END IF;
 
-  -- One personal allowance for the founder. Partner allowances are created
-  -- when each partner joins (invited path above), named from their own signup
-  -- name.
+  -- Fallback when the metadata carried no usable categories (direct
+  -- auth.signUp call, legacy client, or a crafted payload): seed the classic
+  -- starter set (mirrors supabase/seeds/02_seed_categories.sql) so the
+  -- household is usable immediately.
+  IF seeded_category_count = 0 THEN
+    INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active) VALUES
+      (new_household_id, 'Groceries', '🛒', FALSE, TRUE),
+      (new_household_id, 'Dining Out', '🍽️', FALSE, TRUE),
+      (new_household_id, 'Transportation', '🚌', FALSE, TRUE),
+      (new_household_id, 'Entertainment', '🎭', FALSE, TRUE),
+      (new_household_id, 'Shopping', '🛍️', FALSE, TRUE),
+      (new_household_id, 'Bills', '📋', FALSE, TRUE);
+  END IF;
+
+  -- One personal allowance for the founder, under the name they chose at
+  -- signup. Partner allowances are created when each partner joins (invited
+  -- path above), named by the joiner themselves.
   INSERT INTO public.categories (household_id, name, icon, exclude_from_budget_total, is_active)
-  VALUES (
-    new_household_id,
-    COALESCE(NULLIF(signer_name, ''), split_part(lower(NEW.email), '@', 1)) || '''s Allowance',
-    '🧑', TRUE, TRUE
-  );
+  VALUES (new_household_id, allowance_name, '🧑', TRUE, TRUE);
 
   -- Partner emails: one invite row each. Skip blanks and self; a duplicate
   -- within this household is a clean no-op (ON CONFLICT). The LIMIT mirrors

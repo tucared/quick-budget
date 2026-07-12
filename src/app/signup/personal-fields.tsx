@@ -2,41 +2,36 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 interface PersonalFieldsProps {
-  fullName: string
-  onFullNameChange: (value: string) => void
   email: string
   onEmailChange: (value: string) => void
   password: string
   onPasswordChange: (value: string) => void
   confirmPassword: string
   onConfirmPasswordChange: (value: string) => void
+  allowanceName: string
+  onAllowanceNameChange: (value: string) => void
 }
 
 // Who's signing up. Always visible — unlike the household fields below it,
-// nothing here depends on whether the email turns out to be invited.
+// nothing here depends on whether the email turns out to be invited: an
+// invited joiner gets a personal allowance too, so the allowance name stays.
 export default function PersonalFields({
-  fullName,
-  onFullNameChange,
   email,
   onEmailChange,
   password,
   onPasswordChange,
   confirmPassword,
   onConfirmPasswordChange,
+  allowanceName,
+  onAllowanceNameChange,
 }: PersonalFieldsProps) {
   return (
     <>
-      <div className="space-y-2">
-        <Label htmlFor="fullName">Your name</Label>
-        <Input
-          id="fullName"
-          name="fullName"
-          value={fullName}
-          onChange={(e) => onFullNameChange(e.target.value)}
-          placeholder="Optional — defaults to your email name"
-          autoComplete="name"
-          autoFocus
-        />
+      <div className="space-y-1">
+        <p className="text-xs font-medium">Your account</p>
+        <p className="text-xs text-muted-foreground">
+          How you&apos;ll log in to Quick Budget.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -49,6 +44,7 @@ export default function PersonalFields({
           onChange={(e) => onEmailChange(e.target.value)}
           required
           autoComplete="email"
+          autoFocus
         />
       </div>
 
@@ -75,6 +71,23 @@ export default function PersonalFields({
           onChange={(e) => onConfirmPasswordChange(e.target.value)}
           required
           autoComplete="new-password"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="allowanceName">Your personal allowance</Label>
+        <p className="text-xs text-muted-foreground">
+          Everyone gets a personal budget for guilt-free spending that stays
+          out of the shared totals. Name yours however you like.
+        </p>
+        <Input
+          id="allowanceName"
+          name="allowanceName"
+          value={allowanceName}
+          onChange={(e) => onAllowanceNameChange(e.target.value)}
+          placeholder="e.g. Sam's fun money — optional"
+          autoComplete="off"
+          maxLength={40}
         />
       </div>
     </>

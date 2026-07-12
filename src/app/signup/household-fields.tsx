@@ -45,9 +45,10 @@ export default function HouseholdFields({
   return (
     <div className="space-y-4 pt-2 border-t border-border">
       <div className="space-y-1">
-        <p className="text-xs font-medium">About your household</p>
+        <p className="text-xs font-medium">Your household</p>
         <p className="text-xs text-muted-foreground">
-          Quick Budget groups spending by household — you&apos;re starting your own.
+          Budgets here are shared — one pot for you and anyone you invite.
+          Give it a name, or we&apos;ll make one from your email.
         </p>
       </div>
 
@@ -58,7 +59,7 @@ export default function HouseholdFields({
           name="householdName"
           value={householdName}
           onChange={(e) => onHouseholdNameChange(e.target.value)}
-          placeholder="Optional — defaults to your name"
+          placeholder="e.g. Casa Silva — optional"
           autoComplete="off"
         />
       </div>
@@ -99,18 +100,21 @@ export default function HouseholdFields({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Base currency is used for every budget and total and can&apos;t
-          be changed later. Secondary is the other option in the expense
-          form&apos;s currency toggle.
+          Every budget and total is shown in the base currency — it can&apos;t
+          be changed later, so pick the one you mostly spend in. The secondary
+          currency is the quick toggle on the expense form, for trips and
+          foreign spending.
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label>Invite partners (optional)</Label>
-        <p className="text-xs text-muted-foreground">
-          They&apos;ll join this household when they sign up with the email
-          you enter. Up to {MAX_PARTNER_EMAILS} partners.
-        </p>
+        <div className="space-y-1">
+          <p className="text-xs font-medium">Invite your partner</p>
+          <p className="text-xs text-muted-foreground">
+            When they sign up with this email, they&apos;ll join your household
+            automatically — no code needed. Up to {MAX_PARTNER_EMAILS} partners.
+          </p>
+        </div>
         {partnerEmails.map((value, index) => (
           <div key={index} className="flex gap-2">
             <Input
