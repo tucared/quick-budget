@@ -14,11 +14,15 @@ export const config = {
 // server component (redirects to /login when getUser() is empty). /signup is the
 // self-service household-creation entry point — reachable with no session; its
 // server component redirects an already-authenticated user to /expenses.
+// /api/signup/check-invite backs /signup's live invite detection and is
+// necessarily called pre-auth — it has its own IP rate limit and only ever
+// returns a boolean (see the route and public.check_pending_invite).
 const PUBLIC_PATHS = new Set([
   "/login",
   "/signup",
   "/auth/callback",
   "/auth/update-password",
+  "/api/signup/check-invite",
 ])
 
 // Default-deny for anything not in PUBLIC_PATHS: pages bounce to /login, API

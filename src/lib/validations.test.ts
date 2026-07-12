@@ -73,8 +73,10 @@ describe("signupSchema", () => {
     }
   })
 
-  it("requires a non-empty full name", () => {
-    expect(signupSchema.safeParse({ ...valid, fullName: "  " }).success).toBe(false)
+  it("treats fullName as optional", () => {
+    const { fullName: _drop, ...rest } = valid
+    expect(signupSchema.safeParse(rest).success).toBe(true)
+    expect(signupSchema.safeParse({ ...valid, fullName: "  " }).success).toBe(true)
   })
 
   it("accepts up to MAX_PARTNER_EMAILS partner emails and rejects one more", () => {

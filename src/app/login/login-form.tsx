@@ -147,7 +147,7 @@ export default function LoginForm({ initialError }: { initialError?: string }) {
                 href="/signup"
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                Create a household
+                Sign up
               </a>
             </CardFooter>
           </form>

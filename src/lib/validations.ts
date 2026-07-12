@@ -59,7 +59,9 @@ export const signupSchema = z
       .string()
       .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
     confirmPassword: z.string(),
-    fullName: z.string().trim().min(1, "Name is required"),
+    // Optional — handle_new_user() falls back to the email local-part when
+    // blank, so this stays a nicety, not a hard requirement.
+    fullName: z.string().trim().max(100, "Name is too long").optional(),
     householdName: z.string().trim().max(100, "Household name is too long").optional(),
     baseCurrency: currencyCode,
     secondaryCurrency: currencyCode,

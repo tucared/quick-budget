@@ -56,9 +56,10 @@ Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 
 ### Signup / create a household
 
-New households are self-service via `/signup` (linked from `/login` as "Create a
-household"). The founder enters their name, email + password, the household name
-and base/secondary currencies, and optionally partner email(s). The form calls
+New households are self-service via `/signup` (linked from `/login` as "Sign
+up"). The founder enters their email + password, an optional name, and — unless
+the email is detected as already invited (see below) — the household name and
+base/secondary currencies, plus optionally partner email(s). The form calls
 Supabase's public `supabase.auth.signUp` with the household details in
 `options.data`, and the `handle_new_user()` DB trigger does the rest:
 
@@ -69,6 +70,12 @@ Supabase's public `supabase.auth.signUp` with the household details in
   unconsumed invite, the trigger links them into that **existing** household
   (no new household, no duplicate categories), marks the invite consumed, and
   creates their personal allowance from the name they entered.
+
+As the visitor types their email, the form debounces a call to
+`POST /api/signup/check-invite` (a public, IP-rate-limited route backed by
+`public.check_pending_invite`) and collapses the household-setup fields
+automatically when that address is already invited, instead of asking them
+to notice a static disclaimer.
 
 This is the autonomous path: each person sets their own password via `signUp`,
 confirms their email, and lands in the app already scoped to the right household.

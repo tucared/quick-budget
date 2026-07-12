@@ -2,11 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { FALLBACK_RATES_TO_EUR } from "@/lib/currency"
 import { MAX_PARTNER_EMAILS, signupSchema } from "@/lib/validations"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Card,
   CardContent,
@@ -14,16 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import PersonalFields from "./personal-fields"
+import HouseholdFields from "./household-fields"
 
-// Currencies with a known EUR-pivot rate (so cross-rates resolve offline). Keep
-// EUR/BRL first to match the app's defaults.
-const CURRENCIES = Object.keys(FALLBACK_RATES_TO_EUR)
-
-// Mirror the Input component's classes so the native select sits flush with the
-// text inputs (no shadcn Select primitive exists in this project).
-const selectClassName =
-  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+const INVITE_CHECK_DEBOUNCE_MS = 500
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Map a Supabase auth signUp error to an actionable message. Several of these
 // surface project-level/Supabase limits rather than anything the form did wrong
@@ -65,6 +57,7 @@ export default function SignupForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [invited, setInvited] = useState(false)
   const errorRef = useRef<HTMLDivElement>(null)
 
   // The error banner sits at the top of a form that is taller than a phone
@@ -75,6 +68,35 @@ export default function SignupForm() {
       errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
     }
   }, [error])
+
+  // Live "have you been invited?" check as the visitor types their email —
+  // collapses the household fields below instead of showing them greyed out
+  // with a static disclaimer. Debounced and self-cancelling: a response for a
+  // stale email (changed mid-flight) is dropped rather than applied.
+  useEffect(() => {
+    if (!EMAIL_RE.test(email)) {
+      return
+    }
+    let cancelled = false
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/signup/check-invite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        })
+        if (cancelled) return
+        const data = await res.json()
+        setInvited(data?.invited === true)
+      } catch {
+        if (!cancelled) setInvited(false)
+      }
+    }, INVITE_CHECK_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [email])
 
   const updatePartner = (index: number, value: string) => {
     setPartnerEmails((prev) => prev.map((e, i) => (i === index ? value : e)))
@@ -95,7 +117,7 @@ export default function SignupForm() {
       email,
       password,
       confirmPassword,
-      fullName,
+      fullName: fullName.trim() || undefined,
       householdName: householdName.trim() || undefined,
       baseCurrency,
       secondaryCurrency,
@@ -118,7 +140,7 @@ export default function SignupForm() {
           // household + categories are already created by the DB trigger.
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/expenses`,
           data: {
-            full_name: parsed.data.fullName,
+            full_name: parsed.data.fullName ?? "",
             household_name: parsed.data.householdName ?? "",
             base_currency: parsed.data.baseCurrency,
             secondary_currency: parsed.data.secondaryCurrency,
@@ -148,7 +170,7 @@ export default function SignupForm() {
       <Card className="w-full max-w-md border-0 shadow-none bg-transparent">
         <CardHeader className="text-center">
           <CardTitle className="text-sm font-medium uppercase tracking-[0.15em]">
-            Create a household
+            Sign up
           </CardTitle>
         </CardHeader>
 
@@ -172,161 +194,43 @@ export default function SignupForm() {
                 </div>
               )}
 
-              <p className="text-xs text-muted-foreground">
-                Invited by a partner? Sign up with the email address they
-                invited and you&apos;ll join their household automatically —
-                the household fields below won&apos;t apply.
-              </p>
+              <PersonalFields
+                fullName={fullName}
+                onFullNameChange={setFullName}
+                email={email}
+                onEmailChange={setEmail}
+                password={password}
+                onPasswordChange={setPassword}
+                confirmPassword={confirmPassword}
+                onConfirmPasswordChange={setConfirmPassword}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Your name</Label>
-                <Input
-                  id="fullName"
-                  name="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  autoComplete="name"
-                  autoFocus
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="householdName">Household name</Label>
-                <Input
-                  id="householdName"
-                  name="householdName"
-                  value={householdName}
-                  onChange={(e) => setHouseholdName(e.target.value)}
-                  placeholder="Optional — defaults to your name"
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="baseCurrency">Base currency</Label>
-                    <select
-                      id="baseCurrency"
-                      name="baseCurrency"
-                      value={baseCurrency}
-                      onChange={(e) => setBaseCurrency(e.target.value)}
-                      className={cn(selectClassName)}
-                    >
-                      {CURRENCIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="secondaryCurrency">Secondary currency</Label>
-                    <select
-                      id="secondaryCurrency"
-                      name="secondaryCurrency"
-                      value={secondaryCurrency}
-                      onChange={(e) => setSecondaryCurrency(e.target.value)}
-                      className={cn(selectClassName)}
-                    >
-                      {CURRENCIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Base currency is used for every budget and total and can&apos;t
-                  be changed later. Secondary is the other option in the expense
-                  form&apos;s currency toggle.
+              {invited && EMAIL_RE.test(email) ? (
+                <p
+                  className="text-xs text-muted-foreground pt-2 border-t border-border"
+                  aria-live="polite"
+                >
+                  You&apos;ve been invited to join an existing household —
+                  sign up to join it. The household fields don&apos;t apply.
                 </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Invite partners (optional)</Label>
-                <p className="text-xs text-muted-foreground">
-                  They&apos;ll join this household when they sign up with the email
-                  you enter. Up to {MAX_PARTNER_EMAILS} partners.
-                </p>
-                {partnerEmails.map((value, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      type="email"
-                      value={value}
-                      onChange={(e) => updatePartner(index, e.target.value)}
-                      placeholder="partner@example.com"
-                      autoComplete="off"
-                      aria-label={`Partner email ${index + 1}`}
-                    />
-                    {partnerEmails.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removePartner(index)}
-                        aria-label={`Remove partner email ${index + 1}`}
-                      >
-                        ×
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                {partnerEmails.length < MAX_PARTNER_EMAILS && (
-                  <button
-                    type="button"
-                    onClick={addPartner}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    + Add another partner
-                  </button>
-                )}
-              </div>
+              ) : (
+                <HouseholdFields
+                  householdName={householdName}
+                  onHouseholdNameChange={setHouseholdName}
+                  baseCurrency={baseCurrency}
+                  onBaseCurrencyChange={setBaseCurrency}
+                  secondaryCurrency={secondaryCurrency}
+                  onSecondaryCurrencyChange={setSecondaryCurrency}
+                  partnerEmails={partnerEmails}
+                  onPartnerEmailChange={updatePartner}
+                  onAddPartner={addPartner}
+                  onRemovePartner={removePartner}
+                />
+              )}
             </CardContent>
             <CardFooter className="flex-col gap-3">
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating..." : "Create household"}
+                {loading ? "Signing up..." : "Sign up"}
               </Button>
               <a href="/login" className="text-xs text-muted-foreground hover:text-foreground">
                 Already have an account? Log in
