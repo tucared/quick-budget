@@ -59,14 +59,16 @@ Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 New households are self-service via `/signup` (linked from `/login` as "Sign
 up"). The founder enters their email + password, an optional name for their
 personal allowance, and — unless the email is detected as already invited (see
-below) — the household name, base/secondary currencies, their spending
-categories (starting blank, with one-tap suggestion chips for the classic six
-and free-form rows for custom ones; at least one required), plus optionally
-partner email(s). The form calls Supabase's public `supabase.auth.signUp` with
-the household details in `options.data`, and the `handle_new_user()` DB
+below) — the base/secondary currencies, their spending categories (one chip
+list: one-tap starters for the classic six plus custom ones added through an
+inline name + emoji row, which join the same list as chips; at least one
+required), plus optionally partner email(s). There is no household-name field
+— the household is named automatically ("<email name>'s Household") until a
+management UI exists. The form calls Supabase's public `supabase.auth.signUp`
+with the household details in `options.data`, and the `handle_new_user()` DB
 trigger does the rest:
 
-- **Founder** → creates the household with the chosen name/currencies, seeds
+- **Founder** → creates the household with the chosen currencies, seeds
   the categories picked on the form (falling back to the classic starter set
   when a signup arrives without any) + the founder's personal allowance, and
   writes a `household_invites` row per partner email (up to 10).

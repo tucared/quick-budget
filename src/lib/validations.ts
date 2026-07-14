@@ -34,13 +34,18 @@ export type ExpenseFormValues = z.infer<typeof expenseSchema>
 
 // Signup / create-household form validation schema.
 //
-// The founder enters their credentials, the household name + currencies,
-// their spending categories, and optionally partner email(s) to pre-authorize.
-// base_currency must differ from secondary_currency — they are the two options
-// of the expense form's toggle, and the DB enforces it
-// (households_currencies_distinct), so we reject an equal pair up front for a
-// clean message.
+// The founder enters their credentials, the currencies, their spending
+// categories, and optionally partner email(s) to pre-authorize. (The household
+// itself is named by the DB trigger from the founder's email — the form
+// doesn't collect a name.) base_currency must differ from secondary_currency —
+// they are the two options of the expense form's toggle, and the DB enforces
+// it (households_currencies_distinct), so we reject an equal pair up front for
+// a clean message.
 export const MIN_PASSWORD_LENGTH = 8
+
+// Shared by the signup form (gating the live invite check) and the
+// check-invite API route (validating its input) — keep the two in lockstep.
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Hard cap on partner invites per signup. Enforced in the form (no extra rows
 // past this), here, and by the LIMIT in handle_new_user()'s invite loop —
@@ -83,11 +88,9 @@ export const signupSchema = z
     password: z
       .string()
       .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
-    confirmPassword: z.string(),
     // Optional — handle_new_user() falls back to "<email name>'s Allowance"
     // when blank. Used verbatim when present (no suffix appended).
     allowanceName: z.string().trim().max(40, "Allowance name is too long").optional(),
-    householdName: z.string().trim().max(100, "Household name is too long").optional(),
     // Founder path only — the form omits this entirely for an invited signup
     // (the household/category sections are hidden), so absent is valid, but a
     // present list needs at least one entry: there is no in-app category
@@ -104,10 +107,6 @@ export const signupSchema = z
       .array(z.string().trim().email("Enter a valid email"))
       .max(MAX_PARTNER_EMAILS, `You can invite up to ${MAX_PARTNER_EMAILS} partners`)
       .default([]),
-  })
-  .refine((v) => v.password === v.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
   })
   .refine((v) => v.baseCurrency !== v.secondaryCurrency, {
     message: "Base and secondary currency must differ",

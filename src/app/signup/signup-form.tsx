@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import {
+  EMAIL_RE,
   MAX_PARTNER_EMAILS,
   MAX_SIGNUP_CATEGORIES,
   signupSchema,
@@ -22,7 +23,6 @@ import CategoryFields from "./category-fields"
 import AllowanceField from "./allowance-field"
 
 const INVITE_CHECK_DEBOUNCE_MS = 500
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Map a Supabase auth signUp error to an actionable message. Several of these
 // surface project-level/Supabase limits rather than anything the form did wrong
@@ -55,7 +55,6 @@ function signupErrorMessage(error: { message?: string; code?: string; status?: n
 export default function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
   const [allowanceName, setAllowanceName] = useState("")
   const [baseCurrency, setBaseCurrency] = useState("EUR")
   const [secondaryCurrency, setSecondaryCurrency] = useState("BRL")
@@ -119,10 +118,6 @@ export default function SignupForm() {
     setCategories((prev) =>
       prev.length >= MAX_SIGNUP_CATEGORIES ? prev : [...prev, category]
     )
-  const updateCategory = (index: number, patch: Partial<SignupCategory>) =>
-    setCategories((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, ...patch } : c))
-    )
   const removeCategory = (index: number) =>
     setCategories((prev) => prev.filter((_, i) => i !== index))
 
@@ -135,13 +130,13 @@ export default function SignupForm() {
     // invited signup, so only the founder path submits categories — the
     // schema's min-1 check must not fire for a joiner.
     const founder = !invited
-    const trimmedCategories = categories
-      .map((c) => ({ name: c.name.trim(), icon: c.icon.trim() }))
-      .filter((c) => c.name || c.icon !== "🏷️")
+    const trimmedCategories = categories.map((c) => ({
+      name: c.name.trim(),
+      icon: c.icon.trim(),
+    }))
     const parsed = signupSchema.safeParse({
       email,
       password,
-      confirmPassword,
       allowanceName: allowanceName.trim() || undefined,
       baseCurrency,
       secondaryCurrency,
@@ -165,10 +160,9 @@ export default function SignupForm() {
           // household + categories are already created by the DB trigger.
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/expenses`,
           data: {
+            // No household name is sent; the DB trigger names the household
+            // from the founder's email.
             allowance_name: parsed.data.allowanceName ?? "",
-            // No in-app household name; the DB trigger derives one from the
-            // founder's email.
-            household_name: "",
             base_currency: parsed.data.baseCurrency,
             secondary_currency: parsed.data.secondaryCurrency,
             invite_emails: parsed.data.inviteEmails,
@@ -229,12 +223,10 @@ export default function SignupForm() {
                 onEmailChange={setEmail}
                 password={password}
                 onPasswordChange={setPassword}
-                confirmPassword={confirmPassword}
-                onConfirmPasswordChange={setConfirmPassword}
               />
 
               {invited && EMAIL_RE.test(email) ? (
-                <div className="space-y-4 pt-4 border-t border-border">
+                <div className="pt-4 border-t border-border">
                   <p
                     className="text-xs text-muted-foreground"
                     aria-live="polite"
@@ -243,10 +235,6 @@ export default function SignupForm() {
                     password below to join — you&apos;ll share its budget and
                     categories.
                   </p>
-                  <AllowanceField
-                    allowanceName={allowanceName}
-                    onAllowanceNameChange={setAllowanceName}
-                  />
                 </div>
               ) : (
                 <>
@@ -263,13 +251,19 @@ export default function SignupForm() {
                   <CategoryFields
                     categories={categories}
                     onAdd={addCategory}
-                    onChange={updateCategory}
                     onRemove={removeCategory}
-                    allowanceName={allowanceName}
-                    onAllowanceNameChange={setAllowanceName}
                   />
                 </>
               )}
+
+              {/* Both paths get a personal allowance, so the field renders
+                  once, outside the founder/invited fork. */}
+              <div className="pt-2">
+                <AllowanceField
+                  allowanceName={allowanceName}
+                  onAllowanceNameChange={setAllowanceName}
+                />
+              </div>
             </CardContent>
             <CardFooter className="flex-col gap-3">
               <Button type="submit" className="w-full" disabled={loading}>

@@ -8,9 +8,7 @@ import {
 const valid = {
   email: "founder@example.com",
   password: "supersecret",
-  confirmPassword: "supersecret",
   allowanceName: "Founder's fun money",
-  householdName: "Our Home",
   baseCurrency: "EUR",
   secondaryCurrency: "BRL",
   inviteEmails: ["partner@example.com"],
@@ -32,25 +30,12 @@ describe("signupSchema", () => {
     if (result.success) expect(result.data.inviteEmails).toEqual([])
   })
 
-  it("treats householdName as optional", () => {
-    const { householdName: _drop, ...rest } = valid
-    expect(signupSchema.safeParse(rest).success).toBe(true)
-  })
-
   it("rejects an invalid email", () => {
     expect(signupSchema.safeParse({ ...valid, email: "nope" }).success).toBe(false)
   })
 
   it("rejects a short password", () => {
-    expect(signupSchema.safeParse({ ...valid, password: "short", confirmPassword: "short" }).success).toBe(false)
-  })
-
-  it("rejects mismatched passwords", () => {
-    const result = signupSchema.safeParse({ ...valid, confirmPassword: "different" })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues.some((i) => i.path.includes("confirmPassword"))).toBe(true)
-    }
+    expect(signupSchema.safeParse({ ...valid, password: "short" }).success).toBe(false)
   })
 
   it("rejects a non 3-letter currency code", () => {

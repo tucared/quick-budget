@@ -6,10 +6,9 @@ interface AllowanceFieldProps {
   onAllowanceNameChange: (value: string) => void
 }
 
-// Naming your personal allowance. Rendered both for a founder (grouped with the
-// spending categories, since an allowance is just another budget bucket) and for
-// an invited joiner (who still gets their own allowance). Kept as its own
-// component so both paths share one implementation.
+// Naming your personal allowance. Rendered once by the signup form, below the
+// founder/invited fork — both a founder and an invited joiner get their own
+// allowance, so the field applies to either path.
 export default function AllowanceField({
   allowanceName,
   onAllowanceNameChange,

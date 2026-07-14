@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { createRateLimiter, rateLimitResponse } from "@/lib/rate-limit"
+import { EMAIL_RE } from "@/lib/validations"
 
 // Called pre-auth from the /signup form as the visitor types their email, so
 // there's no user id to key on — rate-limit by IP instead. 10/min is enough
 // for a debounced input on one form field, not enough to make scraping the
 // public.check_pending_invite RPC (see supabase/schemas/05_rpcs.sql) practical.
 const rateLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 })
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // POST /api/signup/check-invite { email } -> { invited: boolean }
 //
