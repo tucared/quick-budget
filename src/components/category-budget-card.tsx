@@ -31,6 +31,11 @@ interface CategoryBudgetCardProps {
   // The household's base currency — all amounts on this card are denominated in
   // it. Defaults to EUR for the original household / standalone usage.
   baseCurrency?: string
+  // Compact-only fallback label when `budget` is null (no allocation for this
+  // month yet): `budget_summary` has no row to read the name/icon from, so
+  // the caller passes the category's own values instead.
+  categoryName?: string
+  categoryIcon?: string
 }
 
 function CategoryBudgetCardImpl({
@@ -47,6 +52,8 @@ function CategoryBudgetCardImpl({
   showFraction = false,
   trailing,
   baseCurrency = "EUR",
+  categoryName,
+  categoryIcon,
 }: CategoryBudgetCardProps) {
   if (loading) {
     return (
@@ -57,6 +64,35 @@ function CategoryBudgetCardImpl({
   }
 
   if (!budget) {
+    // Compact variant (expense form / edit dialog): keep the same row shape
+    // as a normal bar — name, fraction, and `trailing` (the Cap checkbox or
+    // overflow-allowance picker) all still need to render here, otherwise a
+    // month with no allocation silently drops the checkbox and the cap split
+    // applies with no way to turn it off. Just gray out the bar itself.
+    if (compact) {
+      return (
+        <div className="px-2.5 py-1.5 rounded-md border bg-muted/40 border-border">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="flex items-center gap-1 min-w-0 text-xs font-medium text-muted-foreground">
+              {categoryIcon && <span className="shrink-0 leading-none">{categoryIcon}</span>}
+              <span className="truncate">{categoryName}</span>
+              {showFraction && additionalAmount > 0 && (
+                <span className="shrink-0 font-normal">
+                  ({formatCurrency(additionalAmount, 2, baseCurrency)})
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {trailing}
+              <span className="text-xs text-muted-foreground">No budget set</span>
+            </div>
+          </div>
+          <div className="h-1 bg-border rounded-full overflow-hidden">
+            <div className="h-full w-full bg-muted-foreground/25" />
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="px-2.5 py-2 bg-[hsl(36,40%,94%)] border border-[hsl(36,30%,78%)] rounded-md text-xs text-[hsl(24,85%,42%)]">
         No budget set for this category this month
