@@ -162,6 +162,10 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
       : undefined
     return stored ?? allowanceCategories[0]?.id ?? null
   }, [selectedOverflowId, allowanceCategories])
+  const effectiveOverflowCategoryObj = useMemo(
+    () => allowanceCategories.find((c) => c.id === effectiveOverflowCategoryId) ?? null,
+    [allowanceCategories, effectiveOverflowCategoryId],
+  )
 
   // The cap is controlled by tapping the category tile itself (JTBD #8): when
   // the selected category is capped and the amount exceeds the cap, re-tapping
@@ -668,6 +672,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                   budget={categoryBudget}
                   compact
                   showFraction={isSplit}
+                  categoryName={selectedCategoryObj?.name}
+                  categoryIcon={selectedCategoryObj?.icon}
                   trailing={
                     showCapControl ? (
                       <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer select-none">
@@ -696,6 +702,8 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
                     budget={overflowBudgetToShow}
                     compact
                     showFraction
+                    categoryName={effectiveOverflowCategoryObj?.name}
+                    categoryIcon={effectiveOverflowCategoryObj?.icon}
                     trailing={
                       allowanceCategories.length > 1 ? (
                         <div className="flex gap-1">

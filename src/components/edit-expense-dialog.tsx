@@ -178,6 +178,10 @@ function EditExpenseForm({
       : undefined
     return stored ?? allowanceCategories[0]?.id ?? null
   }, [selectedOverflowId, allowanceCategories])
+  const effectiveOverflowCategoryObj = useMemo(
+    () => allowanceCategories.find((c) => c.id === effectiveOverflowCategoryId) ?? null,
+    [allowanceCategories, effectiveOverflowCategoryId],
+  )
 
   // Mirror the expense form's split derivation. `isSplit` drives the inline
   // budget-bar treatment; `showCapControl` decides whether the "Cap" checkbox
@@ -585,6 +589,8 @@ function EditExpenseForm({
               budget={rebasedPrimaryBudget}
               compact
               showFraction={isSplit}
+              categoryName={selectedCategoryObj?.name}
+              categoryIcon={selectedCategoryObj?.icon}
               trailing={
                 showCapControl ? (
                   <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer select-none">
@@ -610,6 +616,8 @@ function EditExpenseForm({
                 budget={rebasedOverflowBudget}
                 compact
                 showFraction
+                categoryName={effectiveOverflowCategoryObj?.name}
+                categoryIcon={effectiveOverflowCategoryObj?.icon}
                 trailing={
                   allowanceCategories.length > 1 ? (
                     <div className="flex gap-1">
