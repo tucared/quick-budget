@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase"
+import { setPasswordWithVaultAuth } from "@/lib/auth/vault-auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -37,7 +38,9 @@ export default function UpdatePasswordForm() {
     setLoading(true)
     try {
       const supabase = createClient()
-      const { error: updateError } = await supabase.auth.updateUser({ password })
+      // Stores the password as its KDF-derived auth secret and, for a first-time
+      // user, establishes their E2E vault. See src/lib/auth/vault-auth.ts.
+      const { error: updateError } = await setPasswordWithVaultAuth(supabase, password)
 
       if (updateError) {
         const isNetwork = updateError.message?.toLowerCase().includes("fetch")

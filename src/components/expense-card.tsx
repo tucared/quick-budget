@@ -6,12 +6,16 @@ import { Pencil, Trash2 } from "lucide-react"
 import type { Category } from "@/lib/types"
 import { formatCurrency } from "@/lib/currency"
 import { useCurrency } from "@/lib/contexts/user-context"
+import { useDecryptedDescription } from "@/lib/expenses/use-decrypted-description"
 import { parseLocalDate } from "@/lib/date-utils"
 
 interface ExpenseCardExpense {
   id: string
   category_id: string | null
   description: string | null
+  // Encrypted field blob (E2E). Present on full rows; the card decrypts the
+  // description from it when the vault is unlocked, else uses the plaintext.
+  enc_blob?: unknown
   is_cash: boolean
   amount: number
   currency: string
@@ -50,6 +54,7 @@ function ExpenseCardImpl({
   onDelete,
 }: ExpenseCardProps) {
   const { baseCurrency, format: fmt } = useCurrency()
+  const description = useDecryptedDescription(expense)
   // Imported (Tricount) rows are read-only here — managed on the Sync tab.
   const imported = !!importedFrom
   const showActions = !imported
@@ -78,7 +83,7 @@ function ExpenseCardImpl({
                   {/* When a description is set it replaces the category name as
                       the title; otherwise the category name stands in. */}
                   <span className="font-medium truncate min-w-0">
-                    {expense.description || category?.name || "Uncategorized"}
+                    {description || category?.name || "Uncategorized"}
                   </span>
                   {expense.is_cash && (
                     <span className="shrink-0 text-[10px] tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
@@ -184,6 +189,7 @@ function SplitExpenseCardImpl({
   onDelete,
 }: SplitExpenseCardProps) {
   const { baseCurrency, format: fmt } = useCurrency()
+  const description = useDecryptedDescription(primary)
   const totalConverted = Number(primary.converted_amount) + Number(overflow.converted_amount)
   const showForeign = primary.currency !== baseCurrency
   const foreignTotal = showForeign ? Number(primary.amount) + Number(overflow.amount) : 0
@@ -218,8 +224,8 @@ function SplitExpenseCardImpl({
                   Cash
                 </span>
               )}
-              {primary.description && (
-                <span className="text-sm font-medium truncate">{primary.description}</span>
+              {description && (
+                <span className="text-sm font-medium truncate">{description}</span>
               )}
             </div>
             <div className="relative flex items-start">

@@ -17,6 +17,8 @@ import { CategoryTileSelector, buildCategoryOptions } from "@/components/categor
 import { AmountInputWithCurrency, type AmountInputHandle } from "@/components/amount-input-with-currency"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useUser } from "@/lib/contexts/user-context"
+import { useVault } from "@/lib/contexts/vault-context"
+import { sealExpenseFields } from "@/lib/expenses/encryption"
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value"
 
 interface ExpenseFormProps {
@@ -33,6 +35,7 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCategoryIds, externalRefreshSignal }: ExpenseFormProps) {
   const { user } = useUser()
+  const { vault } = useVault()
   const householdId = user?.householdId
   // The household's accounting + secondary currency drive the form's currency
   // toggle, conversion target, and all displayed amounts. Default to EUR/BRL
@@ -460,23 +463,35 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         submitDerivation.exceedsCap && applyCap && !!effectiveOverflowCategoryId
       const overflowCategoryIdToUse = effectiveOverflowCategoryId
 
+      // Encrypt the description into enc_blob, dual-written alongside the
+      // plaintext column. Ids are minted client-side so the blob's AAD pins to
+      // the row's actual id (the split path already minted its split_group_id
+      // client-side). A locked vault seals nothing → plaintext-only row.
+      const sealDescription = data.description || null
+
       let savedRows: Expense[] | null = null
       if (shouldSplit) {
         const splitGroupId = crypto.randomUUID()
+        const primaryId = crypto.randomUUID()
+        const overflowId = crypto.randomUUID()
         const rows = [
           {
+            id: primaryId,
             ...sharedFields,
             category_id: data.category_id,
             amount: submitDerivation.primaryOriginal,
             converted_amount: submitDerivation.primaryBase,
             split_group_id: splitGroupId,
+            enc_blob: await sealExpenseFields(vault, primaryId, { description: sealDescription }),
           },
           {
+            id: overflowId,
             ...sharedFields,
             category_id: overflowCategoryIdToUse,
             amount: submitDerivation.overflowOriginal,
             converted_amount: submitDerivation.overflowBase,
             split_group_id: splitGroupId,
+            enc_blob: await sealExpenseFields(vault, overflowId, { description: sealDescription }),
           },
         ]
         const { data: inserted, error: insertError } = await supabase
@@ -490,13 +505,16 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
         }
         savedRows = (inserted ?? []) as Expense[]
       } else {
+        const id = crypto.randomUUID()
         const { data: savedExpense, error: insertError } = await supabase
           .from("expenses")
           .insert({
+            id,
             ...sharedFields,
             category_id: data.category_id,
             amount: data.amount,
             converted_amount: round2(data.amount * exchangeRate),
+            enc_blob: await sealExpenseFields(vault, id, { description: sealDescription }),
           })
           .select()
           .single()

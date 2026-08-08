@@ -161,3 +161,55 @@ CREATE POLICY "Household members can update tricount entry map" ON tricount_entr
 
 CREATE POLICY "Household members can delete tricount entry map" ON tricount_entry_map
   FOR DELETE USING (household_id = private.get_my_household_id());
+
+-- ============================================================================
+-- USER_KEY_MATERIAL
+-- ============================================================================
+-- A user manages only their OWN key material, but household members may READ
+-- each other's row so a partner can fetch the public_key needed to wrap the HDK
+-- for them. The private-key ciphertext is readable too but useless without that
+-- member's password.
+ALTER TABLE user_key_material ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Members can view household key material" ON user_key_material
+  FOR SELECT USING (
+    user_id = (SELECT auth.uid()) OR household_id = private.get_my_household_id()
+  );
+
+CREATE POLICY "Users can insert own key material" ON user_key_material
+  FOR INSERT WITH CHECK (
+    user_id = (SELECT auth.uid())
+    AND household_id = private.get_my_household_id()
+  );
+
+CREATE POLICY "Users can update own key material" ON user_key_material
+  FOR UPDATE
+  USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (
+    user_id = (SELECT auth.uid())
+    AND household_id = private.get_my_household_id()
+  );
+
+CREATE POLICY "Users can delete own key material" ON user_key_material
+  FOR DELETE USING (user_id = (SELECT auth.uid()));
+
+-- ============================================================================
+-- HOUSEHOLD_HDK_WRAP
+-- ============================================================================
+-- Household-scoped throughout: any member may read all wraps (each is only
+-- openable by its target member's private key), and any member may write a wrap
+-- for someone in the household — that is how access is granted on onboarding and
+-- restored on password recovery.
+ALTER TABLE household_hdk_wrap ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Household members can view hdk wraps" ON household_hdk_wrap
+  FOR SELECT USING (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can insert hdk wraps" ON household_hdk_wrap
+  FOR INSERT WITH CHECK (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can update hdk wraps" ON household_hdk_wrap
+  FOR UPDATE USING (household_id = private.get_my_household_id());
+
+CREATE POLICY "Household members can delete hdk wraps" ON household_hdk_wrap
+  FOR DELETE USING (household_id = private.get_my_household_id());

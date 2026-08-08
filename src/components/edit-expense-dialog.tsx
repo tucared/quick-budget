@@ -9,6 +9,8 @@ import { fetchConversionRate } from "@/lib/currency"
 import { getErrorMessage } from "@/lib/error-handler"
 import { deriveCapState, partitionSplitSiblings, round2 } from "@/lib/split-utils"
 import { useUser } from "@/lib/contexts/user-context"
+import { useVault } from "@/lib/contexts/vault-context"
+import { sealExpenseFields } from "@/lib/expenses/encryption"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { CategoryBudgetCard } from "@/components/category-budget-card"
@@ -82,6 +84,7 @@ function EditExpenseForm({
   onDeleted,
 }: EditExpenseFormProps) {
   const { user } = useUser()
+  const { vault } = useVault()
   const baseCurrency = user?.baseCurrency ?? "EUR"
   const secondaryCurrency = user?.secondaryCurrency ?? "BRL"
   const excludeFlags = useMemo(() => {
@@ -365,6 +368,11 @@ function EditExpenseForm({
         description: data.description || null,
       } as const
 
+      // Re-seal the description into enc_blob per row (dual-written with the
+      // plaintext column). Each row seals to its own id so the AAD pins the
+      // blob to the row; a locked vault seals nothing → plaintext-only.
+      const sealDescription = data.description || null
+
       // Re-derive against the authoritative rate. `wantsSplitNow` may differ
       // from the form's `wantsSplit` if the rate moved between render and save
       // (e.g., overnight rate refresh).
@@ -386,6 +394,7 @@ function EditExpenseForm({
             amount: data.amount,
             converted_amount: round2(data.amount * exchangeRate),
             category_id: data.category_id,
+            enc_blob: await sealExpenseFields(vault, primaryRow.id, { description: sealDescription }),
           })
           .eq("id", primaryRow.id)
           .select()
@@ -401,9 +410,11 @@ function EditExpenseForm({
       // spend — which is what update-first would do if the insert failed.
       else if (!wasSplit && wantsSplitNow) {
         const splitGroupId = crypto.randomUUID()
+        const overflowId = crypto.randomUUID()
         const { data: inserted, error: insertError } = await supabase
           .from("expenses")
           .insert({
+            id: overflowId,
             logged_by_user_id: primaryRow.logged_by_user_id,
             household_id: primaryRow.household_id,
             category_id: overflowCategoryIdToUse,
@@ -411,6 +422,7 @@ function EditExpenseForm({
             converted_amount: submitDerivation.overflowBase,
             split_group_id: splitGroupId,
             ...sharedFields,
+            enc_blob: await sealExpenseFields(vault, overflowId, { description: sealDescription }),
           })
           .select()
           .single()
@@ -423,6 +435,7 @@ function EditExpenseForm({
             converted_amount: submitDerivation.primaryBase,
             category_id: data.category_id,
             split_group_id: splitGroupId,
+            enc_blob: await sealExpenseFields(vault, primaryRow.id, { description: sealDescription }),
           })
           .eq("id", primaryRow.id)
           .select()
@@ -449,6 +462,7 @@ function EditExpenseForm({
               amount: submitDerivation.primaryOriginal,
               converted_amount: submitDerivation.primaryBase,
               category_id: data.category_id,
+              enc_blob: await sealExpenseFields(vault, primaryRow.id, { description: sealDescription }),
             })
             .eq("id", primaryRow.id)
             .select()
@@ -460,6 +474,7 @@ function EditExpenseForm({
               amount: submitDerivation.overflowOriginal,
               converted_amount: submitDerivation.overflowBase,
               category_id: overflowCategoryIdToUse,
+              enc_blob: await sealExpenseFields(vault, initialOverflowRow.id, { description: sealDescription }),
             })
             .eq("id", initialOverflowRow.id)
             .select()
@@ -485,6 +500,7 @@ function EditExpenseForm({
             converted_amount: round2(data.amount * exchangeRate),
             category_id: data.category_id,
             split_group_id: null,
+            enc_blob: await sealExpenseFields(vault, primaryRow.id, { description: sealDescription }),
           })
           .eq("id", primaryRow.id)
           .select()
