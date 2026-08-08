@@ -143,6 +143,12 @@ export default function LoginForm({ initialError }: { initialError?: string }) {
               >
                 Forgot password?
               </button>
+              <a
+                href="/signup"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Sign up
+              </a>
             </CardFooter>
           </form>
         ) : (

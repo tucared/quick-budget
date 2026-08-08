@@ -1,49 +1,12 @@
--- Utility functions used by tables, triggers, and RLS policies.
---
--- This file is part of the declarative schema. PRs that touch
--- supabase/schemas/** trigger .github/workflows/generate-migration.yml,
--- which runs `supabase db diff` and auto-commits any generated migration
--- to the PR branch. A comment-only change like this one is a no-op for
--- the diff and serves as a smoke test that the workflow runs cleanly.
 
--- Automatically create (or join) a household once a signup is CONFIRMED.
---
--- Two paths, keyed off whether the new user's email matches an unconsumed
--- household_invites row (case-insensitive):
---   - Invited member: link to that existing household, consume the invite, and
---     create their personal allowance (named from the allowance_name they
---     chose at signup, falling back to "<email name>'s Allowance"). No new
---     household and no spending-category seeding — they inherit the founder's.
---   - Founder: create a household reading name/currencies from the signup form's
---     raw_user_meta_data (falling back to the legacy defaults), seed the
---     spending categories chosen on the signup form (clamped and deduped, max
---     20; the classic 6-category starter set when none are usable) + the
---     founder's own allowance, then write an invite row per partner email
---     (capped at 10) so the partner can self-join later. Partner allowances are
---     NOT pre-seeded — each is created at join time under the joiner's own
---     chosen name, so there is no placeholder naming or rename-on-join to keep
---     consistent.
---
--- Fires from two triggers (see DATA_MODEL decision #1, "Timing"):
---   - on_auth_user_created (AFTER INSERT): acts only when the row is already
---     confirmed — the seed path and SQL-provisioned users. A real signUp
---     inserts unconfirmed and is a no-op here.
---   - on_auth_user_confirmed (AFTER UPDATE, hand-authored migration): fires on
---     the email_confirmed_at NULL→NOT NULL transition, i.e. when the user
---     clicks the confirmation link. This is what materializes a real signup —
---     an abandoned signup leaves only an unconfirmed auth.users row (no ghost
---     household), and an invite can only be consumed by someone who can
---     actually receive mail at the invited address.
---
--- raw_user_meta_data is the `options.data` passed to supabase.auth.signUp(),
--- read at confirmation time. Everything is schema-qualified because
--- search_path is empty.
+set check_function_bodies = off;
+
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 DECLARE
   new_household_id UUID;
   invite_household_id UUID;
@@ -211,25 +174,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$;
+$function$
+;
 
--- Trigger-only function: block direct REST/RPC calls from every role. Must
--- revoke from PUBLIC *and* the explicit default API roles — Supabase auto-grants
--- EXECUTE to anon/authenticated/service_role on creation, so REVOKE FROM PUBLIC
--- alone leaves those explicit grants in place.
-REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated, service_role;
 
--- Automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$;
-
--- Trigger-only function: block direct REST/RPC calls from every role.
-REVOKE EXECUTE ON FUNCTION public.update_updated_at_column() FROM PUBLIC, anon, authenticated, service_role;

@@ -360,3 +360,36 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.get_expenses_and_categories(TEXT, INT, DATE) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_expenses_and_categories(TEXT, INT, DATE) TO authenticated;
+
+-- ============================================================================
+-- CHECK PENDING INVITE
+-- ============================================================================
+-- Public existence check backing the /signup form's live invite detection
+-- (src/app/api/signup/check-invite/route.ts): as the visitor types their
+-- email, the form asks "is there a pending household_invites row for this
+-- address?" and collapses the household-setup fields when true, instead of
+-- showing them greyed out with a static disclaimer.
+--
+-- Deliberately public (GRANT ... TO anon below) and deliberately narrow: it
+-- returns a bare boolean, never the household id/name, so at most a caller
+-- confirms "someone invited this address somewhere" — not who, or to what.
+-- That is still a small email-enumeration oracle (anyone can probe arbitrary
+-- addresses); the mitigation is the per-IP rate limit on the calling API
+-- route, not this function. SECURITY DEFINER is required because the RLS
+-- policy on household_invites only lets a household's own members read their
+-- rows — anon has no path to this table otherwise.
+CREATE OR REPLACE FUNCTION public.check_pending_invite(check_email TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM household_invites
+    WHERE lower(email) = lower(check_email) AND consumed_at IS NULL
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.check_pending_invite(TEXT) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_pending_invite(TEXT) TO anon, authenticated;

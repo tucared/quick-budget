@@ -1,6 +1,6 @@
 # Quick Budget
 
-Fast expense tracking and flexible budgeting for partners. Used daily by a two-person household splitting expenses across EUR and BRL.
+Fast expense tracking and flexible budgeting for partners. Built for the author's two-person household (EUR/BRL), now self-service — anyone can create their own household at `/signup`.
 
 Scope: running discretionary spending only. Rent, subscriptions, and other fixed costs are netted out upstream — the monthly target represents what's left to spend day-to-day, so even spending across the month is a realistic baseline.
 
@@ -54,6 +54,75 @@ Visit http://localhost:3000 — login with `user1@example.com` / `password1`
 > start` keeps signing with HS256, so login appears to work then redirects
 > straight back to `/login`.
 
+### Signup / create a household
+
+New households are self-service via `/signup` (linked from `/login` as "Sign
+up"). The founder enters their email + password, an optional name for their
+personal allowance, and — unless the email is detected as already invited (see
+below) — the household name, base/secondary currencies, their spending
+categories (starting blank, with one-tap suggestion chips for the classic six
+and free-form rows for custom ones; at least one required), plus optionally
+partner email(s). The form calls Supabase's public `supabase.auth.signUp` with
+the household details in `options.data`, and the `handle_new_user()` DB
+trigger does the rest:
+
+- **Founder** → creates the household with the chosen name/currencies, seeds
+  the categories picked on the form (falling back to the classic starter set
+  when a signup arrives without any) + the founder's personal allowance, and
+  writes a `household_invites` row per partner email (up to 10).
+- **Invited partner** → when someone signs up with an email that matches an
+  unconsumed invite, the trigger links them into that **existing** household
+  (no new household, no duplicate categories), marks the invite consumed, and
+  creates their personal allowance under the name they chose.
+
+As the visitor types their email, the form debounces a call to
+`POST /api/signup/check-invite` (a public, IP-rate-limited route backed by
+`public.check_pending_invite`) and collapses the household-setup fields
+automatically when that address is already invited, instead of asking them
+to notice a static disclaimer.
+
+This is the autonomous path: each person sets their own password via `signUp`,
+confirms their email, and lands in the app already scoped to the right household.
+There is **no** service-role key in this project, so accounts can't be
+admin-provisioned — invite routing through the public `signUp` is how a second
+member joins. Category and household *management* UIs are deferred; the
+categories chosen at signup are the starting point.
+
+**Supabase config required (per environment — Dev/Prod dashboards under
+Authentication):** enable **Signups**, turn **Confirm email** ON, and keep the
+app origin + `/auth/callback` in the redirect allowlist (see below). Custom
+SMTP is needed for real delivery; locally, confirmation mail lands in Mailpit.
+
+#### Operating signup when you share the link
+
+`/signup` is a public, unauthenticated endpoint, but nothing is materialized
+until the confirmation link is clicked — `handle_new_user()` fires on the
+`email_confirmed_at` transition, so an abandoned signup leaves a single
+unconfirmed row under Auth → Users and no household (see DATA_MODEL.md
+decision #1, "Timing"). When sharing the link with a handful of known people,
+two things to keep an eye on:
+
+- **Email delivery is the real bottleneck.** Supabase's built-in mailer is
+  rate-limited to a few sends/hour, so a cluster of signups will silently fail
+  to deliver confirmations. Configure **custom SMTP** before sharing the link.
+  (Captcha / bot protection isn't needed for a privately-shared link — only
+  enable it if `/signup` ever gets linked publicly or indexed.)
+- **Stale rows accumulate.** Unconfirmed signups linger in Auth → Users (delete
+  them there to free the address), and invited partners may never sign up — in
+  particular, an invite sent to someone who **already has an account** can never
+  be consumed (there is no "join a household" flow for existing users), so it
+  stays pending forever. Inspect pending invites periodically:
+
+```sql
+-- Pending invites: who you invited that hasn't joined yet, and how long ago.
+select h.name as household, hi.email as invited_email, hi.created_at,
+       date_trunc('day', now() - hi.created_at) as age
+from public.household_invites hi
+join public.households h on h.id = hi.household_id
+where hi.consumed_at is null
+order by hi.created_at;
+```
+
 ### Password recovery / onboarding
 
 Login is email + password (`signInWithPassword`). There is also a self-service
@@ -73,10 +142,11 @@ environment — local `supabase/config.toml`, and the Dev/Prod dashboards under
 Authentication → URL Configuration):
 
 - The app origin + `/auth/callback` must be in the **redirect URL allowlist**
-  (locally, `[auth].additional_redirect_urls` plus the app's `site_url`).
+  (locally, `[auth].additional_redirect_urls` plus the app's `site_url`). The
+  same allowlist covers the signup email-confirmation link.
 - Email delivery uses the project's SMTP. Supabase's built-in email is
-  rate-limited; configure custom SMTP for real users. Locally, recovery mail
-  lands in Mailpit (http://localhost:54324).
+  rate-limited; configure custom SMTP for real users. Locally, recovery and
+  confirmation mail land in Mailpit (http://localhost:54324).
 
 ### Useful URLs
 

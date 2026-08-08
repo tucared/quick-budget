@@ -33,6 +33,48 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.households TO service_role;
 REVOKE SELECT ON public.households FROM anon;
 
 -- ============================================================================
+-- HOUSEHOLD_INVITES
+-- ============================================================================
+-- Pre-authorizes an email to join an existing household at signup. The founder
+-- lists partner email(s) when creating the household; handle_new_user() writes a
+-- row here per email. When that person later self-signs-up, handle_new_user()
+-- matches their email to an unconsumed invite and links them to this household
+-- (instead of creating a new one), then stamps consumed_at. There is no service-
+-- role key in this app, so accounts can't be admin-provisioned — invite routing
+-- via the public signUp + this trigger is how a second member joins.
+--
+-- Only the SECURITY DEFINER trigger writes this table; authenticated callers get
+-- SELECT only (future household-management UI), no INSERT/UPDATE/DELETE.
+CREATE TABLE household_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- At most one outstanding (unconsumed) invite per email per household,
+-- case-insensitive. Scoped to the household (not global) so two households can
+-- independently invite the same address; handle_new_user() resolves a sign-up
+-- to the oldest pending invite.
+CREATE UNIQUE INDEX idx_household_invites_email_pending
+  ON household_invites (household_id, lower(email)) WHERE consumed_at IS NULL;
+
+CREATE INDEX idx_household_invites_household ON household_invites(household_id);
+
+GRANT SELECT ON public.household_invites TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.household_invites TO service_role;
+-- Belt-and-braces only. `db diff` does not emit REVOKEs, so the generated
+-- migration carries just the GRANTs above and this statement never executes on
+-- Dev/Prod (declarative schema files only run against shadow/local databases).
+-- That is acceptable: hosted projects don't default-grant anon on
+-- migration-created tables (verified on Dev — anon holds no grants on peer
+-- tables like households either), and RLS is the actual gate regardless (the
+-- SELECT policy resolves private.get_my_household_id() to NULL for anon →
+-- zero rows). Invite emails are PII — keep both layers.
+REVOKE SELECT ON public.household_invites FROM anon;
+
+-- ============================================================================
 -- USERS
 -- ============================================================================
 CREATE TABLE users (
@@ -49,10 +91,23 @@ CREATE INDEX idx_users_household ON users(household_id);
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Auth trigger: create user profile on signup
+-- Auth triggers: materialize the household once a signup is confirmed.
+-- handle_new_user() no-ops while email_confirmed_at is NULL, so the INSERT
+-- trigger only acts on pre-confirmed rows (seeds, SQL-provisioned users) and
+-- real signups materialize at the confirmation click via the UPDATE trigger.
+-- Both live on auth.users, outside the `db diff --schema public` scope — these
+-- declarations are informational; the INSERT trigger is owned by the baseline
+-- migration and the UPDATE trigger by
+-- supabase/migrations/20260711160000_fire_handle_new_user_on_email_confirmation.sql.
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+CREATE TRIGGER on_auth_user_confirmed
+  AFTER UPDATE ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email_confirmed_at IS NULL AND NEW.email_confirmed_at IS NOT NULL)
+  EXECUTE FUNCTION public.handle_new_user();
 
 -- RLS helper: returns the caller's household_id without triggering RLS on
 -- public.users. Lives in the `private` schema (set up in 00_setup.sql) so

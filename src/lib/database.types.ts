@@ -226,6 +226,38 @@ export type Database = {
           },
         ]
       }
+      household_invites: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          household_id: string
+          id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          household_id: string
+          id?: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          household_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_invites_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       households: {
         Row: {
           base_currency: string
@@ -480,6 +512,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      check_pending_invite: { Args: { check_email: string }; Returns: boolean }
       get_expenses_and_categories: {
         Args: { p_limit?: number; p_mode: string; p_month?: string }
         Returns: Json
