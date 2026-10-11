@@ -58,3 +58,21 @@ When setting up the new system, I want to import my expense and budget data from
 ### [x] JTBD #11: Sync shared expenses from Tricount
 When we already track some shared spending in a Tricount, I want to connect it once and have our household's share flow into Quick Budget automatically, so we see a complete picture without re-entering expenses by hand. Connect one or more tricount share links on the **Sync** tab; each sync (manual "Sync"/"Sync all" or automatically once per session on app load) pulls the whole ledger and reconciles new, changed, and removed entries into the shared **Tricount** category. Synced rows are tagged read-only with their tricount name (managed on the Sync tab — Unlink & delete removes a tricount and its imported expenses; pause to freeze a finished one as history). Only the share belonging to assigned household members is counted — a per-tricount mapping editor lets you explicitly assign each tricount member to a household person or exclude them (mapping is always explicit: unassigned members aren't counted until you map them). A tricount that's over can be paused (skipped by syncs, its expenses frozen as history) and resumed later. Each tricount also carries a **timezone** (set on the Sync tab) so a synced expense lands on the same calendar day it shows in Tricount — entry timestamps come back in UTC, so without it evening entries can slip a day. Because the mirrored amount is the household's *share* (what we consumed) rather than the cash that left the wallet, the app also surfaces month-end cashflow: the **Budget** page shows the month's actual **cash out** (what really left the wallet — share replaced by what was paid, income netted in, so no manual math against the total), and the **Sync** tab shows the per-tricount owe/owed breakdown ("you paid €Y · your share €X → …"). This reads who paid each entry and includes `INCOME` entries (which feed reconciliation but are never tracked as spend); actually settling the debt is out of scope. See DATA_MODEL.md (decision #9) for the data model; implementation lives in `src/lib/tricount/`.
 
+
+---
+
+## Full Household Ledger
+
+Planned — see [docs/plans/ledger.md](./docs/plans/ledger.md) for the target model, decisions and stages.
+
+### [ ] JTBD #12: Track all income, spending and long-term pots in one ledger
+When money comes in, goes out (including fixed recurring costs) or moves between our pots (Safety Net, Holidays, allowances…), I want to record it in Quick Budget, so the app is our single ledger instead of a side tool next to a spreadsheet — while the monthly discretionary view keeps working as today.
+
+### [ ] JTBD #13: Close a month and export it for reconciliation
+When a month is over, I want to close it (resetting monthly pots into Unallocated and locking it) and export the ledger and month-end pot balances in our sheet's format, so I can reconcile against bank balances without re-typing anything.
+
+### [ ] JTBD #14: Categorise each Tricount expense
+When our share of a Tricount expense syncs in, I want to assign it to the right pot, so shared spending with friends counts against the budget it belongs to — and the cash we fronted or owe is tracked separately from what we actually consumed.
+
+### [ ] JTBD #15: Prefill recurring costs and monthly allocations
+When a new month starts, I want to insert our fixed recurring costs and the usual monthly allocations from a template (all at once or one by one), so setting up the month takes seconds and only the exceptions need attention.
