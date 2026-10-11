@@ -3,6 +3,7 @@
 - Read @PROGRESS.md when JTBD are mentionned
 - Read @DATA_MODEL.md when planning for data changes
 - Read @README.md to know about the stack and how to launch server
+- Read `docs/plans/ledger.md` before working on the full-ledger migration (pots, transactions, month close, JTBD #12–#15); tick its stage checkbox in the PR that ships it
 - Keep all *.md files mentionned up to date when you perform changes or see drift
 
 # Development guidelines

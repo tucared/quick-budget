@@ -4,6 +4,29 @@
 
 Normalized (2NF-3NF) approach optimized for transactional workloads with simple analytical queries.
 
+A move to a full household ledger (pots, transactions, month close) is planned in [docs/plans/ledger.md](./docs/plans/ledger.md). This file keeps describing the schema **as it is today** until each stage ships.
+
+## Naming Conventions
+
+Apply to every new table/column. Existing names that break them are renamed opportunistically (the ledger plan's stage 1 covers most).
+
+| What | Pattern | Examples |
+|---|---|---|
+| Tables | plural snake_case noun | `households`, `tricount_links` |
+| Instant (`TIMESTAMPTZ`) | `<past verb>_at` | `created_at`, `last_synced_at`, `closed_at` |
+| Actor | `<past verb>_by_user_id`, paired with its `_at` | `created_by_user_id`, `closed_by_user_id` |
+| Calendar day (`DATE`) | `<noun>_date` | `expense_date`, `rate_date`, `ledger_start_date` |
+| Month (`DATE`, 1st of month, CHECKed) | `budget_month` | `budget_allocations.budget_month` |
+| Boolean | `is_<positive adjective>` — no negative flags | `is_active`, `is_cash` |
+| Money (`DECIMAL(12,2)`) | `amount` or `<role>_amount`; in the household base currency unless prefixed `original_` | `cap_amount`, `original_amount` |
+| Currency code | `currency` or `<role>_currency` | `base_currency`, `original_currency` |
+| Foreign key | `<role>_<singular table>_id` (role optional when unambiguous) | `household_id`, `owner_user_id`, `tricount_link_id` |
+| Correlation key (no FK) | `group_id` — documented exception to the FK rule | `split_group_id` (today) |
+| Enum-like text | `role` / `status`, snake_case values; never `type` | `role = 'unallocated'` |
+| Hide / pause | `is_active` (not `archived_at`) | `categories.is_active` |
+
+Known deviations today: `exclude_from_budget_total` (negative flag), `logged_by_user_id` (no `logged_at` pair), `tricount_entry_map.link_id`, `paid_converted_amount` / `share_converted_amount`, `converted_amount` naming — all scheduled for the ledger plan's stage 1/2.
+
 ## Entity Relationship Diagram
 
 ```mermaid
