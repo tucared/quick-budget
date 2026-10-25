@@ -1,6 +1,6 @@
 # pi sandbox on the Raspberry Pi
 
-Runs the [pi](https://pi.dev) coding agent on this repo inside a rootless podman container. Setting up the host from scratch: [HOST.md](./HOST.md). The container sits on an internal-only network; its only way out is a tinyproxy that allows the hosts in `allowlist.txt` plus the Dev Supabase host.
+Runs the [pi](https://pi.dev) coding agent on this repo inside a rootless podman container. Setting up the host from scratch: [HOST.md](./HOST.md). What's next: [ROADMAP.md](./ROADMAP.md). The container sits on an internal-only network; its only way out is a tinyproxy that allows the hosts in `allowlist.txt` plus the Dev Supabase host.
 
 ```
 tmux "pi" ── run.sh ── pi container (pi-internal, no route out)
