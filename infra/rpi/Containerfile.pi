@@ -26,6 +26,9 @@ RUN npm install -g --ignore-scripts --before="${NPM_BEFORE}" "@earendil-works/pi
 
 RUN git config --system credential.https://github.com.helper '!gh auth git-credential'
 
+# Stops Chromium's Google background services (the proxy blocks them anyway; this keeps its log readable).
+COPY chromium-policy.json /etc/chromium/policies/managed/quiet.json
+
 ENV npm_config_ignore_scripts=true \
     PI_SKIP_VERSION_CHECK=1 \
     PI_TELEMETRY=0 \
