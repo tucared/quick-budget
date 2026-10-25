@@ -80,7 +80,7 @@ The matching `CREATE FUNCTION` and `CREATE TRIGGER` declarations in `supabase/sc
 
 | Workflow | When | What |
 |---|---|---|
-| `Generate Migration` | PR touching `supabase/schemas/**` (or `apply-to-dev` label) | `db diff` → commit migration + types; `db push --linked` if labeled |
+| `Generate Migration` | PR touching `supabase/schemas/**` (or `apply-to-dev` label) | `db diff` → commit migration + types; `db push --linked` in a separate `apply-to-dev` job (fresh runner, `supabase-dev` environment) if labeled |
 | `Migrate Prod` | Push to main touching `supabase/migrations/**` | `supabase db push` to Prod + security advisors gate |
 | `Reset Dev` | Daily 05:00 UTC + push to main touching `supabase/**` | Wipes Dev and reapplies main's migration chain |
 | `Backup Prod` | Daily 03:00 UTC | `pg_dump` of Prod |

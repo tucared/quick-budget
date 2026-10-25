@@ -12,6 +12,7 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
+    environment: supabase-prod
     timeout-minutes: 10
 
     steps:

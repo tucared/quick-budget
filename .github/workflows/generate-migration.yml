@@ -35,10 +35,12 @@ name: Generate Migration
 # developer forgets `npm run types:generate` locally, the bot commits the
 # updated file alongside (or instead of) the migration.
 #
-# If the PR carries the `apply-to-dev` label, the final step pushes the
-# resulting migration chain to the Dev Supabase project (via `supabase db
-# push`), so an agent can dogfood the schema change without an extra MCP
-# round-trip. Labeling fires the workflow even when no code changed.
+# If the PR carries the `apply-to-dev` label, the separate `apply-to-dev` job
+# pushes the resulting migration chain to the Dev Supabase project (via
+# `supabase db push`), so an agent can dogfood the schema change without an
+# extra MCP round-trip. Labeling fires the workflow even when no code changed.
+# It's a separate job so the Supabase token never shares a runner with
+# PR-branch code (`npm ci`, tests).
 #
 # Why: lets agents (Claude Code on the web, etc.) iterate on schemas without
 # needing local Docker for `supabase start`. The CLI-generated migration is
@@ -221,12 +223,29 @@ jobs:
               body: `Bot committed ${items.join(' + ')}.\n\nReview before merging — pull the bot's commit if you have a local checkout.`
             });
 
-      # `db push` is idempotent (tracks applied versions in supabase_migrations)
-      # so this safely no-ops if the migration chain already matches Dev.
-      # Multiple labeled PRs open at once will share Dev — daily reset-dev.yml
-      # at 05:00 UTC cleans up.
-      - name: Push migration chain to Dev (label-gated)
-        if: contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
+  # `db push` is idempotent (tracks applied versions in supabase_migrations)
+  # so this safely no-ops if the migration chain already matches Dev.
+  # Multiple labeled PRs open at once will share Dev — daily reset-dev.yml
+  # at 05:00 UTC cleans up.
+  apply-to-dev:
+    needs: generate
+    if: contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: supabase-dev
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+
+      - name: Push migration chain to Dev
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DEV_DB_PASSWORD }}

@@ -190,22 +190,27 @@ Schemas are **declarative**. By default you don't hand-write SQL in `supabase/mi
 
 ### Dogfooding a schema change on Dev before merge
 
-Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs `supabase db push` against the Dev project after generating the migration. This lets an agent dogfood the change end-to-end. The daily `reset-dev.yml` cron at 05:00 UTC cleans Dev back to `main`'s state.
+Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs `supabase db push` against the Dev project after generating the migration (in a separate job, so the token never shares a runner with PR-branch code). This lets an agent dogfood the change end-to-end. The daily `reset-dev.yml` cron at 05:00 UTC cleans Dev back to `main`'s state.
 
 ### Prod migration setup (one-time)
 
-1. Create an access token at https://supabase.com/dashboard/account/tokens
-2. In your GitHub repo, go to **Settings → Secrets and variables → Actions**
-3. Add the following repository secrets:
+1. Create two scoped access tokens at https://supabase.com/dashboard/account/tokens, one per project (not Legacy full-access):
+   - `gh-actions-supabase-prod` — Prod only: Project Settings, API Keys, API Key Secrets, Advisors (all Read)
+   - `gh-actions-supabase-dev` — Dev only: Project Settings, API Keys, API Key Secrets (all Read)
+2. In your GitHub repo, go to **Settings → Environments** and create two environments:
+   - **`supabase-prod`** — Deployment branches: **Selected branches → `main`** only, so a dispatch on another branch gets no Prod secrets.
+   - **`supabase-dev`** — no branch restriction (the `apply-to-dev` job runs on PR branches).
+3. Add the following **environment** secrets (no Supabase secrets at repository level):
 
-| Secret | Used by | What |
-|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | migrate-prod, reset-dev, generate-migration | Personal access token (from step 1) |
-| `SUPABASE_PROD_PROJECT_REF` | migrate-prod | Prod project ref (Supabase Dashboard → Project Settings) |
-| `SUPABASE_DB_PASSWORD` | migrate-prod | Prod database password |
-| `SUPABASE_DEV_PROJECT_REF` | reset-dev, generate-migration (apply-to-dev) | Dev project ref |
-| `SUPABASE_DEV_DB_PASSWORD` | reset-dev, generate-migration (apply-to-dev) | Dev database password |
-| `SUPABASE_DB_URL` | backup-prod | Prod pooler connection string (see Backups below) |
+| Secret | Environment | Used by | What |
+|---|---|---|---|
+| `SUPABASE_ACCESS_TOKEN` | both | migrate-prod, reset-dev, generate-migration (apply-to-dev) | That environment's scoped token (from step 1) |
+| `SUPABASE_PROD_PROJECT_REF` | `supabase-prod` | migrate-prod | Prod project ref (Supabase Dashboard → Project Settings) |
+| `SUPABASE_DB_PASSWORD` | `supabase-prod` | migrate-prod | Prod database password |
+| `SUPABASE_DB_URL` | `supabase-prod` | backup-prod | Prod pooler connection string (see Backups below) |
+| `SUPABASE_DEV_PROJECT_REF` | `supabase-dev` | reset-dev, generate-migration (apply-to-dev) | Dev project ref |
+| `SUPABASE_DEV_DB_PASSWORD` | `supabase-dev` | reset-dev, generate-migration (apply-to-dev) | Dev database password |
+| `SUPABASE_DEV_DB_URL`, `DEV_SEED_PASSWORD` | `supabase-dev` | reset-dev (optional seed-password rotation) | Dev pooler URL + private seed password |
 
 ### Manually resetting Dev
 
@@ -223,8 +228,8 @@ Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump`
 ### Setup (one-time, after creating Supabase project)
 
 1. Get your database connection string from **Supabase → Project Overview → Database → Connection string (URI), method Transaction pooler**
-2. In your GitHub repo, go to **Settings → Secrets and variables → Actions**
-3. Add a new repository secret:
+2. In your GitHub repo, go to **Settings → Environments → `supabase-prod`**
+3. Add a new environment secret:
    - **Name**: `SUPABASE_DB_URL`
    - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
    - **Important**: If your database password contains special characters, URL-encode them (e.g., `!` → `%21`, `@` → `%40`, `#` → `%23`)
