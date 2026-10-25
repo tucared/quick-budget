@@ -15,6 +15,17 @@ fi
 
 mkdir -p "$state/agent" "$state/npm"
 cp "$here/agent/AGENTS.md" "$here/agent/settings.json" "$state/agent/"
+# The token stays a ${...} reference; pi expands it from the container env.
+cat > "$state/agent/mcp.json" <<JSON
+{
+  "mcpServers": {
+    "supabase-dev": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=${SUPABASE_DEV_REF}&features=database,docs",
+      "headers": { "Authorization": "Bearer \${SUPABASE_DEV_MCP_TOKEN}" }
+    }
+  }
+}
+JSON
 { cat "$here/allowlist.txt"; printf '^%s\\.supabase\\.co$\n' "$SUPABASE_DEV_REF"; } > "$state/allowlist"
 
 podman network exists pi-internal || podman network create --internal --subnet 10.89.7.0/24 pi-internal
@@ -41,7 +52,7 @@ exec podman run --rm -it --name pi \
   -e NO_PROXY=localhost,127.0.0.1 -e no_proxy=localhost,127.0.0.1 \
   -e NODE_USE_ENV_PROXY=1 \
   -e AGENT_BROWSER_PROXY=$proxy -e AGENT_BROWSER_PROXY_BYPASS=localhost,127.0.0.1 \
-  -e OPENROUTER_API_KEY -e GH_TOKEN \
+  -e OPENROUTER_API_KEY -e GH_TOKEN -e SUPABASE_DEV_MCP_TOKEN \
   -v "$state/agent:/home/node/.pi/agent" \
   -v "$state/npm:/home/node/.npm" \
   -v "$workspace:/workspace" \

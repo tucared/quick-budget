@@ -36,6 +36,10 @@ ssh rpi sandbox/build.sh
 
 The image ships Debian's Chromium (Chrome for Testing has no Linux ARM build); `AGENT_BROWSER_EXECUTABLE_PATH` and `AGENT_BROWSER_PROXY` point agent-browser at it and the proxy, and `chromium-policy.json` turns off its Google background services. `run.sh` writes a Dev `.env.local` into the workspace on first launch. pi starts `next dev` itself; dev server + browser use about 1.5 GB of the 5 GB cap.
 
+## Supabase MCP
+
+`run.sh` writes `~/.pi/agent/mcp.json` pointing at `mcp.supabase.com` for the Dev project (`database,docs` tools), authenticated by `SUPABASE_DEV_MCP_TOKEN`: a personal access token scoped to Dev only, Database read-write, no Migrations, so `apply_migration` fails and Prod is unreachable. Check with `pi mcp list`.
+
 ## Storage
 
 Rootless podman must use `overlay` via `fuse-overlayfs` (HOST.md §1.6). The `vfs` fallback copies every layer in full — tens of GB on the SD card and builds that stall the whole host, Pi-hole included. `build.sh` ends with a throwaway `--userns=keep-id` run so any first-run ownership remapping happens at build time, not when `run.sh` starts.
