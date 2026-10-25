@@ -29,12 +29,13 @@ exec podman run --rm -it --name pi \
   --log-driver=none \
   --network pi-internal \
   --userns=keep-id \
-  --memory=5g --memory-swap=5g --pids-limit=2048 \
+  --memory=5g --memory-swap=5g --pids-limit=2048 --shm-size=1g \
   --cap-drop=ALL --security-opt=no-new-privileges \
   -e HOME=/home/node \
   -e HTTPS_PROXY=$proxy -e HTTP_PROXY=$proxy -e https_proxy=$proxy -e http_proxy=$proxy \
   -e NO_PROXY=localhost,127.0.0.1 -e no_proxy=localhost,127.0.0.1 \
   -e NODE_USE_ENV_PROXY=1 \
+  -e AGENT_BROWSER_PROXY=$proxy -e AGENT_BROWSER_PROXY_BYPASS=localhost,127.0.0.1 \
   -e OPENROUTER_API_KEY -e GH_TOKEN \
   -v "$state/agent:/home/node/.pi/agent" \
   -v "$state/npm:/home/node/.npm" \
