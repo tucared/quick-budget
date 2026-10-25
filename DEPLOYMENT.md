@@ -195,8 +195,8 @@ Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs 
 ### Prod migration setup (one-time)
 
 1. Create two scoped access tokens at https://supabase.com/dashboard/account/tokens, one per project (not Legacy full-access):
-   - `gh-actions-supabase-prod` — Prod only: Project Settings, API Keys, API Key Secrets, Advisors (all Read)
-   - `gh-actions-supabase-dev` — Dev only: Project Settings, API Keys, API Key Secrets (all Read)
+   - `gh-actions-supabase-prod` — Prod only: Project Settings, API Keys, API Key Secrets, Connection Pooling, Advisors (all Read)
+   - `gh-actions-supabase-dev` — Dev only: Project Settings, API Keys, API Key Secrets, Connection Pooling (all Read)
 2. In your GitHub repo, go to **Settings → Environments** and create two environments:
    - **`supabase-prod`** — Deployment branches: **Selected branches → `main`** only, so a dispatch on another branch gets no Prod secrets.
    - **`supabase-dev`** — no branch restriction (the `apply-to-dev` job runs on PR branches).
