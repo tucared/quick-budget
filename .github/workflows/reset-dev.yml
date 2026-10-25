@@ -20,7 +20,7 @@ concurrency:
 jobs:
   reset:
     runs-on: ubuntu-latest
-    environment: supabase-dev
+    environment: Preview
     timeout-minutes: 10
 
     steps:
@@ -42,7 +42,7 @@ jobs:
       # password (`password1`) in supabase/seeds/01_create_users.sql is a
       # working credential for anyone who reads the repo. This step replaces
       # it after every reset with a private one. Opt-in: it only runs when
-      # these are set in the `supabase-dev` environment —
+      # these are set in the `Preview` environment —
       #   DEV_SEED_PASSWORD      secret: the password Dev logins should actually use
       #   SUPABASE_POOLER_HOST   variable: pooler host from the dashboard
       # Until they're set, Dev keeps the public seed password (status quo).
