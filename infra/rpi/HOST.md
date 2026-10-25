@@ -20,8 +20,14 @@ Fresh SD card → working rpi (Pi-hole for the TV + the pi sandbox). Run the hos
    ```bash
    sudo apt-get update
    sudo apt-get install -y tmux mosh rsync nftables unattended-upgrades \
-     podman netavark aardvark-dns slirp4netns uidmap
+     podman netavark aardvark-dns slirp4netns uidmap fuse-overlayfs
    sudo loginctl enable-linger max
+   ```
+6. Rootless podman storage. Without this, podman 4.3 falls back to `vfs`, which stores every layer as a full copy (tens of GB, builds that saturate the SD card):
+   ```bash
+   mkdir -p ~/.config/containers
+   printf '[storage]\ndriver = "overlay"\n\n[storage.options.overlay]\nmount_program = "/usr/bin/fuse-overlayfs"\n' > ~/.config/containers/storage.conf
+   podman info --format '{{.Store.GraphDriverName}}'   # overlay
    ```
 
 ## 2. Pi-hole
