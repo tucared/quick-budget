@@ -30,7 +30,15 @@ ssh rpi sandbox/build.sh
 - `cmux ssh-tmux rpi` (desktop) or `mosh rpi -- tmux attach -t pi` (phone)
 - Window 1 runs pi; when it exits you get a host shell — `~/sandbox/run.sh` relaunches
 - Shell in the running container: `podman exec -it pi bash`; standalone shell: `~/sandbox/run.sh shell`
-- Proxy log (denied hosts show up here): `podman logs -f pi-proxy`
+- Proxy log (denied hosts show up here): `podman logs -f pi-proxy | grep -i filtered`. `pi.dev` (pi's own startup check) is denied on purpose.
+
+## Dogfooding
+
+The image ships Debian's Chromium (Chrome for Testing has no Linux ARM build); `AGENT_BROWSER_EXECUTABLE_PATH` and `AGENT_BROWSER_PROXY` point agent-browser at it and the proxy, and `chromium-policy.json` turns off its Google background services. `run.sh` writes a Dev `.env.local` into the workspace on first launch. pi starts `next dev` itself; dev server + browser use about 1.5 GB of the 5 GB cap.
+
+## Storage
+
+Rootless podman must use `overlay` via `fuse-overlayfs` (HOST.md §1.6). The `vfs` fallback copies every layer in full — tens of GB on the SD card and builds that stall the whole host, Pi-hole included. `build.sh` ends with a throwaway `--userns=keep-id` run so any first-run ownership remapping happens at build time, not when `run.sh` starts.
 
 ## Pins
 

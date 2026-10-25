@@ -30,7 +30,9 @@ Files under `infra/rpi/host/` go to `/etc` and need `sudo install` by the user (
 ```bash
 ssh rpi 'systemctl --user is-active pi-tmux.service; tmux ls; podman ps --format "{{.Names}} {{.Status}}"'
 ssh rpi 'podman logs --tail 50 pi-proxy'     # denied hosts show as 403 / "Filtered"
+ssh rpi "podman info --format '{{.Store.GraphDriverName}}'; df -h / | tail -1"   # must be overlay, not vfs
 ```
+`pi.dev` denials are expected. A build or start that seems to hang and a filling SD card both point at `vfs` storage (README → Storage).
 
 ## Allowing a new host
 
