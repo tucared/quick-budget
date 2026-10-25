@@ -200,17 +200,17 @@ Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs 
 2. In your GitHub repo, go to **Settings → Environments** and create two environments:
    - **`supabase-prod`** — Deployment branches: **Selected branches → `main`** only, so a dispatch on another branch gets no Prod secrets.
    - **`supabase-dev`** — no branch restriction (the `apply-to-dev` job runs on PR branches).
-3. Add the following **environment** secrets (no Supabase secrets at repository level):
+3. In **each** environment, add the same names with that project's values (no Supabase secrets at repository level):
 
-| Secret | Environment | Used by | What |
+| Name | Kind | Used by | What |
 |---|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | both | migrate-prod, reset-dev, generate-migration (apply-to-dev) | That environment's scoped token (from step 1) |
-| `SUPABASE_PROD_PROJECT_REF` | `supabase-prod` | migrate-prod | Prod project ref (Supabase Dashboard → Project Settings) |
-| `SUPABASE_DB_PASSWORD` | `supabase-prod` | migrate-prod | Prod database password |
-| `SUPABASE_DB_URL` | `supabase-prod` | backup-prod | Prod pooler connection string (see Backups below) |
-| `SUPABASE_DEV_PROJECT_REF` | `supabase-dev` | reset-dev, generate-migration (apply-to-dev) | Dev project ref |
-| `SUPABASE_DEV_DB_PASSWORD` | `supabase-dev` | reset-dev, generate-migration (apply-to-dev) | Dev database password |
-| `SUPABASE_DEV_DB_URL`, `DEV_SEED_PASSWORD` | `supabase-dev` | reset-dev (optional seed-password rotation) | Dev pooler URL + private seed password |
+| `SUPABASE_ACCESS_TOKEN` | secret | migrate-prod, reset-dev, apply-to-dev | That environment's scoped token (from step 1) |
+| `SUPABASE_PROJECT_REF` | secret | all | Project ref (Supabase Dashboard → Project Settings) |
+| `SUPABASE_DB_PASSWORD` | secret | all | Database password |
+| `SUPABASE_POOLER_HOST` | variable | backup-prod, reset-dev (seed rotation) | Pooler host, e.g. `aws-0-eu-west-3.pooler.supabase.com` (Dashboard → Connect) |
+| `DEV_SEED_PASSWORD` | secret, `supabase-dev` only | reset-dev (optional seed rotation) | Private password for Dev seed users |
+
+The connection URL is built from ref + pooler host, with the password passed via `PGPASSWORD`.
 
 ### Manually resetting Dev
 
@@ -227,14 +227,9 @@ Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump`
 
 ### Setup (one-time, after creating Supabase project)
 
-1. Get your database connection string from **Supabase → Project Overview → Database → Connection string (URI), method Transaction pooler**
-2. In your GitHub repo, go to **Settings → Environments → `supabase-prod`**
-3. Add a new environment secret:
-   - **Name**: `SUPABASE_DB_URL`
-   - **Value**: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
-   - **Important**: If your database password contains special characters, URL-encode them (e.g., `!` → `%21`, `@` → `%40`, `#` → `%23`)
-4. Confirm the recipient public key is in place: `.github/backup-recipient.txt` should contain a single `age1pq1...` line. The matching private key is in 1Password as "Quick Budget backup key" — without it backups cannot be restored.
-5. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Backup Prod → Run workflow**.
+1. Make sure `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` and the `SUPABASE_POOLER_HOST` variable are set in the `supabase-prod` environment (see Prod migration setup above). The workflow connects through the transaction pooler (port 6543).
+2. Confirm the recipient public key is in place: `.github/backup-recipient.txt` should contain a single `age1pq1...` line. The matching private key is in 1Password as "Quick Budget backup key" — without it backups cannot be restored.
+3. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Backup Prod → Run workflow**.
 
 ### Restoring from backup
 
