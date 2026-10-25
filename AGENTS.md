@@ -10,6 +10,7 @@
 - Use the `dogfood` skill for exploratory UI testing (test one viewport in general, 2 for larger changes)
    - Safari on iOS: run `agent-browser set viewport 402 714` after `open`
    - Firefox on Android: run `agent-browser set viewport 427 804` after `open`
+- Use Supabase MCP instead of docker for interacting with the database
 - Seeds are committed directly in `supabase/seeds/` with fake data
 - **Database schema changes** — invoke the `supabase-schema-flow` skill for the declarative-vs-hand-authored split, the `apply-to-dev` label flow, how views (`budget_summary`) are hand-authored outside the declarative chain, and the full CI map. Defaults: edit `supabase/schemas/` (never hand-write `supabase/migrations/` unless the skill says you should), and after schema changes regenerate types via `npm run types:generate` (or let the workflow do it).
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
@@ -28,8 +29,6 @@
 - **Seed data awareness.** Creating real expenses during testing affects budget summaries and category totals. Clean up test data immediately after verification, preferably via SQL.
 
 # Claude Code only
-
-- Use Supabase MCP instead of docker for interacting with the database
 
 ## Cloud environment (Claude Code web)
 
