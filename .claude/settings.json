@@ -1,7 +1,6 @@
 {
   "permissions": {
     "ask": [
-      "Write(supabase/migrations/**)",
       "Edit(supabase/migrations/**)"
     ]
   },
