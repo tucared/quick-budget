@@ -1,0 +1,6 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "openrouter/pareto-code",
+  "defaultProjectTrust": "always",
+  "enableInstallTelemetry": false
+}

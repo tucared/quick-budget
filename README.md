@@ -124,6 +124,7 @@ Functionalist visual direction inspired by Dieter Rams and Braun industrial desi
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Production deployment guide
 - **[DATA_MODEL.md](./DATA_MODEL.md)** — Database schema and design decisions
 - **[PROGRESS.md](./PROGRESS.md)** — Feature roadmap
+- **[infra/rpi/README.md](./infra/rpi/README.md)** — pi coding agent sandbox on a Raspberry Pi
 
 ## License
 
