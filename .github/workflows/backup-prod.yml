@@ -41,7 +41,9 @@ jobs:
 
       - name: Run pg_dump and encrypt
         env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Password via PGPASSWORD so special characters need no URL-encoding.
+          DATABASE_URL: postgresql://postgres.${{ secrets.SUPABASE_PROJECT_REF }}@${{ vars.SUPABASE_POOLER_HOST }}:6543/postgres
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
