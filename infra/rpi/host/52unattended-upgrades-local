@@ -1,0 +1,5 @@
+// Extra origins on top of Debian's defaults in 50unattended-upgrades.
+Unattended-Upgrade::Origins-Pattern {
+	"origin=Tailscale";
+	"origin=Raspberry Pi Foundation";
+};
