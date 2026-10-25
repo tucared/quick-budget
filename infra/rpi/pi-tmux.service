@@ -1,0 +1,13 @@
+[Unit]
+Description=tmux session running the pi sandbox
+After=network-online.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/env tmux new-session -d -s pi -n pi "%h/sandbox/run.sh; exec bash"
+ExecStop=/usr/bin/env tmux kill-session -t pi
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

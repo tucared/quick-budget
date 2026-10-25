@@ -1,0 +1,38 @@
+FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+
+ARG PI_VERSION=1.3.0
+ARG JJ_VERSION=0.46.0
+ARG JJ_SHA256=80e28f7501c11e50e0ca06cd6a1fa1d982cff9cc59bfe4411a9d36aa501d867e
+ARG GH_VERSION=2.102.0
+ARG GH_SHA256=7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484
+# Transitive npm deps of pi resolve as of this date (7-day cooldown).
+ARG NPM_BEFORE=2026-10-18
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl fd-find git ripgrep \
+  && ln -s /usr/bin/fdfind /usr/local/bin/fd \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN cd /tmp \
+  && curl -fsSLo jj.tgz "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-aarch64-unknown-linux-musl.tar.gz" \
+  && echo "${JJ_SHA256}  jj.tgz" | sha256sum -c - \
+  && tar -xzf jj.tgz -C /usr/local/bin ./jj \
+  && curl -fsSLo gh.tgz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_arm64.tar.gz" \
+  && echo "${GH_SHA256}  gh.tgz" | sha256sum -c - \
+  && tar -xzf gh.tgz -C /usr/local/bin --strip-components=2 "gh_${GH_VERSION}_linux_arm64/bin/gh" \
+  && rm -f jj.tgz gh.tgz
+
+RUN npm install -g --ignore-scripts --before="${NPM_BEFORE}" "@earendil-works/pi-coding-agent@${PI_VERSION}"
+
+RUN git config --system credential.https://github.com.helper '!gh auth git-credential'
+
+ENV npm_config_ignore_scripts=true \
+    PI_SKIP_VERSION_CHECK=1 \
+    PI_TELEMETRY=0 \
+    NEXT_TELEMETRY_DISABLED=1 \
+    JJ_USER="Tucared (pi)" \
+    JJ_EMAIL=20599978+tucared@users.noreply.github.com
+
+USER node
+WORKDIR /workspace
+ENTRYPOINT ["pi"]
