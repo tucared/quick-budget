@@ -232,7 +232,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'apply-to-dev')
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: supabase-dev
+    environment: Preview
     permissions:
       contents: read
 

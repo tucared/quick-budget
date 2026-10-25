@@ -197,9 +197,9 @@ Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs 
 1. Create two scoped access tokens at https://supabase.com/dashboard/account/tokens, one per project (not Legacy full-access):
    - `gh-actions-supabase-prod` — Prod only: Project Settings, API Keys, API Key Secrets, Connection Pooling, Advisors (all Read)
    - `gh-actions-supabase-dev` — Dev only: Project Settings, API Keys, API Key Secrets, Connection Pooling (all Read)
-2. In your GitHub repo, go to **Settings → Environments** and create two environments:
-   - **`supabase-prod`** — Deployment branches: **Selected branches → `main`** only, so a dispatch on another branch gets no Prod secrets.
-   - **`supabase-dev`** — no branch restriction (the `apply-to-dev` job runs on PR branches).
+2. In your GitHub repo, go to **Settings → Environments**. Vercel's GitHub integration already creates two environments named after its own (`Production`, `Preview`), so CI reuses those rather than adding parallel ones — **Production = Prod Supabase, Preview = Dev Supabase**, mirroring Vercel's own mapping:
+   - **`Production`** — Deployment branches: **Selected branches → `main`** only, so a dispatch on another branch gets no Prod secrets. Vercel's production deploys come from `main`, so they're unaffected.
+   - **`Preview`** — no branch restriction (the `apply-to-dev` job runs on PR branches).
 3. In **each** environment, add the same names with that project's values (no Supabase secrets at repository level):
 
 | Name | Kind | Used by | What |
@@ -208,7 +208,7 @@ Add the **`apply-to-dev`** label to your PR. `generate-migration.yml` then runs 
 | `SUPABASE_PROJECT_REF` | secret | all | Project ref (Supabase Dashboard → Project Settings) |
 | `SUPABASE_DB_PASSWORD` | secret | all | Database password |
 | `SUPABASE_POOLER_HOST` | variable | backup-prod, reset-dev (seed rotation) | Pooler host, e.g. `aws-0-eu-west-3.pooler.supabase.com` (Dashboard → Connect) |
-| `DEV_SEED_PASSWORD` | secret, `supabase-dev` only | reset-dev (optional seed rotation) | Private password for Dev seed users |
+| `DEV_SEED_PASSWORD` | secret, `Preview` only | reset-dev (optional seed rotation) | Private password for Dev seed users |
 
 The connection URL is built from ref + pooler host, with the password passed via `PGPASSWORD`.
 
@@ -227,7 +227,7 @@ Supabase Free tier has **no built-in backups**. `backup-prod.yml` runs `pg_dump`
 
 ### Setup (one-time, after creating Supabase project)
 
-1. Make sure `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` and the `SUPABASE_POOLER_HOST` variable are set in the `supabase-prod` environment (see Prod migration setup above). The workflow connects through the transaction pooler (port 6543).
+1. Make sure `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` and the `SUPABASE_POOLER_HOST` variable are set in the `Production` environment (see Prod migration setup above). The workflow connects through the transaction pooler (port 6543).
 2. Confirm the recipient public key is in place: `.github/backup-recipient.txt` should contain a single `age1pq1...` line. The matching private key is in 1Password as "Quick Budget backup key" — without it backups cannot be restored.
 3. The backup runs automatically at 03:00 UTC daily. You can also trigger it manually from **Actions → Backup Prod → Run workflow**.
 
