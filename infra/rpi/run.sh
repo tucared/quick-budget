@@ -8,6 +8,11 @@ proxy=http://10.89.7.2:8888
 
 set -a; . "$here/.env"; set +a
 
+if [[ ! -f $workspace/.env.local ]]; then
+  printf 'NEXT_PUBLIC_SUPABASE_URL=https://%s.supabase.co\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=%s\n' \
+    "$SUPABASE_DEV_REF" "${SUPABASE_DEV_PUBLISHABLE_KEY:?set it in .env}" > "$workspace/.env.local"
+fi
+
 mkdir -p "$state/agent" "$state/npm"
 cp "$here/agent/AGENTS.md" "$here/agent/settings.json" "$state/agent/"
 { cat "$here/allowlist.txt"; printf '^%s\\.supabase\\.co$\n' "$SUPABASE_DEV_REF"; } > "$state/allowlist"
