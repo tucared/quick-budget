@@ -3,11 +3,12 @@ Description=tmux session running the pi sandbox
 After=network-online.target
 
 [Service]
-Type=forking
-ExecStart=/usr/bin/env tmux new-session -d -s pi -n pi "%h/sandbox-src/infra/rpi/run.sh; exec bash"
+# oneshot + has-session: a "pi" session started by hand is adopted instead of
+# failing with "duplicate session" and restart-looping every 5s.
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'tmux has-session -t pi 2>/dev/null || tmux new-session -d -s pi -n pi "%h/sandbox-src/infra/rpi/run.sh; exec bash"'
 ExecStop=/usr/bin/env tmux kill-session -t pi
-Restart=always
-RestartSec=5
 
 [Install]
 WantedBy=default.target

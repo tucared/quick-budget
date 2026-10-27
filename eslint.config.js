@@ -55,6 +55,13 @@ export default [
     },
   },
   {
+    // pi extensions aren't typechecked (pi's types aren't installed here), so catch TDZ bugs in lint.
+    files: ['infra/rpi/agent/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-use-before-define': ['error', { functions: false }],
+    },
+  },
+  {
     files: ['scripts/**/*.{js,mjs,cjs}'],
     languageOptions: {
       globals: {

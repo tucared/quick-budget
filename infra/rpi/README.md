@@ -30,6 +30,8 @@ ssh rpi sandbox-src/infra/rpi/build.sh       # only if a Containerfile changed
 
 Then relaunch pi (`run.sh` below). Reinstall `pi-tmux.service` if it changed (HOST.md §5).
 
+To try a PR before merging: `git -C ~/sandbox-src fetch origin <branch> && git -C ~/sandbox-src checkout FETCH_HEAD`, then `pi-run`; go back with `git -C ~/sandbox-src checkout main`. Only do this for PRs you've read — it runs on the host.
+
 ## Use
 
 - `cmux ssh-tmux rpi` (desktop) or `mosh rpi -- tmux attach -t pi` (phone)
