@@ -33,8 +33,9 @@ Then relaunch pi (`run.sh` below). Reinstall `pi-tmux.service` if it changed (HO
 ## Use
 
 - `cmux ssh-tmux rpi` (desktop) or `mosh rpi -- tmux attach -t pi` (phone)
-- Window 1 runs pi; when it exits you get a host shell — `~/sandbox-src/infra/rpi/run.sh` relaunches
-- Shell in the running container: `podman exec -it pi bash`; standalone shell: `~/sandbox-src/infra/rpi/run.sh shell`
+- Window 1 runs pi; when it exits you get a host shell — `pi-run` relaunches (aliases from HOST.md §5)
+- Shell in the running container: `podman exec -it pi bash`; standalone shell: `pi-run shell`
+- After merging an `infra/rpi` change: `pi-deploy && pi-run` (pulls `~/sandbox-src`, rebuilds, relaunches)
 - Proxy log (denied hosts show up here): `podman logs -f pi-proxy | grep -i filtered`. `pi.dev` (pi's own startup check) is denied on purpose.
 
 ## Dogfooding
