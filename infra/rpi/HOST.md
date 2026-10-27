@@ -111,6 +111,10 @@ git clone https://github.com/tucared/quick-budget ~/github/tucared/quick-budget
 mkdir -p ~/.config/systemd/user
 cp ~/sandbox-src/infra/rpi/pi-tmux.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now pi-tmux.service
+cat >> ~/.bashrc <<'EOF'
+alias pi-run='~/sandbox-src/infra/rpi/run.sh'
+alias pi-deploy='git -C ~/sandbox-src pull --ff-only && ~/sandbox-src/infra/rpi/build.sh'
+EOF
 ```
 
 `.env` needs `OPENROUTER_API_KEY` (key `rpi-pi`, $20 cap), `GH_TOKEN` (fine-grained PAT `rpi-pi-agent`: `quick-budget` only, Contents + Pull requests read/write, nothing else), `SUPABASE_DEV_REF`.
