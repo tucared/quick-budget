@@ -11,18 +11,43 @@ tmux "pi" ── run.sh ── pi container (pi-internal, no route out)
 
 | Host path | Purpose | Visible to pi |
 |---|---|---|
-| `~/sandbox/` | these files + `.env` (secrets) | no |
-| `~/.local/share/pi-sandbox/agent` | pi settings, sessions, global `AGENTS.md` (re-copied on each launch) | yes |
+| `~/github/tucared/quick-budget/infra/rpi/` | these files (run directly from repo) | no |
+| `~/.config/pi-sandbox/.env` | secrets (API keys, tokens) | no |
+| `~/.local/share/pi-sandbox/agent` | pi settings, sessions, extensions, global `AGENTS.md` (re-copied on each launch) | yes |
 | `~/.local/share/pi-sandbox/npm` | npm cache | yes |
 | `~/github/tucared/quick-budget` | pi's clone of the repo | yes |
 
 ## Deploy changes
 
-From the Mac (never `--delete`, it would remove `.env`):
+**One-time setup on pi:**
 
 ```bash
-rsync -av infra/rpi/ rpi:sandbox/
-ssh rpi sandbox/build.sh
+# Create .env with your secrets
+mkdir -p ~/.config/pi-sandbox
+cp ~/github/tucared/quick-budget/infra/rpi/.env.example ~/.config/pi-sandbox/.env
+$EDITOR ~/.config/pi-sandbox/.env  # add your API keys
+```
+
+**To deploy updates:**
+
+```bash
+cd ~/github/tucared/quick-budget
+jj git fetch && jj rebase -d main
+infra/rpi/build.sh                  # only if Containerfile changed
+infra/rpi/run.sh                    # relaunch pi
+```
+
+**From Mac** (if you prefer pushing from there):
+
+```bash
+ssh rpi 'cd ~/github/tucared/quick-budget && jj git fetch && jj rebase -d main && infra/rpi/build.sh'
+```
+
+**Aliases** (optional, add to `~/.bashrc`):
+
+```bash
+alias pi-run='~/github/tucared/quick-budget/infra/rpi/run.sh'
+alias pi-build='~/github/tucared/quick-budget/infra/rpi/build.sh'
 ```
 
 ## Use

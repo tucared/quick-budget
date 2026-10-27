@@ -6,7 +6,21 @@ state="${XDG_DATA_HOME:-$HOME/.local/share}/pi-sandbox"
 workspace="$HOME/github/tucared/quick-budget"
 proxy=http://10.89.7.2:8888
 
-set -a; . "$here/.env"; set +a
+# Load secrets from XDG config dir (not from repo)
+envfile="${XDG_CONFIG_HOME:-$HOME/.config}/pi-sandbox/.env"
+if [[ ! -f $envfile ]]; then
+  # First run: copy .env.example as template
+  if [[ -f $here/.env.example ]]; then
+    mkdir -p "$(dirname "$envfile")"
+    cp "$here/.env.example" "$envfile"
+    echo "Created $envfile from .env.example — edit it with your API keys, then re-run." >&2
+    exit 1
+  else
+    echo "Error: $envfile not found and no .env.example to copy from." >&2
+    exit 1
+  fi
+fi
+set -a; . "$envfile"; set +a
 
 if [[ ! -f $workspace/.env.local ]]; then
   printf 'NEXT_PUBLIC_SUPABASE_URL=https://%s.supabase.co\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=%s\n' \
@@ -15,6 +29,11 @@ fi
 
 mkdir -p "$state/agent" "$state/npm"
 cp "$here/agent/AGENTS.md" "$here/agent/settings.json" "$state/agent/"
+# Copy extensions (if any) — replace wholesale so deleted extensions don't linger
+rm -rf "$state/agent/extensions"
+if [[ -d "$here/agent/extensions" ]]; then
+  cp -r "$here/agent/extensions" "$state/agent/extensions"
+fi
 # The token stays a ${...} reference; pi expands it from the container env.
 cat > "$state/agent/mcp.json" <<JSON
 {
