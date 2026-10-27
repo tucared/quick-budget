@@ -11,15 +11,17 @@ Design and layout: `infra/rpi/README.md`. Full host setup: `infra/rpi/HOST.md`.
 
 - **Ask before every `ssh rpi`**, even read-only. The user runs anything needing `sudo` themselves; give the command and what it does.
 - If you are pi running inside the sandbox, you can't reach the rpi host — propose changes in a PR instead.
-- Never commit secrets or the tailnet name (the repo is public). Secrets live only in `~/sandbox/.env` on the rpi.
-- Deploy with `rsync -av infra/rpi/ rpi:sandbox/` — never `--delete` (it would remove `.env`).
+- Never commit secrets or the tailnet name (the repo is public). Secrets live only in `~/.config/pi-sandbox/.env` on the rpi.
+- The host runs these files from `~/sandbox-src`, a host-only clone that tracks `main`. Never run them from pi's workspace (`~/github/tucared/quick-budget`) — pi can write there.
 
 ## Deploy a change
 
+Merge to `main` first, then:
+
 ```bash
-rsync -av infra/rpi/ rpi:sandbox/
-ssh rpi sandbox/build.sh                                  # only if a Containerfile changed
-ssh rpi 'cp ~/sandbox/pi-tmux.service ~/.config/systemd/user/ && systemctl --user daemon-reload'   # only if the unit changed
+ssh rpi 'git -C ~/sandbox-src pull --ff-only'
+ssh rpi sandbox-src/infra/rpi/build.sh                    # only if a Containerfile changed
+ssh rpi 'cp ~/sandbox-src/infra/rpi/pi-tmux.service ~/.config/systemd/user/ && systemctl --user daemon-reload'   # only if the unit changed
 ```
 Restarting `pi-tmux.service` kills the running pi session — ask first.
 

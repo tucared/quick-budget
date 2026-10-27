@@ -23,6 +23,7 @@ let fetching: Promise<void> | undefined;
 // Cache model reasoning capabilities: modelId -> supported_efforts
 const modelCapabilities = new Map<string, string[] | null>();
 let warnedUnsupported: string | undefined; // track what we've already warned about
+let physicalModel: string | undefined; // responseModel of the latest assistant message
 
 async function fetchModelCapabilities(modelId: string): Promise<string[] | null> {
 	if (modelCapabilities.has(modelId)) {
@@ -30,7 +31,7 @@ async function fetchModelCapabilities(modelId: string): Promise<string[] | null>
 	}
 	try {
 		const res = await fetch("https://openrouter.ai/api/v1/models");
-		if (!res.ok) return null;
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		const body = (await res.json()) as {
 			data?: Array<{ id: string; reasoning?: { supported_efforts?: string[] } }>;
 		};
@@ -43,6 +44,8 @@ async function fetchModelCapabilities(modelId: string): Promise<string[] | null>
 		if (!modelCapabilities.has(modelId)) modelCapabilities.set(modelId, null);
 		return modelCapabilities.get(modelId)!;
 	} catch {
+		// Remember the miss so a failing endpoint isn't refetched after every reply.
+		modelCapabilities.set(modelId, null);
 		return null;
 	}
 }
@@ -94,22 +97,13 @@ function installFooter(ctx: ExtensionContext) {
 				};
 				const ctxStr = fmtTokens(tokens);
 
-				// Find the actual physical model from the latest assistant message
-				let physicalModel: string | undefined;
-				for (const e of ctx.sessionManager.getBranch()) {
-					if (e.type === "message" && e.message.role === "assistant") {
-						const m = e.message as AssistantMessage & { responseModel?: string };
-						if (m.responseModel) physicalModel = m.responseModel;
-					}
-				}
-
 				// Session cost: delta of the key's lifetime usage since session start.
 				// Adaptive precision: sub-cent spends still show up.
 				const sessionCost =
 					keyUsage !== undefined && sessionBaseline !== undefined
 						? Math.max(0, keyUsage - sessionBaseline)
 						: undefined;
-				const fmtCost = (n: number) => `$${n.toFixed(2)}`;
+				const fmtCost = (n: number) => `$${n.toFixed(n > 0 && n < 0.01 ? 3 : 2)}`;
 
 				const remaining =
 					typeof keyLimit === "number" && keyUsage !== undefined ? keyLimit - keyUsage : undefined;
@@ -132,13 +126,13 @@ function installFooter(ctx: ExtensionContext) {
 				let levelStr = "";
 				if (level) {
 					const supported = modelCapabilities.get(displayModel);
-					const isUnsupported = supported && !supported.includes(level);
+					const isUnsupported = !!supported?.length && !supported.includes(level);
 					levelStr = `:${level}${isUnsupported ? "⚠" : ""}`;
 
 					// One-time warning notification
 					if (isUnsupported && warnedUnsupported !== `${displayModel}:${level}`) {
 						warnedUnsupported = `${displayModel}:${level}`;
-						const supportedList = supported.join(", ");
+						const supportedList = supported!.join(", ");
 						ctx.ui.notify(
 							`⚠ "${level}" not supported by ${modelId}. Use: ${supportedList}`,
 							"warning",
@@ -161,6 +155,14 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		if (enabled) installFooter(ctx);
 		sessionBaseline = undefined;
+		// Resumed sessions: pick up the physical model once instead of per render.
+		physicalModel = undefined;
+		for (const e of ctx.sessionManager.getBranch()) {
+			if (e.type === "message" && e.message.role === "assistant") {
+				const m = e.message as AssistantMessage & { responseModel?: string };
+				if (m.responseModel) physicalModel = m.responseModel;
+			}
+		}
 		await fetchKeyBalance();
 
 		// Pre-fetch model capabilities for validation
@@ -186,6 +188,7 @@ export default function (pi: ExtensionAPI) {
 			void fetchKeyBalance();
 			// Fetch capabilities for the physical model that handled this request
 			const m = event.message as AssistantMessage & { responseModel?: string };
+			if (m.responseModel) physicalModel = m.responseModel;
 			if (m.responseModel && !modelCapabilities.has(m.responseModel)) {
 				fetchModelCapabilities(m.responseModel).then(() => requestRender?.());
 			}

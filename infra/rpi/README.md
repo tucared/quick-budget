@@ -11,50 +11,30 @@ tmux "pi" ── run.sh ── pi container (pi-internal, no route out)
 
 | Host path | Purpose | Visible to pi |
 |---|---|---|
-| `~/github/tucared/quick-budget/infra/rpi/` | these files (run directly from repo) | no |
+| `~/sandbox-src/infra/rpi/` | these files, run from a host-only clone that tracks `main` | no |
 | `~/.config/pi-sandbox/.env` | secrets (API keys, tokens) | no |
-| `~/.local/share/pi-sandbox/agent` | pi settings, sessions, extensions, global `AGENTS.md` (re-copied on each launch) | yes |
+| `~/.local/share/pi-sandbox/agent` | pi settings, sessions, global `AGENTS.md`, `extensions/` (re-copied on each launch; `extensions/` is replaced wholesale) | yes |
 | `~/.local/share/pi-sandbox/npm` | npm cache | yes |
 | `~/github/tucared/quick-budget` | pi's clone of the repo | yes |
 
+The host never runs scripts from pi's clone: pi can write to it, so it could rewrite `run.sh` or the allowlist. `~/sandbox-src` is a separate clone (not a worktree — that would share pi's `.git`) that only ever pulls reviewed `main`.
+
 ## Deploy changes
 
-**One-time setup on pi:**
+After the change is merged to `main`:
 
 ```bash
-# Create .env with your secrets
-mkdir -p ~/.config/pi-sandbox
-cp ~/github/tucared/quick-budget/infra/rpi/.env.example ~/.config/pi-sandbox/.env
-$EDITOR ~/.config/pi-sandbox/.env  # add your API keys
+ssh rpi 'git -C ~/sandbox-src pull --ff-only'
+ssh rpi sandbox-src/infra/rpi/build.sh       # only if a Containerfile changed
 ```
 
-**To deploy updates:**
-
-```bash
-cd ~/github/tucared/quick-budget
-jj git fetch && jj rebase -d main
-infra/rpi/build.sh                  # only if Containerfile changed
-infra/rpi/run.sh                    # relaunch pi
-```
-
-**From Mac** (if you prefer pushing from there):
-
-```bash
-ssh rpi 'cd ~/github/tucared/quick-budget && jj git fetch && jj rebase -d main && infra/rpi/build.sh'
-```
-
-**Aliases** (optional, add to `~/.bashrc`):
-
-```bash
-alias pi-run='~/github/tucared/quick-budget/infra/rpi/run.sh'
-alias pi-build='~/github/tucared/quick-budget/infra/rpi/build.sh'
-```
+Then relaunch pi (`run.sh` below). Reinstall `pi-tmux.service` if it changed (HOST.md §5).
 
 ## Use
 
 - `cmux ssh-tmux rpi` (desktop) or `mosh rpi -- tmux attach -t pi` (phone)
-- Window 1 runs pi; when it exits you get a host shell — `~/sandbox/run.sh` relaunches
-- Shell in the running container: `podman exec -it pi bash`; standalone shell: `~/sandbox/run.sh shell`
+- Window 1 runs pi; when it exits you get a host shell — `~/sandbox-src/infra/rpi/run.sh` relaunches
+- Shell in the running container: `podman exec -it pi bash`; standalone shell: `~/sandbox-src/infra/rpi/run.sh shell`
 - Proxy log (denied hosts show up here): `podman logs -f pi-proxy | grep -i filtered`. `pi.dev` (pi's own startup check) is denied on purpose.
 
 ## Dogfooding
