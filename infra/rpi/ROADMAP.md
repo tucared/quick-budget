@@ -31,10 +31,9 @@ Dependabot can't see the `ARG` pins (pi, jj, gh, `NPM_BEFORE`).
 
 ### Nightly deploy from `main`
 
-- A read-only clone on the host, separate from pi's workspace (e.g. `~/sandbox-src`); pi must never be able to write to it
-- A systemd user timer: fetch `main`, `rsync infra/rpi/ ~/sandbox/` (never `--delete`), run `build.sh` if a Containerfile changed, reinstall the unit if `pi-tmux.service` changed
+- A systemd user timer: `git -C ~/sandbox-src pull --ff-only`, run `build.sh` if a Containerfile changed, reinstall the unit if `pi-tmux.service` changed
 - Restart the session only if pi is idle; otherwise leave it for the next run
-- After this, `main` is the source of truth and rsync from the Mac is only for testing unmerged changes
+- Until then, `git -C ~/sandbox-src pull` is a manual step after each merge
 
 ## Later
 

@@ -12,7 +12,7 @@ if [[ ! -f $envfile ]]; then
   # First run: copy .env.example as template
   if [[ -f $here/.env.example ]]; then
     mkdir -p "$(dirname "$envfile")"
-    cp "$here/.env.example" "$envfile"
+    install -m 600 "$here/.env.example" "$envfile"
     echo "Created $envfile from .env.example — edit it with your API keys, then re-run." >&2
     exit 1
   else

@@ -71,23 +71,24 @@ No grant has `tag:rpi` as source, so the rpi can't reach your other devices.
 
 ## 4. Host config files
 
-Copy the sandbox from the Mac first (`rsync -av infra/rpi/ rpi:sandbox/`), then:
+Clone the host-only copy of the repo first (pi never sees it; see README), then:
 
 ```bash
+git clone https://github.com/tucared/quick-budget ~/sandbox-src
 # Firewall. The timer rolls it back in 2 min unless you cancel it, so a bad rule can't lock you out.
-sudo nft -c -f ~/sandbox/host/nftables.conf
+sudo nft -c -f ~/sandbox-src/infra/rpi/host/nftables.conf
 sudo systemd-run --unit=nft-rollback --on-active=120 /usr/sbin/nft delete table inet filter
-sudo install -m 644 ~/sandbox/host/nftables.conf /etc/nftables.conf
+sudo install -m 644 ~/sandbox-src/infra/rpi/host/nftables.conf /etc/nftables.conf
 sudo systemctl enable --now nftables && sudo systemctl reload nftables
 # Still connected? Open a second session to be sure, then:
 sudo systemctl stop nft-rollback.timer
 
 # Pi-hole survives out-of-memory
-sudo install -D -m 644 ~/sandbox/host/pihole-FTL-oom.conf /etc/systemd/system/pihole-FTL.service.d/oom.conf
+sudo install -D -m 644 ~/sandbox-src/infra/rpi/host/pihole-FTL-oom.conf /etc/systemd/system/pihole-FTL.service.d/oom.conf
 sudo systemctl daemon-reload && sudo systemctl restart pihole-FTL
 
 # Automatic security updates, plus Tailscale and Raspberry Pi packages
-sudo install -m 644 ~/sandbox/host/52unattended-upgrades-local /etc/apt/apt.conf.d/
+sudo install -m 644 ~/sandbox-src/infra/rpi/host/52unattended-upgrades-local /etc/apt/apt.conf.d/
 echo 'unattended-upgrades unattended-upgrades/enable_auto_updates boolean true' | sudo debconf-set-selections
 sudo dpkg-reconfigure -f noninteractive unattended-upgrades
 ```
@@ -102,12 +103,13 @@ sudo unattended-upgrade --dry-run 2>&1 | grep -i 'allowed origins'
 ## 5. Sandbox
 
 ```bash
-cp ~/sandbox/.env.example ~/sandbox/.env && chmod 600 ~/sandbox/.env && nano ~/sandbox/.env
+mkdir -p ~/.config/pi-sandbox
+install -m 600 ~/sandbox-src/infra/rpi/.env.example ~/.config/pi-sandbox/.env && nano ~/.config/pi-sandbox/.env
 git clone https://github.com/tucared/quick-budget ~/github/tucared/quick-budget
-~/sandbox/build.sh
-~/sandbox/run.sh shell      # inside: jj git init --colocate && jj bookmark track main@origin && exit
+~/sandbox-src/infra/rpi/build.sh
+~/sandbox-src/infra/rpi/run.sh shell      # inside: jj git init --colocate && jj bookmark track main@origin && exit
 mkdir -p ~/.config/systemd/user
-cp ~/sandbox/pi-tmux.service ~/.config/systemd/user/
+cp ~/sandbox-src/infra/rpi/pi-tmux.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now pi-tmux.service
 ```
 
@@ -131,5 +133,5 @@ Phone: Tailscale app + Termux (F-Droid) with `pkg install openssh mosh`, `~/.ssh
 ```bash
 sudo apt-get update && sudo apt-get full-upgrade   # reboot if the kernel changed
 pihole -up
-~/sandbox/build.sh --pull && systemctl --user restart pi-tmux.service
+git -C ~/sandbox-src pull --ff-only && ~/sandbox-src/infra/rpi/build.sh --pull && systemctl --user restart pi-tmux.service
 ```
