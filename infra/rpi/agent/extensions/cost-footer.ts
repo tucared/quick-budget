@@ -166,9 +166,9 @@ export default function (pi: ExtensionAPI) {
 		await fetchKeyBalance();
 
 		// Pre-fetch model capabilities for validation
-		const physicalModel = ctx.model?.id;
-		if (physicalModel) {
-			fetchModelCapabilities(physicalModel).then(() => requestRender?.());
+		const startModel = ctx.model?.id;
+		if (startModel) {
+			fetchModelCapabilities(startModel).then(() => requestRender?.());
 		}
 
 		// Safety-net refresh every 5 minutes (timers belong to the session, not the factory)
