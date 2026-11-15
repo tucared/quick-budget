@@ -122,6 +122,7 @@ Functionalist visual direction inspired by Dieter Rams and Braun industrial desi
 ## Documentation
 
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Production deployment guide
+- **[GLOSSARY.md](./GLOSSARY.md)** — Domain vocabulary
 - **[DATA_MODEL.md](./DATA_MODEL.md)** — Database schema and design decisions
 - **[PROGRESS.md](./PROGRESS.md)** — Feature roadmap
 - **[docs/agents/](./docs/agents/)** — Agent skill config (issue tracker, triage labels, domain docs)
