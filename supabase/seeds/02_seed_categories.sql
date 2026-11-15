@@ -36,7 +36,7 @@ BEGIN
     (shared_household_id, 'User One Allowance', '🧑‍🎨', TRUE, TRUE),
     (shared_household_id, 'User Two Allowance', '🧑‍💼', TRUE, TRUE);
 
-  -- Illustrative caps for JTBD #8. The expense form surfaces an inline toggle
+  -- Illustrative caps. The expense form surfaces an inline toggle
   -- when a logged amount exceeds these. Caps are EUR-denominated.
   -- (A constraint-absence guard used to wrap these while the legacy
   -- both-or-neither CHECK was still in the migration chain; that constraint

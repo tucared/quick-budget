@@ -33,7 +33,7 @@ export interface ExpenseWithDetails extends Expense {
   category?: Category
 }
 
-// Two sibling expense rows linked by a shared split_group_id (see JTBD #8).
+// Two sibling expense rows linked by a shared split_group_id (see GLOSSARY.md: split expense).
 // The list view collapses each pair into a single visual card.
 export interface SplitGroup {
   splitGroupId: string
