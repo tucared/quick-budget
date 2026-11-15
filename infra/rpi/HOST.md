@@ -117,7 +117,7 @@ alias pi-deploy='git -C ~/sandbox-src pull --ff-only && ~/sandbox-src/infra/rpi/
 EOF
 ```
 
-`.env` needs `OPENROUTER_API_KEY` (key `rpi-pi`, $20 cap), `GH_TOKEN` (fine-grained PAT `rpi-pi-agent`: `quick-budget` only, Contents + Pull requests read/write, nothing else), `SUPABASE_DEV_REF`.
+`.env` needs `OPENROUTER_API_KEY` (key `rpi-pi`, $20 cap), `GH_TOKEN` (fine-grained PAT `rpi-pi-agent`: `quick-budget` only, Contents + Pull requests + Issues read/write, nothing else), `SUPABASE_DEV_REF`.
 
 ## 6. Clients
 
