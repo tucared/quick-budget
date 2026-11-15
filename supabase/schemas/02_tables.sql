@@ -12,6 +12,10 @@ CREATE TABLE households (
   -- conversion to base_currency is derived as a cross-rate
   -- (rate_to_eur(input) / rate_to_eur(base_currency)). Defaults to EUR so the
   -- original household is unchanged and no expense backfill is needed.
+  -- Effectively SET-ONCE: changing it after the household has data leaves every
+  -- existing converted_amount/converted_currency (and Tricount ledger amount)
+  -- in the old currency with no automatic backfill, silently mixing currencies.
+  -- There is no in-app UI to change it; adding one needs a one-off re-conversion.
   base_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (base_currency ~ '^[A-Z]{3}$'),
   -- The secondary (foreign) currency offered alongside base_currency in the
   -- expense form's currency toggle. Must differ from base_currency — they are
@@ -197,7 +201,7 @@ CREATE TABLE categories (
   -- row's title, so the icon must always be present.
   icon TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  -- Optional cap configuration (JTBD #8). When set, expenses logged against
+  -- Optional cap configuration. When set, expenses logged against
   -- this category in amounts exceeding `cap_amount` (in the household's base
   -- currency) surface an inline toggle in the expense form: ON splits into two
   -- sibling rows (cap → this category, overflow → an allowance the user picks
@@ -229,7 +233,7 @@ REVOKE SELECT ON public.categories FROM anon;
 -- ============================================================================
 CREATE TABLE expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- Audit trail of who entered the row (DATA_MODEL.md decision #1) — it never
+  -- Audit trail of who entered the row — it never
   -- restricts visibility, so it must never destroy data either: SET NULL on
   -- user deletion preserves the household's shared expense history (a CASCADE
   -- here would silently erase every expense the departing partner logged).
@@ -248,7 +252,7 @@ CREATE TABLE expenses (
   exchange_rate DECIMAL(12, 6) NOT NULL DEFAULT 1.0 CHECK (exchange_rate > 0),
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
   description TEXT,
-  -- App-managed correlation id for the cap-with-overflow split flow (JTBD #8):
+  -- App-managed correlation id for the cap-with-overflow split flow:
   -- a single user-facing purchase is stored as two sibling rows sharing this id,
   -- one in the capped primary category and one in the overflow category. NULL
   -- means a normal single-row expense. Not an FK — the value is minted
@@ -439,6 +443,12 @@ REVOKE SELECT ON public.tricount_links FROM anon;
 -- changed (via `content_hash`), and removed entries across all months instead
 -- of re-importing duplicates. `expense_id` cascades, so deleting a synced
 -- expense in Quick Budget drops its mapping and the next sync re-creates it.
+-- "Read-only" synced expenses is a UI rule, not a DB rule: the sync runs in the
+-- caller's session, so RLS cannot tell it from a user write. An out-of-band edit
+-- of a mirrored row is NOT auto-reverted, because `content_hash` covers only
+-- Tricount-derived fields and the sync never reads the expense row back.
+-- BALANCE (settlement) entries are skipped entirely, so accrued balances can
+-- differ from Tricount's own post-settlement figure.
 --
 -- This table doubles as the owe/owed reconciliation ledger. A row exists for
 -- every *reconcilable* entry — ACTIVE NORMAL expenses AND ACTIVE INCOME — so the

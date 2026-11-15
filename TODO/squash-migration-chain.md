@@ -146,7 +146,7 @@ grep -rn '20260[0-9]\{8,\}_' --include='*.md' --include='*.sql' \
 
 Known sites:
 
-- `DATA_MODEL.md` sections 6, 7, 8 reference specific migration filenames (`20260513235951_decouple_realtime_from_declarative_schemas.sql`, `20260514120000_add_household_id_to_jwt_claims.sql`, `20260514025710_drop_pg_graphql_extension.sql`). Replace with "the squashed baseline `<merge-day-ts>_baseline.sql`" plus the section anchor.
+- `supabase/schemas/` comments reference specific migration filenames (`20260513235951_decouple_realtime_from_declarative_schemas.sql`, `20260514120000_add_household_id_to_jwt_claims.sql`, `20260514025710_drop_pg_graphql_extension.sql`). Replace with "the squashed baseline `<merge-day-ts>_baseline.sql`" plus the section anchor.
 - `supabase/schemas/README.md` lines 46-50 list 5 hand-authored migrations under "Where this PR's hand-authored migrations live". Replace with one-line baseline reference + note that future hand-authored work follows the existing rules.
 - `.agents/skills/supabase-schema-flow/SKILL.md` lines 36, 52, 68, 75 reference specific filenames. Update similarly.
 - `DEPLOYMENT.md` already documents the original bootstrap baseline. Add a note that the chain was re-squashed on `<date>`.
