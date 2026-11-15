@@ -10,6 +10,7 @@ Scope: running discretionary spending only. Rent, subscriptions, and other fixed
 - Mid-month rebalancing — move money between categories when priorities shift
 - Personal allowances tracked separately from shared spending
 - Connect a Tricount and sync your household's share of shared expenses (read-only)
+- Month-end cash out (shared categories and each allowance) to feed the household's financial journal
 
 ## Background
 
@@ -123,8 +124,6 @@ Functionalist visual direction inspired by Dieter Rams and Braun industrial desi
 
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Production deployment guide
 - **[GLOSSARY.md](./GLOSSARY.md)** — Domain vocabulary
-- **[DATA_MODEL.md](./DATA_MODEL.md)** — Database schema and design decisions
-- **[PROGRESS.md](./PROGRESS.md)** — Feature roadmap
 - **[docs/agents/](./docs/agents/)** — Agent skill config (issue tracker, triage labels, domain docs)
 - **[infra/rpi/README.md](./infra/rpi/README.md)** — pi coding agent sandbox on a Raspberry Pi
 
