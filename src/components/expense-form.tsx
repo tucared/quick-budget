@@ -65,7 +65,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
   // Cents-first input state (POS-style: digits fill from the right)
   const [centsRaw, setCentsRaw] = useState(0)
 
-  // Cap-with-overflow toggle (JTBD #8). The cap amount comes from the selected
+  // Cap-with-overflow toggle. The cap amount comes from the selected
   // category's `cap_amount`; this boolean is just "apply the cap or not".
   // Defaults ON; re-arms to ON whenever the category changes (see the
   // render-time reset below) so a stale OFF state from a different category
@@ -167,12 +167,12 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
     [allowanceCategories, effectiveOverflowCategoryId],
   )
 
-  // The cap is controlled by tapping the category tile itself (JTBD #8): when
+  // The cap is controlled by tapping the category tile itself: when
   // the selected category is capped and the amount exceeds the cap, re-tapping
   // the tile cycles overflow → allowance 1 → … → allowance N → no cap → repeat.
   // Show the cap control when the selected category is capped, the amount
   // exceeds the cap, and the household has at least one allowance to overflow
-  // into (JTBD #8).
+  // into.
   const showCapControl =
     capDerivation.exceedsCap && !selectedCategoryIsAllowance && allowanceCategories.length > 0
 
@@ -667,7 +667,7 @@ export function ExpenseForm({ onExpenseSaved, initialCategories, initialTopCateg
               <>
                 {/* Category bar. When the amount exceeds the cap, an inline
                     "Cap" checkbox (styled like the Cash checkbox) toggles the
-                    split (JTBD #8); the (€) fraction shows the capped slice. */}
+                    split; the (€) fraction shows the capped slice. */}
                 <CategoryBudgetCard
                   budget={categoryBudget}
                   compact

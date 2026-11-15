@@ -10,7 +10,7 @@ export function round2(value: number): number {
   return +value.toFixed(2)
 }
 
-// Cap-with-overflow derivation (JTBD #8). Given the selected category's cap
+// Cap-with-overflow derivation. Given the selected category's cap
 // configuration and the entered amount + exchange rate, returns whether the
 // expense exceeds the configured cap and — if so — the exact original- and
 // base-currency amounts that should be written to the primary (capped) and
