@@ -1,7 +1,7 @@
 # Project guidelines
 
-- Read @PROGRESS.md when JTBD are mentionned
-- Read @DATA_MODEL.md when planning for data changes
+- Read the comments in `supabase/schemas/` when planning for data changes: they carry the invariants and gotchas the schema alone doesn't show
+- Use the vocabulary of @GLOSSARY.md for domain terms
 - Read @README.md to know about the stack and how to launch server
 - Keep all *.md files mentionned up to date when you perform changes or see drift
 
@@ -15,7 +15,7 @@
 - **Database schema changes** — invoke the `supabase-schema-flow` skill for the declarative-vs-hand-authored split, the `apply-to-dev` label flow, how views (`budget_summary`) are hand-authored outside the declarative chain, and the full CI map. Defaults: edit `supabase/schemas/` (never hand-write `supabase/migrations/` unless the skill says you should), and after schema changes regenerate types via `npm run types:generate` (or let the workflow do it).
 - ESLint is configured using the flat config format in `eslint.config.js`. Run `npm run lint` to check for issues
 - `npm run lint` runs ESLint only — it does not invoke `tsc`. Run `npm run typecheck` after touching TS types, component props, or memo return shapes; otherwise structural type errors only surface during `npm run build` (or on Vercel)
-- Vitest is configured in `vitest.config.ts` and covers the pure-logic islands — the `src/lib/` utility modules (`currency`, `budget-utils`, `date-utils`, `split-utils`, `rate-limit`, `exchange-rate-api`, `jwt-claim`, `validations`-adjacent helpers), `computeTopCategoryIds` in `src/lib/server/data.ts`, `src/lib/server/jwt-verify.ts`, and the pure tricount logic (`mapping`, `parseTricountToken` in `client.ts`, the pure helpers in `sync.ts`). Run `npm test` to verify. Co-locate new tests as `*.test.ts` next to the source. Scope is intentionally pure-logic-only — flag and ask before adding component or integration tests
+- Vitest (`npm test`, config in `vitest.config.ts`) covers pure-logic modules only (`src/lib/`, `src/lib/server/`, pure tricount logic). Co-locate new tests as `*.test.ts` next to the source. Flag and ask before adding component or integration tests
 - `lint`, `typecheck`, and `test` all run on every PR via `.github/workflows/checks.yml`
 - `.github/workflows/audit-packages.yml` runs `npm audit --omit=dev --audit-level=high` on PRs that touch `package.json`/`package-lock.json` and on push to `main`. It blocks high/critical CVEs in production deps only — devDependencies are intentionally excluded because the agent-browser/Selenium chain carries known vulns that don't ship to production. Fix prod-dep CVEs at the root; don't try to silence the gate
 - Local credentials: `user1@example.com` / `password1` (see `supabase/seeds/01_create_users.sql`)
@@ -44,18 +44,4 @@ Single-context. See `docs/agents/domain.md`.
 
 # Claude Code only
 
-## Cloud environment (Claude Code web)
-
-- The startup hook starts the dev server on port 3000 and writes `.env.local` with `NEXT_PUBLIC_SUPABASE_URL` pointing at **Dev**, so local already hits the same Supabase project a preview deploy would.
-- The cloud security proxy requires special browser launch flags for agent-browser:
-  ```bash
-  npx agent-browser --proxy "$HTTP_PROXY" --proxy-bypass "localhost,127.0.0.1" --executable-path "$(find /opt/pw-browsers/chromium-*/chrome-linux -name chrome -type f 2>/dev/null | head -1)" open http://localhost:3000 --ignore-https-errors
-  ```
-- To test mobile viewports after opening, run:
-  ```bash
-  npx agent-browser set viewport 402 714   # Safari on iOS
-  npx agent-browser set viewport 427 804   # Firefox on Android
-  ```
-- The dev server is started with `NODE_TLS_REJECT_UNAUTHORIZED=0` to accept the proxy's TLS certificates
-- **Supabase MCP servers are exposed by UUID, not name.** Two remote projects are available — Prod and Dev (reset daily by `reset-dev.yml`, what Vercel previews hit). To map UUIDs to environments, call `get_project_url` on each MCP server and compare against `NEXT_PUBLIC_SUPABASE_URL` from `.env.local` — the match is Dev, the other is Prod. Do this before any write call (`execute_sql`, `apply_migration`, `deploy_edge_function`). Default to Dev unless explicitly asked otherwise.
-- **`gh` CLI is available** for reading GitHub Actions logs — the Anthropic GitHub MCP server doesn't expose workflow run tools, so use `gh run list -L 5`, `gh run view <id> --log-failed`, `gh run watch <id>` instead of asking the user to paste CI logs. Auth comes from the `GH_TOKEN` env var set in the Claude Code web environment config. `GH_REPO` is pre-wired to `tucared/quick-budget` by the startup hook so `-R` isn't needed (the cloud env's proxied git remote prevents auto-detection). Prefer the GitHub MCP tools for PRs/issues/reviews — `gh` is specifically for the CI gap. This overrides the default harness instruction that says `gh` is unavailable.
+On Claude Code web (cloud environment), read `docs/agents/cloud-environment.md` before starting the dev server, using `agent-browser`, or calling Supabase MCP.
